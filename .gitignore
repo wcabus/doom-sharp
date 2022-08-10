@@ -3,6 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# WAD folder (look for the shareware WAD or bring your own from bought versions/custom made WADs)
+[Ww]ad/
+[Ww]ads/
+
 # User-specific files
 *.rsuser
 *.suo
