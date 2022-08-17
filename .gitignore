@@ -352,3 +352,5 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+src/DoomSharp.Console/Properties/launchSettings.json

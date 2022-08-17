@@ -1,22 +1,31 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30114.105
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoomSharp.Console", "DoomSharp.Console\DoomSharp.Console.csproj", "{D8C12615-18AF-4870-A647-10C3C133E3C6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Console", "DoomSharp.Console\DoomSharp.Console.csproj", "{D8C12615-18AF-4870-A647-10C3C133E3C6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoomSharp.Core", "DoomSharp.Core\DoomSharp.Core.csproj", "{24B4556C-2C14-4356-AF07-7E396546A008}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D8C12615-18AF-4870-A647-10C3C133E3C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D8C12615-18AF-4870-A647-10C3C133E3C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D8C12615-18AF-4870-A647-10C3C133E3C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D8C12615-18AF-4870-A647-10C3C133E3C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24B4556C-2C14-4356-AF07-7E396546A008}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24B4556C-2C14-4356-AF07-7E396546A008}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24B4556C-2C14-4356-AF07-7E396546A008}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24B4556C-2C14-4356-AF07-7E396546A008}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B84D3873-73DD-4361-B0DD-9339259760F8}
 	EndGlobalSection
 EndGlobal
