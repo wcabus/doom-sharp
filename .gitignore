@@ -354,3 +354,5 @@ MigrationBackup/
 .ionide/
 
 src/DoomSharp.Console/Properties/launchSettings.json
+
+src/DoomSharp.Windows/Properties/launchSettings.json
