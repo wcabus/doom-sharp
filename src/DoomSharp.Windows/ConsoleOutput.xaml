@@ -1,0 +1,24 @@
+﻿<Window x:Class="DoomSharp.Windows.ConsoleOutput"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DoomSharp.Windows"
+        xmlns:vm="clr-namespace:DoomSharp.Windows.ViewModels"
+        mc:Ignorable="d"
+        Height="450" 
+        Width="800"
+        Title="{Binding Path=Title}"
+        DataContext="{Binding Path=ConsoleViewModel, Source={StaticResource ViewModelLocator}}">
+    <DockPanel>
+        <TextBox IsReadOnly="True" 
+                 VerticalScrollBarVisibility="Auto" 
+                 FontFamily="Consolas" 
+                 IsUndoEnabled="False"
+                 TextWrapping="WrapWithOverflow" 
+                 AcceptsReturn="True"
+                 Background="Black"
+                 Foreground="Silver"
+                 Text="{Binding Path=ConsoleOutput}"/>
+    </DockPanel>
+</Window>

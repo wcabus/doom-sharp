@@ -6,10 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Folder Include="Graphics\" />
-    <Folder Include="Extensions\" />
-    <Folder Include="UI\" />
-  </ItemGroup>
-
 </Project>

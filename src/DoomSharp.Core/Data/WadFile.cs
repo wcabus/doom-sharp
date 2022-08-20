@@ -31,8 +31,8 @@ public class WadFile : IDisposable
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 8)]
         public string Name;
     }
-    
-    public static async Task<WadFile?> LoadFromFileAsync(string file)
+
+    public static WadFile? LoadFromFile(string file)
     {
         var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
         var br = new BinaryReader(fs, Encoding.ASCII, false);
@@ -69,13 +69,13 @@ public class WadFile : IDisposable
             }
         }
 
-        var fileInfo = new List<FileLump>(wadFile.LumpCount);
+        var fileInfo = new List<WadLump>(wadFile.LumpCount);
 
         reader.BaseStream.Seek(wadFile.Header.InfoTableOfs, SeekOrigin.Begin);
         for (var i = 0; i < wadFile.LumpCount; i++)
         {
             var lump = reader.ReadStruct<FileLump>();
-            fileInfo.Add(lump);
+            fileInfo.Add(new WadLump(wadFile, lump));
         }
 
         wadFile.Lumps = fileInfo;
@@ -91,11 +91,17 @@ public class WadFile : IDisposable
     }
 
     public WadInfo Header { get; private init; }
-    public ICollection<FileLump> Lumps { get; private set; } = Array.Empty<FileLump>();
+    public ICollection<WadLump> Lumps { get; private set; } = Array.Empty<WadLump>();
     public int LumpCount => Header.NumLumps;
 
     public void Dispose()
     {
         _reader.Dispose();
+    }
+
+    public void ReadLumpData(WadLump destination)
+    {
+        _reader.BaseStream.Seek(destination.Lump.FilePos, SeekOrigin.Begin);
+        destination.Data = _reader.ReadBytes(destination.Lump.Size);
     }
 }

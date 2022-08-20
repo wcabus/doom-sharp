@@ -2,6 +2,7 @@
 using DoomSharp.Core;
 
 DoomGame.SetConsole(new WinConsole());
+DoomGame.SetOutputRenderer(new BitmapGraphics());
 
 try
 {

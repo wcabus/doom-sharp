@@ -1,0 +1,14 @@
+﻿<Window x:Class="DoomSharp.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DoomSharp.Windows"
+        mc:Ignorable="d"
+        Title="{Binding Path=Title}"
+        Height="400" Width="640"
+        DataContext="{Binding Path=MainViewModel, Source={StaticResource ViewModelLocator}}">
+    <DockPanel Background="Black">
+        <Image Source="{Binding Output}" x:Name="RenderTarget" />
+    </DockPanel>
+</Window>

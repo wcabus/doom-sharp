@@ -1,7 +1,9 @@
 ﻿namespace DoomSharp.Core.Data;
 
-public class WadFileCollection : List<WadFile>, IDisposable
+public class WadFileCollection : List<WadLump>, IDisposable
 {
+    private readonly List<WadFile> _wadFiles = new();
+
     /// <summary>
     /// Pass a null terminated list of files to use.
     /// All files are optional, but at least one file
@@ -15,16 +17,17 @@ public class WadFileCollection : List<WadFile>, IDisposable
     ///  does override all earlier ones.
     /// </summary>
     /// <param name="files"></param>
-    public static async Task<WadFileCollection> InitializeMultipleFilesAsync(IEnumerable<string> files)
+    public static WadFileCollection InitializeMultipleFiles(IEnumerable<string> files)
     {
         var collection = new WadFileCollection();
 
         foreach (var file in files)
         {
-            var wadFile = await WadFile.LoadFromFileAsync(file);
+            var wadFile = WadFile.LoadFromFile(file);
             if (wadFile != null)
             {
-                collection.Add(wadFile);
+                collection._wadFiles.Add(wadFile);
+                collection.AddRange(wadFile.Lumps);
             }
         }
 
@@ -36,11 +39,79 @@ public class WadFileCollection : List<WadFile>, IDisposable
         return collection;
     }
 
-    public int LumpCount => Count == 0 ? 0 : this.Sum(x => x.LumpCount);
+    public byte[] GetLumpName(string name, PurgeTag tag)
+    {
+        return GetLumpNum(GetNumForName(name), tag);
+    }
+
+    public byte[] GetLumpNum(int lump, PurgeTag tag)
+    {
+        if (lump >= LumpCount)
+        {
+            DoomGame.Error($"W_CacheLumpNum: {lump} >= numlumps");
+        }
+
+        if (this[lump].Data == null)
+        {
+            // read the lump in
+            ReadLump(lump, this[lump], tag);
+        }
+        else
+        {
+            ChangeTag(this[lump], tag);
+        }
+
+        return this[lump].Data!;
+    }
+
+    private int GetNumForName(string name)
+    {
+        var num = CheckNumForName(name);
+        if (num == -1)
+        {
+            DoomGame.Error($"W_GetNumForName: {name} not found!");
+        }
+
+        return num;
+    }
+
+    private int CheckNumForName(string name)
+    {
+        // scan backwards so patch lump files take precedence
+        var i = LumpCount;
+        while (i-- > 0)
+        {
+            if (string.Equals(this[i].Lump.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        
+        // TFB. Not found.
+        return -1;
+    }
+
+    private void ReadLump(int lump, WadLump destination, PurgeTag tag)
+    {
+        if (lump < 0 || lump >= LumpCount)
+        {
+            DoomGame.Error($"W_ReadLump: {lump} >= numlumps (or < 0)");
+        }
+
+        destination.File.ReadLumpData(destination);
+        destination.Tag = tag;
+    }
+
+    private void ChangeTag(WadLump lump, PurgeTag tag)
+    {
+        lump.Tag = tag;
+    }
+
+    public int LumpCount => Count;
 
     public void Dispose()
     {
-        foreach (var item in this)
+        foreach (var item in _wadFiles)
         {
             item.Dispose();
         }

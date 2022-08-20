@@ -2,72 +2,49 @@
 
 public class Menu
 {
-    public Menu()
+    public Menu(int numItems, Menu? previousMenu, IList<MenuItem> items, Action drawRoutine, int x, int y, int lastOn)
     {
-        /*
-         https://github.com/id-Software/DOOM/blob/master/linuxdoom-1.10/m_menu.c
-        currentMenu = &MainDef;
-        itemOn = currentMenu->lastOn;
-        whichSkull = 0;
-        skullAnimCounter = 10;
-        screenSize = screenblocks - 3;
-        messageToPrint = 0;
-        messageString = NULL;
-        messageLastMenuActive = menuactive;
-        quickSaveSlot = -1;
-
-        // Here we could catch other version dependencies,
-        //  like HELP1/2, and four episodes.
-
-      
-        switch ( gamemode )
-        {
-              case commercial:
-	        // This is used because DOOM 2 had only one HELP
-                //  page. I use CREDIT as second page now, but
-	        //  kept this hack for educational purposes.
-	        MainMenu[readthis] = MainMenu[quitdoom];
-	        MainDef.numitems--;
-	        MainDef.y += 8;
-	        NewDef.prevMenu = &MainDef;
-	        ReadDef1.routine = M_DrawReadThis1;
-	        ReadDef1.x = 330;
-	        ReadDef1.y = 165;
-	        ReadMenu1[0].routine = M_FinishReadThis;
-	        break;
-              case shareware:
-	        // Episode 2 and 3 are handled,
-	        //  branching to an ad screen.
-              case registered:
-	        // We need to remove the fourth episode.
-	        EpiDef.numitems--;
-	        break;
-              case retail:
-	        // We are fine.
-              default:
-	        break;
-        }
-         
-         */
-
-        switch (DoomGame.Instance.GameMode)
-        {
-            case GameMode.Commercial:
-                break;
-
-            case GameMode.Shareware:
-                break;
-
-            case GameMode.Registered:
-                break;
-
-            case GameMode.Retail:
-                break;
-
-            default:
-                break;
-        }
+        NumItems = numItems;
+        PreviousMenu = previousMenu;
+        Items = items;
+        DrawRoutine = drawRoutine;
+        X = x;
+        Y = y;
+        LastOn = lastOn;
     }
 
-    public bool IsActive { get; private set; } = false;
+    public int NumItems { get; set; }
+    public Menu? PreviousMenu { get; set; }
+    public IList<MenuItem> Items { get; set; }
+    public Action DrawRoutine { get; set; }
+    
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int LastOn { get; set; }
+}
+
+
+public class MenuItem
+{
+    public MenuItem(MenuItemStatus status, string name, Action<int>? choiceRoutine = null, char? hotKey = null)
+    {
+        Status = status;
+        Name = name;
+        ChoiceRoutine = choiceRoutine;
+        HotKey = hotKey;
+    }
+
+    public MenuItemStatus Status { get; set; }
+    public string Name { get; set; }
+    public Action<int>? ChoiceRoutine { get; set; }
+    public char? HotKey { get; set; }
+}
+
+
+public enum MenuItemStatus
+{
+    Empty = -1,
+    NoCursorHere = 0,
+    Ok = 1,
+    ArrowsOk = 2
 }
