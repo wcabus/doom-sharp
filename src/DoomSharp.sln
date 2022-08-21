@@ -5,7 +5,12 @@ VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Core", "DoomSharp.Core\DoomSharp.Core.csproj", "{24B4556C-2C14-4356-AF07-7E396546A008}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoomSharp.Windows", "DoomSharp.Windows\DoomSharp.Windows.csproj", "{12AD853C-AA4E-4C39-BBC2-4ACCDEE147C7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Windows", "DoomSharp.Windows\DoomSharp.Windows.csproj", "{12AD853C-AA4E-4C39-BBC2-4ACCDEE147C7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{59C39BE7-05AF-4BE7-8A3B-6077BD17E405}"
+	ProjectSection(SolutionItems) = preProject
+		..\README.md = ..\README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -32,6 +32,7 @@ This should give you a file called `launchSettings.json` which looks like this:
 ## Progress
 Loading the original WAD files should work, although I've only tested the shareware WAD for now. When running, the game loop starts and switches between the title screen, credits and help screen (depending on the game version/WAD files).
 
-The menu system has also already been implemented but because input handling is not yet there, you can't access it while running the game. You can however trigger it to render while debugging.
+The menu system has also already been implemented, you can access it while running the game by pressing the ESC key. Not all options have been implemented yet, they may change visually but not yet trigger actual actions.
+Starting a new game currently crashes.
 
 Next step is to implement playing back demo's so that the startup experience is complete.
