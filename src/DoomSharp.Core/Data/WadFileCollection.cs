@@ -64,12 +64,12 @@ public class WadFileCollection : List<WadLump>, IDisposable
         return this[lump].Data!;
     }
 
-    private int GetNumForName(string name)
+    public int GetNumForName(string name)
     {
         var num = CheckNumForName(name);
         if (num == -1)
         {
-            DoomGame.Error($"W_GetNumForName: {name} not found!");
+            DoomGame.Console.WriteLine($"W_GetNumForName: {name} not found!");
         }
 
         return num;

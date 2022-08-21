@@ -6,7 +6,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DoomSharp.Core;
 using DoomSharp.Core.Graphics;
+using DoomSharp.Core.Input;
 using DoomSharp.Windows.Annotations;
+using Microsoft.VisualBasic;
+using Constants = DoomSharp.Core.Constants;
 
 namespace DoomSharp.Windows.ViewModels;
 
@@ -28,6 +31,7 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     private readonly Int32Rect _rectangle = new(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
     private readonly int _stride;
     private readonly byte[] _screenBuffer;
+    private readonly Queue<InputEvent> _events = new();
 
     public string Title
     {
@@ -118,6 +122,14 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     public void StartTic()
     {
+        while (_events.TryDequeue(out var ev)) // has events
+        {
+            DoomGame.Instance.PostEvent(ev);
+        }
+    }
 
+    public void AddEvent(InputEvent ev)
+    {
+        _events.Enqueue(ev);
     }
 }

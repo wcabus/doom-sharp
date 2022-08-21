@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using DoomSharp.Core.Data;
+using DoomSharp.Core.Input;
 
 namespace DoomSharp.Core.UI;
 
@@ -321,6 +322,398 @@ public class MenuController
             _whichSkull ^= 1;
             _skullAnimationCounter = 8;
         }
+    }
+
+    private int _joyWait = 0;
+    private int _mouseWait = 0;
+    private int _mouseX = 0;
+    private int _mouseY = 0;
+    private int _lastX = 0;
+    private int _lastY = 0;
+
+    public bool HandleEvent(InputEvent ev)
+    {
+        var ch = -1;
+
+        if (ev.Type == EventType.Joystick && _joyWait < DoomGame.Instance.GetTime())
+        {
+            if (ev.Data3 == -1)
+            {
+                ch = (int)Keys.UpArrow;
+                _joyWait = DoomGame.Instance.GetTime() + 5;
+            }
+            else if (ev.Data3 == 1)
+            {
+                ch = (int)Keys.DownArrow;
+                _joyWait = DoomGame.Instance.GetTime() + 5;
+            }
+
+            if (ev.Data2 == -1)
+            {
+                ch = (int)Keys.LeftArrow;
+                _joyWait = DoomGame.Instance.GetTime() + 2;
+            }
+            else if (ev.Data2 == 1)
+            {
+                ch = (int)Keys.RightArrow;
+                _joyWait = DoomGame.Instance.GetTime() + 2;
+            }
+
+            if ((ev.Data1 & 1) != 0)
+            {
+                ch = (int)Keys.Enter;
+                _joyWait = DoomGame.Instance.GetTime() + 5;
+            }
+            else if ((ev.Data1 & 2) != 0)
+            {
+                ch = (int)Keys.Backspace;
+                _joyWait = DoomGame.Instance.GetTime() + 5;
+            }
+        }
+        else if (ev.Type == EventType.Mouse && _mouseWait < DoomGame.Instance.GetTime())
+        {
+            _mouseY += ev.Data3;
+            if (_mouseY < _lastY - 30)
+            {
+                ch = (int)Keys.DownArrow;
+                _mouseWait = DoomGame.Instance.GetTime() + 5;
+                _mouseY = _lastY -= 30;
+            }
+            else if (_mouseY > _lastY + 30)
+            {
+                ch = (int)Keys.UpArrow;
+                _mouseWait = DoomGame.Instance.GetTime() + 5;
+                _mouseY = _lastY += 30;
+            }
+
+            _mouseX += ev.Data2;
+            if (_mouseX < _lastX - 30)
+            {
+                ch = (int)Keys.LeftArrow;
+                _mouseWait = DoomGame.Instance.GetTime() + 5;
+                _mouseX = _lastX -= 30;
+            }
+            else if (_mouseX > _lastX + 30)
+            {
+                ch = (int)Keys.RightArrow;
+                _mouseWait = DoomGame.Instance.GetTime() + 5;
+                _mouseX = _lastX += 30;
+            }
+
+            if ((ev.Data1 & 1) != 0)
+            {
+                ch = (int)Keys.Enter;
+                _mouseWait = DoomGame.Instance.GetTime() + 15;
+            }
+            else if ((ev.Data1 & 2) != 0)
+            {
+                ch = (int)Keys.Backspace;
+                _mouseWait = DoomGame.Instance.GetTime() + 15;
+            }
+        }
+        else if (ev.Type == EventType.KeyDown)
+        {
+            ch = ev.Data1;
+        }
+
+        if (ch == -1)
+        {
+            return false;
+        }
+
+        // Save game string input
+        if (_saveStringEnter)
+        {
+            switch (ch)
+            {
+                case (int)Keys.Backspace:
+                    if (_saveCharIndex > 0)
+                    {
+                        _saveCharIndex--;
+                        _saveGameStrings[_saveSlot] = _saveGameStrings[_saveSlot][..(_saveGameStrings[_saveSlot].Length - 1)];
+                    }
+                    break;
+
+                case (int)Keys.Escape:
+                    _saveStringEnter = false;
+                    _saveGameStrings[_saveSlot] = _oldSaveString;
+                    break;
+
+                case (int)Keys.Enter:
+                    _saveStringEnter = false;
+                    if (!string.IsNullOrWhiteSpace(_saveGameStrings[_saveSlot]))
+                    {
+                        DoSave(_saveSlot);
+                    }
+                    break;
+
+                default:
+                    var saveChar = char.ToUpper((char)ch);
+                    if (saveChar != 32)
+                    {
+                        if ((saveChar - Constants.HuFontStart) < 0 || (saveChar - Constants.HuFontStart) >= Constants.HuFontSize)
+                        {
+                            break; // invalid char (not in font)
+                        }
+                    }
+
+                    if (((int)saveChar is >= 32 and <= 127) &&
+                        _saveCharIndex < SaveStringSize - 1 &&
+                        StringWidth(_saveGameStrings[_saveSlot]) < (SaveStringSize - 2) * 8)
+                    {
+                        _saveGameStrings[_saveSlot] += saveChar;
+                        _saveCharIndex++;
+                    }
+
+                    break;
+            }
+
+            return true;
+        }
+
+        // Take care of any messages that need input
+        if (_messageToPrint)
+        {
+            if (_messageNeedsInput && ch is not (' ' or 'n' or 'y' or (char)Keys.Escape))
+            {
+                return false;
+            }
+
+            IsActive = _messageLastMenuActive;
+            _messageToPrint = false;
+            
+            _messageRoutine?.Invoke((char)ch);
+            
+            IsActive = false;
+            // S_StartSound(NULL, sfx_swtchx);
+            return true;
+        }
+
+        //if (devparm && ch == KEY_F1)
+        //{
+        //    G_ScreenShot();
+        //    return true;
+        //}
+
+        if (!IsActive)
+        {
+            switch (ch)
+            {
+                case (int)Keys.Minus: // Screen size down
+                    //if (automapactive || chat_on)
+                    //{
+                    //    return false;
+                    //}
+                    SizeDisplay(0);
+                    // S_StartSound(NULL, sfx_stnmov);
+                    return true;
+
+                case (int)Keys.Equals: // Screen size up
+                    //if (automapactive || chat_on)
+                    //{
+                    //    return false;
+                    //}
+                    SizeDisplay(1);
+                    // S_StartSound(NULL, sfx_stnmov);
+                    return true;
+
+                case (int)Keys.F1: // Help key
+                    StartControlPanel();
+
+                    _currentMenu = DoomGame.Instance.GameMode == GameMode.Retail ? _readMenu2 : _readMenu;
+
+                    _itemOn = 0;
+                    // S_StartSound(NULL, sfx_swtchn);
+                    return true;
+
+                case (int)Keys.F2:            // Save
+                    StartControlPanel();
+                    // S_StartSound(NULL, sfx_swtchn);
+                    SaveGame(0);
+                    return true;
+
+                case (int)Keys.F3:            // Load
+                    StartControlPanel();
+                    // S_StartSound(NULL, sfx_swtchn);
+                    LoadGame(0);
+                    return true;
+
+                case (int)Keys.F4:            // Sound Volume
+                    StartControlPanel();
+                    _currentMenu = _soundMenu;
+                    _itemOn = (int)SoundMenuItemIndexes.SoundFxVolume;
+                    // S_StartSound(NULL, sfx_swtchn);
+                    return true;
+
+                case (int)Keys.F5:            // Detail toggle
+                    ChangeDetail(0);
+                    // S_StartSound(NULL, sfx_swtchn);
+                    return true;
+
+                case (int)Keys.F6:            // Quicksave
+                    // S_StartSound(NULL, sfx_swtchn);
+                    QuickSave();
+                    return true;
+
+                case (int)Keys.F7:            // End game
+                    // S_StartSound(NULL, sfx_swtchn);
+                    EndGame(0);
+                    return true;
+
+                case (int)Keys.F8:            // Toggle messages
+                    ChangeMessages(0);
+                    // S_StartSound(NULL, sfx_swtchn);
+                    return true;
+
+                case (int)Keys.F9:            // Quickload
+                    // S_StartSound(NULL, sfx_swtchn);
+                    QuickLoad();
+                    return true;
+
+                case (int)Keys.F10:           // Quit DOOM
+                    // S_StartSound(NULL, sfx_swtchn);
+                    QuitDOOM(0);
+                    return true;
+
+                case (int)Keys.F11:           // gamma toggle
+                    DoomGame.Instance.Video.ToggleGamma();
+                    // players[consoleplayer].message = gammamsg[usegamma];
+                    return true;
+            }
+        }
+
+        // Pop-up menu?
+        if (!IsActive)
+        {
+            if (ch == (int)Keys.Escape)
+            {
+                StartControlPanel();
+                // S_StartSound(NULL, sfx_swtchn);
+                return true;
+            }
+            return false;
+        }
+
+        // Keys usable within menu
+        switch (ch)
+        {
+            case (int)Keys.DownArrow:
+                do
+                {
+                    if (_itemOn + 1 > _currentMenu.NumItems - 1)
+                    {
+                        _itemOn = 0;
+                    }
+                    else
+                    {
+                        _itemOn++;
+                    }
+                    // S_StartSound(NULL, sfx_pstop);
+                } while (_currentMenu.Items[_itemOn].Status == MenuItemStatus.Empty);
+                return true;
+
+            case (int)Keys.UpArrow:
+                do
+                {
+                    if (_itemOn == 0)
+                    {
+                        _itemOn = _currentMenu.NumItems - 1;
+                    }
+                    else
+                    {
+                        _itemOn--;
+                    }
+                    // S_StartSound(NULL, sfx_pstop);
+                } while (_currentMenu.Items[_itemOn].Status == MenuItemStatus.Empty);
+                return true;
+
+            case (int)Keys.LeftArrow:
+                if (_currentMenu.Items[_itemOn].ChoiceRoutine is not null && _currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
+                {
+                    // S_StartSound(NULL, sfx_stnmov);
+                    _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(0);
+                }
+                return true;
+
+            case (int)Keys.RightArrow:
+                if (_currentMenu.Items[_itemOn].ChoiceRoutine is not null && _currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
+                {
+                    // S_StartSound(NULL, sfx_stnmov);
+                    _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(1);
+                }
+                return true;
+
+            case (int)Keys.Enter:
+                if (_currentMenu.Items[_itemOn].ChoiceRoutine is not null && _currentMenu.Items[_itemOn].Status > 0)
+                {
+                    _currentMenu.LastOn = _itemOn;
+                    if (_currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
+                    {
+                        // S_StartSound(NULL, sfx_stnmov);
+                        _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(1); // right arrow
+                    }
+                    else
+                    {
+                        _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(_itemOn);
+                        // S_StartSound(NULL, sfx_pistol);
+                    }
+                }
+                return true;
+                
+            case (int)Keys.Escape:
+                _currentMenu.LastOn = _itemOn;
+                ClearMenus();
+                // S_StartSound(NULL, sfx_swtchx);
+                return true;
+
+            case (int)Keys.Backspace:
+                _currentMenu.LastOn = _itemOn;
+                if (_currentMenu.PreviousMenu is not null)
+                {
+                    _currentMenu = _currentMenu.PreviousMenu;
+                    _itemOn = _currentMenu.LastOn;
+                    // S_StartSound(NULL, sfx_swtchn);
+                }
+                return true;
+
+            default:
+                for (var i = _itemOn + 1; i < _currentMenu.NumItems; i++)
+                {
+                    if (_currentMenu.Items[i].HotKey == ch)
+                    {
+                        _itemOn = i;
+                        // S_StartSound(NULL, sfx_pstop);
+                        return true;
+                    }
+                }
+
+                for (var i = 0; i <= _itemOn; i++)
+                {
+                    if (_currentMenu.Items[i].HotKey == ch)
+                    {
+                        _itemOn = i;
+                        // S_StartSound(NULL, sfx_pstop);
+                        return true;
+                    }
+                }
+
+                break;
+
+        }
+
+        return false;
+    }
+
+    private void StartControlPanel()
+    {
+        if (IsActive)
+        {
+            return;
+        }
+
+        IsActive = true;
+        _currentMenu = _mainMenu;
+        _itemOn = _currentMenu.LastOn;
     }
 
     private void DrawMainMenu()
@@ -720,6 +1113,17 @@ public class MenuController
         }
     }
 
+    private void DoSave(int slot)
+    {
+        // G_SaveGame(slot, _saveGameStrings[slot]);
+        ClearMenus();
+
+        if (_quickSaveSlot == -2)
+        {
+            _quickSaveSlot = slot;
+        }
+    }
+
     private void SaveSelect(int choice)
     {
         // we are going to be intercepting all chars
@@ -749,6 +1153,68 @@ public class MenuController
 
         SetupNextMenu(_saveMenu);
         ReadSaveStrings();
+    }
+
+    private void QuickSaveResponse(char ch)
+    {
+        if (ch == 'y')
+        {
+            DoSave(_quickSaveSlot);
+            // S_StartSound(NULL,sfx_swtchx);
+        }
+    }
+
+    private void QuickSave()
+    {
+        //if (!usergame)
+        //{
+        //    S_StartSound(NULL, sfx_oof);
+        //    return;
+        //}
+
+        if (DoomGame.Instance.GameState != GameState.Level)
+        {
+            return;
+        }
+
+        if (_quickSaveSlot < 0)
+        {
+            StartControlPanel();
+            ReadSaveStrings();
+            SetupNextMenu(_saveMenu);
+            _quickSaveSlot = -2; // means to pick a slot now
+            return;
+        }
+
+        var tempString = string.Format(Messages.QuickSavePrompt, _saveGameStrings[_quickSaveSlot]);
+        StartMessage(tempString, QuickSaveResponse, true);
+    }
+
+    private void QuickLoadResponse(char ch)
+    {
+        if (ch == 'y')
+        {
+            LoadSelect(_quickSaveSlot);
+            // S_StartSound(NULL,sfx_swtchx);
+        }
+    }
+
+    private void QuickLoad()
+    {
+        //if (netgame)
+        //{
+        //    M_StartMessage(QLOADNET, NULL, false);
+        //    return;
+        //}
+
+        if (_quickSaveSlot < 0)
+        {
+            StartMessage(Messages.QuickSaveSpot, null, false);
+            return;
+        }
+
+        var tempString = string.Format(Messages.QuickLoadPrompt, _saveGameStrings[_quickSaveSlot]);
+        StartMessage(tempString, QuickLoadResponse, true);
     }
 
     private void ReadSaveStrings()

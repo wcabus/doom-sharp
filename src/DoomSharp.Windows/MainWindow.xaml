@@ -7,7 +7,8 @@
         mc:Ignorable="d"
         Title="{Binding Path=Title}"
         Height="400" Width="640"
-        DataContext="{Binding Path=MainViewModel, Source={StaticResource ViewModelLocator}}">
+        DataContext="{Binding Path=MainViewModel, Source={StaticResource ViewModelLocator}}"
+        KeyDown="HandleKeyDown" KeyUp="HandleKeyUp" MouseMove="HandleMouseMove" MouseDown="HandleMouseDown" MouseUp="HandleMouseUp">
     <DockPanel Background="Black">
         <Image Source="{Binding Output}" x:Name="RenderTarget" />
     </DockPanel>

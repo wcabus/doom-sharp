@@ -22,6 +22,8 @@ public static class Constants
     public const int MaxPlayers = 4;
     public const int MaxNetNodes = 8; // 4 players max + drones
 
+    public const int MaxEvents = 64;
+
     public const char HuFontStart = '!';
     public const char HuFontEnd = '_';
     public const int HuFontSize = HuFontEnd - HuFontStart + 1;

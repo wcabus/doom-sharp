@@ -1,5 +1,6 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.Graphics;
+using DoomSharp.Core.Input;
 using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core;
@@ -17,7 +18,7 @@ public class DoomGame : IDisposable
     private readonly Video _video = new(_graphics);
     private readonly Zone _zone = new();
 
-    private GameController _game = new();
+    private readonly GameController _game = new();
     private MenuController? _menu;
     private HudController? _hud;
 
@@ -32,6 +33,8 @@ public class DoomGame : IDisposable
     private long _baseTime = 0;
     private int _skiptics = 0;
     private int _gametime;
+
+    private Queue<InputEvent> _events = new(Constants.MaxEvents);
 
     // Flag: true only if started as net deathmatch.
     // An enum might handle altdeath/cooperative better.
@@ -261,7 +264,7 @@ public class DoomGame : IDisposable
         // clean up border stuff
         if (GameState != _oldDisplayGameState && GameState != GameState.Level)
         {
-            _graphics.UpdatePalette(WadData.GetLumpName("PLAYPAL", PurgeTag.Cache));
+            _video.SetPalette("PLAYPAL");
         }
 
         // see if the border needs to be initially drawn
@@ -450,7 +453,7 @@ public class DoomGame : IDisposable
         //    {
         //        if (nettics[0] <= nettics[nodeforplayer[i]])
         //        {
-        //            gametime--;
+        //            _gametime--;
         //            // printf ("-");
         //        }
         //        frameskip[frameon & 3] = (oldnettics > nettics[nodeforplayer[i]]);
@@ -589,12 +592,33 @@ public class DoomGame : IDisposable
         // UNSUPPORTED?
     }
 
+    public void PostEvent(InputEvent ev)
+    {
+        _events.Enqueue(ev);
+    }
+
     private void ProcessEvents()
     {
         // process events and dispatch them to the menu and the game logic (the latter only if the menu didn't eat the event)
+
+        // IF STORE DEMO, DO NOT ACCEPT INPUT
+        if (GameMode == GameMode.Commercial && WadData.GetNumForName("map01") < 0)
+        {
+            return;
+        }
+
+        while (_events.TryDequeue(out var currentEvent))
+        {
+            if (_menu!.HandleEvent(currentEvent))
+            {
+                continue;
+            }
+
+            // _game.HandleEvent(currentEvent);
+        }
     }
 
-    private int GetTime()
+    public int GetTime()
     {
         var timeSinceEpoch = DateTime.UtcNow - DateTime.UnixEpoch;
         var secondsSinceEpoch = (int)timeSinceEpoch.TotalSeconds;
