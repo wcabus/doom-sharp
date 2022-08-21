@@ -1,4 +1,4 @@
-﻿namespace DoomSharp.Core.Graphics;
+namespace DoomSharp.Core.Graphics;
 
 public class Video
 {
@@ -67,14 +67,14 @@ public class Video
         {
             var column = patch.Columns[col];
 
-            if (column.TopDelta == 255)
+            if (column is null || column.TopDelta == 255)
             {
                 continue;
             }
 
             // step through the posts in a column 
-            //while (column.TopDelta != 0xff)
-            //{
+            while (column != null && column.TopDelta != 255)
+            {
                 var source = 0;
                 var dest = destTop + column.TopDelta * Constants.ScreenWidth;
                 var count = column.Length;
@@ -85,8 +85,8 @@ public class Video
                     dest += Constants.ScreenWidth;
                 }
 
-            //    column = patch.Columns[col++];
-            //}
+                column = column.Next;
+            }
         }
     }
 
