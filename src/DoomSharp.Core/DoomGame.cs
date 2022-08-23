@@ -1,13 +1,15 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
+using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
+using System.Runtime.InteropServices;
 
 namespace DoomSharp.Core;
 
 public class DoomGame : IDisposable
 {
-    private const int Version = 166;
+    public const int Version = 166;
     private static IConsole _console = new NullConsole();
     private static IGraphics _graphics = new NullGraphics();
 
@@ -19,6 +21,7 @@ public class DoomGame : IDisposable
     private readonly Zone _zone = new();
 
     private readonly GameController _game = new();
+    private readonly NetworkController _network = new();
     private MenuController? _menu;
     private HudController? _hud;
 
@@ -26,19 +29,27 @@ public class DoomGame : IDisposable
 
     private int[] _frametics = new int[4];
     private int _frameOn;
-    private int[] _frameskip = new int[4];
-    private int _oldnettics;
-    private int _oldEnterTics = 0;
+    private bool[] _frameskip = new bool[4];
     
     private long _baseTime = 0;
     private int _skiptics = 0;
     private int _gametime;
 
-    private Queue<InputEvent> _events = new(Constants.MaxEvents);
+    private TicCommand[] _localCommands = new TicCommand[Constants.BackupTics];
+    private TicCommand[][] _netCommands = new TicCommand[Constants.MaxPlayers][];
+    private int[] _netTics = new int[Constants.MaxNetNodes];
+    private bool[] _nodeInGame = new bool[Constants.MaxNetNodes];
+    private bool[] _remoteResend = new bool[Constants.MaxNetNodes];
+    private int[] _resendTo = new int[Constants.MaxNetNodes];
+    private int[] _resendCount = new int[Constants.MaxNetNodes];
 
-    // Flag: true only if started as net deathmatch.
-    // An enum might handle altdeath/cooperative better.
-    private bool _deathmatch = false;
+    private int[] _nodeForPlayer = new int[Constants.MaxPlayers];
+    private int _maxSend;
+
+    private int _oldnettics;
+    private int _oldEnterTics = 0;
+
+    private readonly Queue<InputEvent> _events = new(Constants.MaxEvents);
 
     private int _demoSequence;
     private bool _advancedemo;
@@ -47,10 +58,12 @@ public class DoomGame : IDisposable
 
     private GameState _oldDisplayGameState = GameState.Wipe;
     
-
     private DoomGame()
     {
-        
+        for (var i = 0; i < _netCommands.Length; i++)
+        {
+            _netCommands[i] = new TicCommand[Constants.BackupTics];
+        }
     }
 
     public async Task RunAsync()
@@ -128,7 +141,7 @@ public class DoomGame : IDisposable
             // I_Init ();
 
             _console.WriteLine("D_CheckNetGame: Checking network game status.");
-            // D_CheckNetGame ();
+            CheckNetGame();
 
             _console.WriteLine("S_Init: Setting up sound.");
             // S_Init (snd_SfxVolume, snd_MusicVolume);
@@ -139,11 +152,11 @@ public class DoomGame : IDisposable
             _console.WriteLine("ST_Init: Init status bar.");
             // ST_Init();
 
-            if (GameAction != GameAction.LoadGame)
+            if (_game.GameAction != GameAction.LoadGame)
             {
-                if (AutoStart || NetGame)
+                if (AutoStart || _game.NetGame)
                 {
-                    // G_InitNew(startskill, startepisode, startmap);
+                    _game.InitNew(StartSkill, StartEpisode, StartMap);
                 }
                 else
                 {
@@ -159,9 +172,9 @@ public class DoomGame : IDisposable
         }
     }
 
+    public DoomCommunication DoomCom { get; } = new();
+
     public GameMode GameMode { get; private set; } = GameMode.Indetermined;
-    public GameAction GameAction { get; set; } = GameAction.Nothing;
-    public GameState GameState { get; set; } = GameState.Wipe;
     public GameState WipeGameState { get; private set; } = GameState.Wipe;
     public GameLanguage Language { get; private set; } = GameLanguage.English;
 
@@ -169,12 +182,6 @@ public class DoomGame : IDisposable
     public int StartEpisode { get; set; } = 1;
     public int StartMap { get; set; } = 1;
     public bool AutoStart { get; set; } = false;
-    public bool NetGame { get; set; } = false; // Netgame? Only true if >1 player.
-
-    /// <summary>
-    /// gametic is the tic about to (or currently being) run
-    /// </summary>
-    public int GameTic { get; private set; } = 0;
 
     public int TicDup { get; private set; } = 1; // tic duplication // 1 = no duplication, 2-5 = dup for slow nets
 
@@ -190,8 +197,8 @@ public class DoomGame : IDisposable
     public bool AutoMapActive { get; set; } = false;   // In AutoMap mode?
     public bool MenuActive { get; set; } = false;  // Menu overlayed?
     public bool InHelpScreensActive { get; set; } = false;
-    public bool Paused { get; set; } = false;		// Game Pause?
 
+    public GameController Game => _game;
     public Video Video => _video;
     public HudController Hud => _hud!;
     public WadFileCollection WadData => _wadFiles!;
@@ -212,11 +219,42 @@ public class DoomGame : IDisposable
     private void Display()
     {
         var y = 0;
+        var wipe = false;
 
-        switch (GameState)
+        //if (nodrawers)
+        //    return;                    // for comparative timing / profiling
+
+        // redrawsbar = false;
+
+        // change the view size if needed
+        //if (setsizeneeded)
+        //{
+        //    R_ExecuteSetViewSize();
+        //    oldgamestate = -1;                      // force background redraw
+        //    borderdrawcount = 3;
+        //}
+
+        // save the current screen if about to wipe
+        if (_game.GameState != _game.WipeGameState)
+        {
+            wipe = true;
+            _video.WipeStartScreen(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
+        }
+        else
+        {
+            wipe = false;
+        }
+
+        if (_game.GameState == GameState.Level && _game.GameTic > 0)
+        {
+            // HU_Erase();
+        }
+
+        // do buffered drawing
+        switch (_game.GameState)
         {
             case GameState.Level:
-                if (GameTic == 0)
+                if (_game.GameTic == 0)
                 {
                     break;
                 }
@@ -251,31 +289,31 @@ public class DoomGame : IDisposable
         // I_UpdateNoBlit(); // Doesn't do anything
 
         // draw the view directly
-        if (GameState == GameState.Level && !AutoMapActive && GameTic != 0)
+        if (_game.GameState == GameState.Level && !AutoMapActive && _game.GameTic != 0)
         {
             // R_RenderPlayerView(&players[displayplayer]);
         }
 
-        if (GameState == GameState.Level && GameTic != 0)
+        if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
             // HU_Drawer();
         }
 
         // clean up border stuff
-        if (GameState != _oldDisplayGameState && GameState != GameState.Level)
+        if (_game.GameState != _oldDisplayGameState && _game.GameState != GameState.Level)
         {
             _video.SetPalette("PLAYPAL");
         }
 
         // see if the border needs to be initially drawn
-        if (GameState == GameState.Level && _oldDisplayGameState != GameState.Level)
+        if (_game.GameState == GameState.Level && _oldDisplayGameState != GameState.Level)
         {
             // viewactivestate = false;        // view was not active
             // R_FillBackScreen();    // draw the pattern into the back screen
         }
 
         // see if the border needs to be updated to the screen
-        if (GameState == GameState.Level && !AutoMapActive /*&& scaledviewwidth != 320*/)
+        if (_game.GameState == GameState.Level && !AutoMapActive /*&& scaledviewwidth != 320*/)
         {
             if (_menu!.IsActive || MenuActive /* || !viewactivestate*/)
             {
@@ -289,12 +327,12 @@ public class DoomGame : IDisposable
         }
 
         MenuActive = _menu!.IsActive;
-        // viewactivestate = viewactive;
+        // viewactivestate = _game.ViewActive;
         InHelpScreensActive = _menu!.InHelpScreens;
-        _oldDisplayGameState /*= wipegamestate*/ = GameState;
+        _oldDisplayGameState = _game.WipeGameState = _game.GameState;
 
         // draw pause pic
-        if (Paused)
+        if (_game.Paused)
         {
             if (AutoMapActive)
             {
@@ -313,31 +351,34 @@ public class DoomGame : IDisposable
         NetUpdate(); // send out any new accumulation
 
         // normal update
-        //if (!wipe)
-        //{
+        if (!wipe)
+        {
             _video.SignalOutputReady(); // page flip or blit buffer
             return;
-        //}
+        }
 
-        //// wipe update
-        //wipe_EndScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
+        // wipe update
+        _video.WipeEndScreen(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
 
-        //wipestart = I_GetTime() - 1;
+        var wipeStart = GetTime() - 1;
+        var done = false;
+        var nowTime = 0;
+        var tics = 0;
 
-        //do
-        //{
-        //    do
-        //    {
-        //        nowtime = I_GetTime();
-        //        tics = nowtime - wipestart;
-        //    } while (!tics);
-        //    wipestart = nowtime;
-        //    done = wipe_ScreenWipe(wipe_Melt
-        //        , 0, 0, SCREENWIDTH, SCREENHEIGHT, tics);
-        //    I_UpdateNoBlit();
-        //    M_Drawer();                            // menu is drawn even on top of wipes
-        //    I_FinishUpdate();                      // page flip or blit buffer
-        //} while (!done);
+        do
+        {
+            do
+            {
+                nowTime = GetTime();
+                tics = nowTime - wipeStart;
+            } while (tics == 0);
+
+            wipeStart = nowTime;
+            done = _video.WipeScreenEffect(WipeMethod.Melt, 0, 0, Constants.ScreenWidth, Constants.ScreenHeight, tics);
+            // I_UpdateNoBlit(); // Doesn't do anything
+            _menu!.Drawer();                       // menu is drawn even on top of wipes
+            _video.SignalOutputReady();            // page flip or blit buffer
+        } while (!done);
     }
 
     private void DoomLoop()
@@ -354,18 +395,18 @@ public class DoomGame : IDisposable
             //// process one or more tics
             if (_singleTics)
             {
-                //I_StartTic();
-                //D_ProcessEvents();
+                _graphics.StartTic();
+                ProcessEvents();
                 //G_BuildTiccmd(&netcmds[consoleplayer][MakeTic % BACKUPTICS]);
-                //if (_advancedemo)
-                //{
-                //    DoAdvanceDemo();
-                //}
+                if (_advancedemo)
+                {
+                    DoAdvanceDemo();
+                }
 
-                //_menu!.Ticker();
-
+                _menu!.Ticker();
                 _game.Ticker();
-                GameTic++;
+
+                _game.GameTic++;
                 MakeTic++;
             }
             else
@@ -390,6 +431,33 @@ public class DoomGame : IDisposable
         }
     }
 
+    private void QuitNetGame()
+    {
+        //if (debugfile)
+        //    fclose(debugfile);
+
+        if (!_game.NetGame || !_game.UserGame || _game.ConsolePlayer == -1 || _game.DemoPlayback)
+        {
+            return;
+        }
+
+        // send a bunch of packets for security
+        var netBuffer = _network.DoomCom.Data;
+        netBuffer.Player = _game.ConsolePlayer;
+        netBuffer.NumTics = 0;
+        for (var i = 0; i < 4; i++)
+        {
+            for (var j = 1; j < _network.DoomCom.NumNodes; j++)
+            {
+                if (_nodeInGame[j])
+                {
+                    HSendPacket(j, Constants.NetCommands.Exit);
+                }
+            }
+            WaitVBL(1);
+        }
+    }
+
     private void TryRunTics()
     {
         var enterTic = GetTime() / TicDup;
@@ -400,16 +468,18 @@ public class DoomGame : IDisposable
 
         var lowTic = int.MaxValue;
         var numplaying = 0;
-        //for (var i = 0; i < doomcom->numnodes; i++)
-        //{
-        //    if (nodeingame[i])
-        //    {
-        //        numplaying++;
-        //        if (nettics[i] < lowtic)
-        //            lowtic = nettics[i];
-        //    }
-        //}
-        var availableTics = lowTic - GameTic / TicDup;
+        for (var i = 0; i < DoomCom.NumNodes; i++)
+        {
+            if (_nodeInGame[i])
+            {
+                numplaying++;
+                if (_netTics[i] < lowTic)
+                {
+                    lowTic = _netTics[i];
+                }
+            }
+        }
+        var availableTics = lowTic - _game.GameTic / TicDup;
 
         // decide how many tics to run
         var counts = 0;
@@ -438,49 +508,53 @@ public class DoomGame : IDisposable
         //        "=======real: %i  avail: %i  game: %i\n",
         //        realtics, availabletics, counts);
 
-        //if (!demoplayback)
-        //{
-        //    // ideally nettics[0] should be 1 - 3 tics above lowtic
-        //    // if we are consistantly slower, speed up time
-        //    for (i = 0; i < MAXPLAYERS; i++)
-        //        if (playeringame[i])
-        //            break;
-        //    if (consoleplayer == i)
-        //    {
-        //        // the key player does not adapt
-        //    }
-        //    else
-        //    {
-        //        if (nettics[0] <= nettics[nodeforplayer[i]])
-        //        {
-        //            _gametime--;
-        //            // printf ("-");
-        //        }
-        //        frameskip[frameon & 3] = (oldnettics > nettics[nodeforplayer[i]]);
-        //        oldnettics = nettics[0];
-        //        if (frameskip[0] && frameskip[1] && frameskip[2] && frameskip[3])
-        //        {
-        //            skiptics = 1;
-        //            // printf ("+");
-        //        }
-        //    }
-        //}// demoplayback
+        if (!_game.DemoPlayback)
+        {
+            // ideally nettics[0] should be 1 - 3 tics above lowtic
+            // if we are consistantly slower, speed up time
+            int i;
+            for (i = 0; i < Constants.MaxPlayers; i++)
+            {
+                if (_game.PlayerInGame[i])
+                    break;
+            }
+
+            if (_game.ConsolePlayer == i)
+            {
+                // the key player does not adapt
+            }
+            else
+            {
+                if (_netTics[0] <= _netTics[_nodeForPlayer[i]])
+                {
+                    _gametime--;
+                    // printf ("-");
+                }
+                _frameskip[_frameOn & 3] = (_oldnettics > _netTics[_nodeForPlayer[i]]);
+                _oldnettics = _netTics[0];
+                if (_frameskip[0] && _frameskip[1] && _frameskip[2] && _frameskip[3])
+                {
+                    _skiptics = 1;
+                    // printf ("+");
+                }
+            }
+        }// demoplayback
 
         // wait for new tics if needed
-        while (lowTic < (GameTic / TicDup + counts))
+        while (lowTic < (_game.GameTic / TicDup + counts))
         {
             NetUpdate();
             lowTic = int.MaxValue;
 
-            //for (var i = 0; i < doomcom->numnodes; i++)
-            //{
-            //    if (nodeingame[i] && nettics[i] < lowtic)
-            //    {
-            //        lowtic = nettics[i];
-            //    }
-            //}
+            for (var i = 0; i < DoomCom.NumNodes; i++)
+            {
+                if (_nodeInGame[i] && _netTics[i] < lowTic)
+                {
+                    lowTic = _netTics[i];
+                }
+            }
 
-            if (lowTic < (GameTic / TicDup))
+            if (lowTic < (_game.GameTic / TicDup))
             {
                 Error("TryRunTics: lowtic < gametic");
             }
@@ -498,7 +572,7 @@ public class DoomGame : IDisposable
         {
             for (var i = 0; i < TicDup; i++)
             {
-                if ((GameTic / TicDup) > lowTic)
+                if ((_game.GameTic / TicDup) > lowTic)
                 {
                     Error("gametic>lowtic");
                 }
@@ -510,23 +584,21 @@ public class DoomGame : IDisposable
 
                 _menu!.Ticker();
                 _game.Ticker();
-                GameTic++;
+                _game.GameTic++;
 
                 // modify command for duplicated tics
                 if (i != TicDup - 1)
                 {
-                    //ticcmd_t* cmd;
-                    //int buf;
-                    //int j;
-
-                    //buf = (gametic / ticdup) % BACKUPTICS;
-                    //for (j = 0; j < MAXPLAYERS; j++)
-                    //{
-                    //    cmd = &netcmds[j][buf];
-                    //    cmd->chatchar = 0;
-                    //    if (cmd->buttons & BT_SPECIAL)
-                    //        cmd->buttons = 0;
-                    //}
+                    var buf = (_game.GameTic / TicDup) % Constants.BackupTics;
+                    for (var j = 0; j < Constants.MaxPlayers; j++)
+                    {
+                        var cmd = _netCommands[j][buf];
+                        cmd.ChatChar = 0;
+                        if ((cmd.Buttons & (int)ButtonCode.Special) != 0)
+                        {
+                            cmd.Buttons = 0;
+                        }
+                    }
                 }
             }
             NetUpdate();    // check for new console commands
@@ -536,33 +608,34 @@ public class DoomGame : IDisposable
     private void NetUpdate()
     {
         // check time
-        var nowtime = GetTime() / TicDup;
-        var newtics = nowtime - _gametime;
-        _gametime = nowtime;
+        var nowTime = GetTime() / TicDup;
+        var newTics = nowTime - _gametime;
+        _gametime = nowTime;
 
-        if (newtics <= 0) // nothing new to update
+        if (newTics <= 0) // nothing new to update
         {
             // listen for other packets
             GetPackets();
             return;
         }
 
-        if (_skiptics <= newtics)
+        if (_skiptics <= newTics)
         {
-            newtics -= _skiptics;
+            newTics -= _skiptics;
             _skiptics = 0;
         }
         else
         {
-            _skiptics -= newtics;
-            newtics = 0;
+            _skiptics -= newTics;
+            newTics = 0;
         }
 
-        // netbuffer->player = consoleplayer;
+        var netBuffer = DoomCom.Data;
+        netBuffer.Player = _game.ConsolePlayer;
 
         // build new ticcmds for console player
-        var gameTicDiv = GameTic / TicDup;
-        for (var i = 0; i < newtics; i++)
+        var gameTicDiv = _game.GameTic / TicDup;
+        for (var i = 0; i < newTics; i++)
         {
             _graphics.StartTic();
             ProcessEvents();
@@ -571,7 +644,8 @@ public class DoomGame : IDisposable
                 break;          // can't hold any more
             }
 
-            // G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
+            // TODO _game.BuildTicCommand(_localCommands[MakeTic & Constants.BackupTics]);
+            
             MakeTic++;
         }
 
@@ -581,15 +655,324 @@ public class DoomGame : IDisposable
         }
 
         // send the packet to the other nodes
-        // UNSUPPORTED
+        for (var i = 0; i < DoomCom.NumNodes; i++)
+        {
+            if (!_nodeInGame[i])
+            {
+                continue;
+            }
+
+            int realStart;
+            netBuffer.StartTic = realStart = _resendTo[i];
+            netBuffer.NumTics = MakeTic - realStart;
+            if (netBuffer.NumTics > Constants.BackupTics)
+            {
+                Error("NetUpdate: netbuffer->numtics > BACKUPTICS");
+            }
+
+            _resendTo[i] = MakeTic - DoomCom.ExtraTics;
+
+            for (var j = 0; j < netBuffer.NumTics; j++)
+            {
+                netBuffer.Commands[j] =  _localCommands[(realStart+ j) % Constants.BackupTics];
+            }
+
+            if (_remoteResend[i])
+            {
+                netBuffer.RetransmitFrom = _netTics[i];
+                HSendPacket(i, Constants.NetCommands.Retransmit);
+            }
+            else
+            {
+                netBuffer.RetransmitFrom = 0;
+                HSendPacket(i, 0);
+            }
+        }
 
         // listen for other packets
         GetPackets();
     }
 
+    private int NetbufferSize()
+    {
+        return Marshal.SizeOf<TicCommand>();
+    }
+
+    private uint NetbufferChecksum()
+    {
+        return 0;
+    }
+
+    private DoomData _reboundStore;
+    private bool _reboundPacket;
+
+    private void HSendPacket(int node, uint flags)
+    {
+        var netBuffer = DoomCom.Data;
+
+        netBuffer.CheckSum = NetbufferChecksum() | flags;
+        if (node != 0)
+        {
+            _reboundStore = netBuffer;
+            _reboundPacket = true;
+            return;
+        }
+
+        if (_game.DemoPlayback)
+        {
+            return;
+        }
+
+        if (!_game.NetGame)
+        {
+            Error("Tried to transmit to another node");
+        }
+
+        DoomCom.Command = Command.Send;
+        DoomCom.RemoteNode = node;
+        DoomCom.DataLength = NetbufferSize();
+
+        //if (debugfile)
+        //{
+        //    int i;
+        //    int realretrans;
+        //    if (netbuffer->checksum & NCMD_RETRANSMIT)
+        //        realretrans = ExpandTics(netbuffer->retransmitfrom);
+        //    else
+        //        realretrans = -1;
+
+        //    fprintf(debugfile, "send (%i + %i, R %i) [%i] ",
+        //        ExpandTics(netbuffer->starttic),
+        //        netbuffer->numtics, realretrans, doomcom->datalength);
+
+        //    for (i = 0; i < doomcom->datalength; i++)
+        //        fprintf(debugfile, "%i ", ((byte*)netbuffer)[i]);
+
+        //    fprintf(debugfile, "\n");
+        //}
+
+        _network.NetworkCommand();
+    }
+
+    private bool HGetPacket()
+    {
+        var netbuffer = _network.DoomCom.Data;
+        if (_reboundPacket)
+        {
+            netbuffer = _reboundStore;
+            _network.DoomCom.RemoteNode = 0;
+            _reboundPacket = false;
+            return true;
+        }
+
+        if (!_game.NetGame)
+        {
+            return false;
+        }
+
+        if (_game.DemoPlayback)
+        {
+            return false;
+        }
+
+        _network.DoomCom.Command = Command.Get;
+        _network.NetworkCommand();
+
+        if (_network.DoomCom.RemoteNode == -1)
+        {
+            return false;
+        }
+
+        if (_network.DoomCom.DataLength != NetbufferSize())
+        {
+            //if (debugfile)
+            //    fprintf(debugfile, "bad packet length %i\n", doomcom->datalength);
+            return false;
+        }
+
+        if (NetbufferChecksum() != (netbuffer.CheckSum & Constants.NetCommands.CheckSum))
+        {
+            //if (debugfile)
+            //    fprintf(debugfile, "bad packet checksum\n");
+            return false;
+        }
+
+        //if (debugfile)
+        //{
+        //    int realretrans;
+        //    int i;
+
+        //    if (netbuffer->checksum & NCMD_SETUP)
+        //        fprintf(debugfile, "setup packet\n");
+        //    else
+        //    {
+        //        if (netbuffer->checksum & NCMD_RETRANSMIT)
+        //            realretrans = ExpandTics(netbuffer->retransmitfrom);
+        //        else
+        //            realretrans = -1;
+
+        //        fprintf(debugfile, "get %i = (%i + %i, R %i)[%i] ",
+        //            doomcom->remotenode,
+        //            ExpandTics(netbuffer->starttic),
+        //            netbuffer->numtics, realretrans, doomcom->datalength);
+
+        //        for (i = 0; i < doomcom->datalength; i++)
+        //            fprintf(debugfile, "%i ", ((byte*)netbuffer)[i]);
+        //        fprintf(debugfile, "\n");
+        //    }
+        //}
+        return true;
+    }
+
     private void GetPackets()
     {
         // UNSUPPORTED?
+    }
+
+    private void CheckNetGame()
+    {
+        for (var i = 0; i < Constants.MaxNetNodes; i++)
+        {
+            _nodeInGame[i] = false;
+            _netTics[i] = 0;
+            _remoteResend[i] = false;    // set when local needs tics
+            _resendTo[i] = 0;        // which tic to start sending
+        }
+
+        _network.Initialize();
+        if (_network.DoomCom.Id != Constants.DoomComId)
+        {
+            Error("Doomcom buffer invalid!");
+            return;
+        }
+
+        _game.ConsolePlayer = _game.DisplayPlayer = _network.DoomCom.ConsolePlayer;
+        if (_game.NetGame)
+        {
+            ArbitrateNetStart();
+        }
+
+        Console.WriteLine($"startskill {StartSkill}  deathmatch: {_game.DeathMatch}  startmap: {StartMap}  startepisode: {StartEpisode}");
+
+        // read values out of doomcom
+        TicDup = _network.DoomCom.TicDup;
+        _maxSend = Constants.BackupTics / (2 * TicDup) - 1;
+        if (_maxSend < 1)
+        {
+            _maxSend = 1;
+        }
+
+        for (var i = 0; i < _network.DoomCom.NumPlayers; i++)
+        {
+            _game.PlayerInGame[i] = true;
+        }
+
+        for (var i = 0; i < _network.DoomCom.NumNodes; i++)
+        {
+            _nodeInGame[i] = true;
+        }
+
+        Console.WriteLine($"player {_game.ConsolePlayer + 1} of {_network.DoomCom.NumPlayers} ({_network.DoomCom.NumNodes} nodes)");
+    }
+
+    private void CheckAbort()
+    {
+        var stopTic = GetTime() + 2;
+        while (GetTime() < stopTic)
+        {
+            _graphics.StartTic();
+        }
+
+        _graphics.StartTic();
+        while (_events.TryDequeue(out var ev))
+        {
+            if (ev.Type == EventType.KeyDown && ev.Data1 == (int)Keys.Escape)
+            {
+                Error("Network game synchronization aborted.");
+            }
+        }
+    }
+
+    private void ArbitrateNetStart()
+    {
+        AutoStart = true;
+
+        var netBuffer = _network.DoomCom.Data;
+
+        if (_network.DoomCom.ConsolePlayer != 0)
+        {
+            // listen for setup info from key player
+            Console.WriteLine("Listening for network start info ...");
+            
+            while (true)
+            {
+                CheckAbort();
+                if (!HGetPacket())
+                {
+                    continue;
+                }
+                if ((netBuffer.CheckSum & Constants.NetCommands.Setup) != 0)
+                {
+                    if (netBuffer.Player != Version)
+                    {
+                        Error("Different DOOM versions cannot play a net game!");
+                        return;
+                    }
+
+                    StartSkill = (SkillLevel)(netBuffer.RetransmitFrom & 15);
+                    _game.DeathMatch = ((netBuffer.RetransmitFrom & 0xc0) >> 6) != 0;
+                    var nomonsters = (netBuffer.RetransmitFrom & 0x20) > 0;
+                    var respawnparm = (netBuffer.RetransmitFrom & 0x10) > 0;
+                    StartMap = netBuffer.StartTic & 0x3f;
+                    StartEpisode = netBuffer.StartTic >> 6;
+                    return;
+                }
+            }
+        }
+        else
+        {
+            // key player, send the setup info
+            Console.WriteLine("Sending network start info ...");
+
+            int i;
+            var gotInfo = new bool[Constants.MaxNetNodes];
+            do
+            {
+                CheckAbort();
+                for (i = 0; i < _network.DoomCom.NumNodes; i++)
+                {
+                    netBuffer.RetransmitFrom = (int)StartSkill;
+                    if (_game.DeathMatch)
+                    {
+                        netBuffer.RetransmitFrom |= ((_game.DeathMatch ? 1 : 0) << 6);
+                    }
+                    //if (nomonsters)
+                    //    netbuffer->retransmitfrom |= 0x20;
+                    //if (respawnparm)
+                    //    netbuffer->retransmitfrom |= 0x10;
+                    netBuffer.StartTic = StartEpisode * 64 + StartMap;
+                    netBuffer.Player = Version;
+                    netBuffer.NumTics = 0;
+                    HSendPacket(i, Constants.NetCommands.Setup);
+                }
+
+                for (i = 10 ; i != 0 && HGetPacket(); --i)
+                {
+                    if ((netBuffer.Player & 0x7f) < Constants.MaxNetNodes)
+                    {
+                        gotInfo[netBuffer.Player & 0x7f] = true;
+                    }
+                }
+
+                for (i = 1; i < _network.DoomCom.NumNodes; i++)
+                {
+                    if (!gotInfo[i])
+                    {
+                        break;
+                    }
+                }
+            } while (i < _network.DoomCom.NumNodes);
+        }
     }
 
     public void PostEvent(InputEvent ev)
@@ -630,25 +1013,25 @@ public class DoomGame : IDisposable
         return (int)((secondsSinceEpoch - _baseTime) * Constants.TicRate + timeSinceEpoch.Milliseconds * Constants.TicRate / 1000f);
     }
 
-    private void StartTitle()
+    public void StartTitle()
     {
-        GameAction = GameAction.Nothing;
+        _game.GameAction = GameAction.Nothing;
         _demoSequence = -1;
         AdvanceDemo();
     }
 
-    private void AdvanceDemo()
+    public void AdvanceDemo()
     {
         _advancedemo = true;
     }
 
     private void DoAdvanceDemo()
     {
-        // players[consoleplayer].playerstate = PST_LIVE;  // not reborn
-        _advancedemo = false;
-        // usergame = false;               // no save / end game here
-        Paused = false;
-        GameAction = GameAction.Nothing;
+        // _game.Players[_game.ConsolePlayer].PlayerState = PST_LIVE; // not reborn
+        _advancedemo = false; 
+        _game.UserGame = false;               // no save / end game here
+        _game.Paused = false;
+        _game.GameAction = GameAction.Nothing;
 
         if (GameMode == GameMode.Retail)
         {
@@ -670,7 +1053,7 @@ public class DoomGame : IDisposable
                 {
                     _demoPageTic = 170;
                 }
-                GameState = GameState.DemoScreen;
+                _game.GameState = GameState.DemoScreen;
                 _demoPageName = "TITLEPIC";
                 if (GameMode == GameMode.Commercial)
                 {
@@ -687,7 +1070,7 @@ public class DoomGame : IDisposable
                 break;
             case 2:
                 _demoPageTic = 200;
-                GameState = GameState.DemoScreen;
+                _game.GameState = GameState.DemoScreen;
                 _demoPageName = "CREDIT";
                 break;
             case 3:
@@ -695,7 +1078,7 @@ public class DoomGame : IDisposable
                 _game.DeferedPlayDemo("demo2");
                 break;
             case 4:
-                GameState = GameState.DemoScreen;
+                _game.GameState = GameState.DemoScreen;
                 if (GameMode == GameMode.Commercial)
                 {
                     _demoPageTic = 35 * 11;
@@ -739,6 +1122,23 @@ public class DoomGame : IDisposable
         {
             AdvanceDemo();
         }
+    }
+
+    public void Quit()
+    {
+        QuitNetGame();
+        
+        //I_ShutdownSound();
+        //I_ShutdownMusic();
+        //M_SaveDefaults();
+        //I_ShutdownGraphics();
+        
+        Console.Shutdown();
+    }
+
+    public void WaitVBL(int count)
+    {
+        Thread.Sleep(count * (1000 / 70));
     }
 
     private void IdentifyVersion()

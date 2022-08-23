@@ -1,4 +1,6 @@
-﻿namespace DoomSharp.Core;
+﻿using System.Diagnostics;
+
+namespace DoomSharp.Core;
 
 public class NullConsole : IConsole
 {
@@ -8,5 +10,10 @@ public class NullConsole : IConsole
 
     public void SetTitle(string title)
     {
+    }
+
+    public void Shutdown()
+    {
+        Process.GetCurrentProcess().Close();
     }
 }

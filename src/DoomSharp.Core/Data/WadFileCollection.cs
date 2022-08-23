@@ -39,13 +39,18 @@ public class WadFileCollection : List<WadLump>, IDisposable
         return collection;
     }
 
-    public byte[] GetLumpName(string name, PurgeTag tag)
+    public byte[]? GetLumpName(string name, PurgeTag tag)
     {
         return GetLumpNum(GetNumForName(name), tag);
     }
 
-    public byte[] GetLumpNum(int lump, PurgeTag tag)
+    public byte[]? GetLumpNum(int lump, PurgeTag tag)
     {
+        if (lump < 0)
+        {
+            return null;
+        }
+
         if (lump >= LumpCount)
         {
             DoomGame.Error($"W_CacheLumpNum: {lump} >= numlumps");

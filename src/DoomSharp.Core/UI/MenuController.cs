@@ -234,12 +234,12 @@ public class MenuController
     public bool InHelpScreens { get; private set; } = false;
 
     public bool ShowMessages { get; private set; } = true;
-    public bool DetailLevel { get; private set; } = true;
-    public int MouseSensitivity { get; private set; } = 5; // TODO Find default
+    public bool DetailLevel { get; private set; } = false;
+    public int MouseSensitivity { get; private set; } = 5;
     public int ScreenSize { get; private set; }
-    public int ScreenBlocks { get; private set; } = 3; // TODO Find Default
-    public int SoundFxVolume { get; private set; } = 8; // TODO Find Default
-    public int MusicVolume { get; private set; } = 8; // TODO Find Default
+    public int ScreenBlocks { get; private set; } = 10;
+    public int SoundFxVolume { get; private set; } = 13;
+    public int MusicVolume { get; private set; } = 13;
 
     public int SelectedEpisode { get; private set; } = 0;
 
@@ -577,7 +577,7 @@ public class MenuController
 
                 case (int)Keys.F11:           // gamma toggle
                     DoomGame.Instance.Video.ToggleGamma();
-                    // players[consoleplayer].message = gammamsg[usegamma];
+                    // DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = gammamsg[usegamma];
                     return true;
             }
         }
@@ -754,11 +754,12 @@ public class MenuController
 
     private void NewGame(int choice)
     {
-        //if (netgame && !demoplayback)
-        //{
-        //    M_StartMessage(NEWGAME, NULL, false);
-        //    return;
-        //}
+        var game = DoomGame.Instance.Game;
+        if (game.NetGame && !game.DemoPlayback)
+        {
+            StartMessage(Messages.NewGame, null, false);
+            return;
+        }
 
         SetupNextMenu(DoomGame.Instance.GameMode == GameMode.Commercial 
             ? _newGameMenu 
@@ -769,11 +770,11 @@ public class MenuController
     {
         if (choice == (int)NewGameMenuItemIndexes.Nightmare)
         {
-            // TODO M_StartMessage(NIGHTMARE, VerifyNightmare, true);
+            StartMessage(Messages.Nightmare, VerifyNightmare, true);
             return;
         }
 
-        //G_DeferedInitNew(choice, epi + 1, 1);
+        DoomGame.Instance.Game.DeferedInitNew((SkillLevel)choice, SelectedEpisode + 1, 1);
         ClearMenus();
     }
 
@@ -784,7 +785,7 @@ public class MenuController
             return;
         }
 
-        //G_DeferedInitNew(nightmare, epi + 1, 1);
+        DoomGame.Instance.Game.DeferedInitNew(SkillLevel.Nightmare, SelectedEpisode + 1, 1);
         ClearMenus();
     }
 
@@ -792,7 +793,7 @@ public class MenuController
     {
         if (DoomGame.Instance.GameMode == GameMode.Shareware && choice != 0)
         {
-            // M_StartMessage(SWSTRING, NULL, false);
+            StartMessage(Messages.Shareware, null, false);
             SetupNextMenu(_readMenu);
             return;
         }
@@ -816,29 +817,34 @@ public class MenuController
     {
         ShowMessages = !ShowMessages;
 
-        //if (!showMessages)
-        //    players[consoleplayer].message = MSGOFF;
+        //if (!ShowMessages)
+        //{
+        //    DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = MSGOFF;
+        //}
         //else
-        //    players[consoleplayer].message = MSGON;
+        //{
+        //    DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = MSGON;
+        //}
 
         //message_dontfuckwithme = true;
     }
 
     private void EndGame(int choice)
     {
-        //if (!usergame)
-        //{
-        //    S_StartSound(NULL, sfx_oof);
-        //    return;
-        //}
+        var game = DoomGame.Instance.Game;
+        if (!game.UserGame)
+        {
+            // S_StartSound(NULL, sfx_oof);
+            return;
+        }
 
-        //if (netgame)
-        //{
-        //    M_StartMessage(NETEND, NULL, false);
-        //    return;
-        //}
+        if (game.NetGame)
+        {
+            // M_StartMessage(NETEND, NULL, false);
+            return;
+        }
 
-        //M_StartMessage(ENDGAME, M_EndGameResponse, true);
+        // M_StartMessage(ENDGAME, M_EndGameResponse, true);
     }
 
     private void EndGameResponse(char choice)
@@ -850,7 +856,7 @@ public class MenuController
 
         _currentMenu.LastOn = _itemOn;
         ClearMenus();
-        // D_StarTitle();
+        DoomGame.Instance.StartTitle();
     }
 
     private void ChangeSensitivity(int choice)
@@ -1146,7 +1152,7 @@ public class MenuController
         //    return;
         //}
 
-        if (DoomGame.Instance.GameState != GameState.Level)
+        if (DoomGame.Instance.Game.GameState != GameState.Level)
         {
             return;
         }
@@ -1172,7 +1178,7 @@ public class MenuController
         //    return;
         //}
 
-        if (DoomGame.Instance.GameState != GameState.Level)
+        if (DoomGame.Instance.Game.GameState != GameState.Level)
         {
             return;
         }
@@ -1249,7 +1255,7 @@ public class MenuController
         }
         else
         {
-            endMessage = Messages.QuitMessages.ElementAt((DoomGame.Instance.GameTic % (Messages.NumberOfQuitMessages - 2)) + 1) + Environment.NewLine + Environment.NewLine + Messages.DosY;
+            endMessage = Messages.QuitMessages.ElementAt((DoomGame.Instance.Game.GameTic % (Messages.NumberOfQuitMessages - 2)) + 1) + Environment.NewLine + Environment.NewLine + Messages.DosY;
         }
         
         StartMessage(endMessage, QuitResponse, true);
@@ -1262,15 +1268,20 @@ public class MenuController
             return;
         }
 
-        //if (!netgame)
-        //{
-        //    if (gamemode == commercial)
-        //        S_StartSound(NULL, quitsounds2[(gametic >> 2) & 7]);
-        //    else
-        //        S_StartSound(NULL, quitsounds[(gametic >> 2) & 7]);
-        //    I_WaitVBL(105);
-        //}
-        //I_Quit();
+        if (!DoomGame.Instance.Game.NetGame)
+        {
+            if (DoomGame.Instance.GameMode == GameMode.Commercial)
+            {
+                // S_StartSound(NULL, quitsounds2[(gametic >> 2) & 7]);
+            }
+            else
+            {
+                // S_StartSound(NULL, quitsounds[(gametic >> 2) & 7]);
+            }
+            DoomGame.Instance.WaitVBL(105);
+        }
+
+        DoomGame.Instance.Quit();
     }
 
     private void ClearMenus()

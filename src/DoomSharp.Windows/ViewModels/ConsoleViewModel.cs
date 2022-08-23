@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using DoomSharp.Core;
 using DoomSharp.Windows.Annotations;
 
@@ -43,6 +44,14 @@ public class ConsoleViewModel : IConsole, INotifyPropertyChanged
     {
         Title = $"{title} - Console output";
         MainViewModel.Instance.Title = title;
+    }
+
+    public void Shutdown()
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Application.Current.Shutdown();
+        });
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

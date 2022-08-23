@@ -12,6 +12,13 @@ public class Video
     private int _gamma = 0;
     private static readonly byte[][] GammaTable = new byte[5][];
 
+    private bool _wipeGo = false;
+    private byte[] _wipeScreenStart;
+    private byte[] _wipeScreenEnd;
+    private byte[] _wipeScreen;
+
+    private int[]? _wipeMeltPos = null;
+
     static Video()
     {
         GammaTable[0] = new byte[] {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,
@@ -149,6 +156,37 @@ public class Video
     }
 
     //
+    // V_DrawBlock
+    // Draw a linear block of pixels into the view buffer.
+    //
+    public void DrawBlock(int x, int y, int screen, int width, int height, byte[] src)
+    {
+        // Range check
+        if (x < 0 ||
+            (x + width) > Constants.ScreenWidth ||
+            y < 0 ||
+            (y + height) > Constants.ScreenHeight ||
+            screen > 4)
+        {
+            DoomGame.Console.WriteLine("Bad V_DrawBlock");
+            return;
+        }
+        // End range check
+
+        MarkRectangle(0, 0, width, height);
+
+        var destIdx = y * Constants.ScreenWidth + x;
+        var sourceIdx = 0;
+        while (height-- > 0)
+        {
+            Array.Copy(src, sourceIdx, _screens[screen], destIdx, width);
+            sourceIdx += width;
+            destIdx += Constants.ScreenWidth;
+        }
+        
+    }
+
+    //
     // V_DrawPatch
     // Masks a column based masked pic to the screen. 
     //
@@ -210,8 +248,13 @@ public class Video
     // V_DrawPatch
     // Masks a column based masked pic to the screen. 
     //
-    public void DrawPatch(int x, int y, int screen, byte[] patch)
+    public void DrawPatch(int x, int y, int screen, byte[]? patch)
     {
+        if (patch is null)
+        {
+            return;
+        }
+
         DrawPatch(x, y, screen, Patch.FromBytes(patch));
     }
 
@@ -228,9 +271,234 @@ public class Video
     // V_DrawPatchDirect
     // Draws directly to the screen on the pc. 
     //
-    public void DrawPatchDirect(int x, int y, int screen, byte[] patch)
+    public void DrawPatchDirect(int x, int y, int screen, byte[]? patch)
     {
+        if (patch is null)
+        {
+            return;
+        }
+
         DrawPatch(x, y, screen, Patch.FromBytes(patch));
+    }
+
+    // Wiping / melting functions
+    public int WipeStartScreen(int x, int y, int width, int height)
+    {
+        _wipeScreenStart = _screens[2];
+        ReadScreen(_wipeScreenStart);
+        return 0;
+    }
+
+    public int WipeEndScreen(int x, int y, int width, int height)
+    {
+        _wipeScreenEnd = _screens[3];
+        ReadScreen(_wipeScreenEnd);
+        DrawBlock(x, y, 0, width, height, _wipeScreenStart); // restore start screen.
+        return 0;
+    }
+
+    public bool WipeScreenEffect(WipeMethod wipeMethod, int x, int y, int width, int height, int tics)
+    {
+        var rc = false;
+        var wipeNo = (int)wipeMethod;
+
+        var wipeFunctions = new Func<int, int, int, bool>[]
+        {
+            InitializeColorTransform, DoColorTransform, ExitColorTransform,
+            InitializeMelt, DoMelt, ExitMelt
+        };
+
+        // initial stuff
+        if (!_wipeGo)
+        {
+            _wipeGo = true;
+            // wipe_scr = (byte *) Z_Malloc(width*height, PU_STATIC, 0); // DEBUG
+            _wipeScreen = _screens[0];
+            wipeFunctions[wipeNo * 3](width, height, tics);
+        }
+
+        // do a piece of wipe-in
+        MarkRectangle(0, 0, width, height);
+        rc = wipeFunctions[wipeNo * 3 + 1](width, height, tics);
+        //  V_DrawBlock(x, y, 0, width, height, wipe_scr); // DEBUG
+
+        // final stuff
+        if (rc)
+        {
+            _wipeGo = false;
+            wipeFunctions[wipeNo * 3 + 2](width, height, tics);
+        }
+
+        return !_wipeGo;
+    }
+
+    private bool InitializeColorTransform(int width, int height, int tics)
+    {
+        Array.Copy(_wipeScreenStart, 0, _wipeScreen, 0, Constants.ScreenWidth * Constants.ScreenHeight);
+        return false;
+    }
+
+    private bool DoColorTransform(int width, int height, int tics)
+    {
+        var changed = false;
+
+        var targetIdx = 0;
+        var sourceIdx = 0;
+
+        while (targetIdx != width * height)
+        {
+            if (_wipeScreen[targetIdx] != _wipeScreenEnd[sourceIdx])
+            {
+                byte newValue;
+                if (_wipeScreen[targetIdx] > _wipeScreenEnd[sourceIdx])
+                {
+                    newValue = (byte)(_wipeScreen[targetIdx] - tics);
+                    if (newValue < _wipeScreenEnd[sourceIdx])
+                    {
+                        _wipeScreen[targetIdx] = _wipeScreenEnd[sourceIdx];
+                    }
+                    else
+                    {
+                        _wipeScreen[targetIdx] = newValue;
+                    }
+                    
+                    changed = true;
+                }
+                else if (_wipeScreen[targetIdx] < _wipeScreenEnd[sourceIdx])
+                {
+                    newValue = (byte)(_wipeScreen[targetIdx] + tics);
+                    if (newValue > _wipeScreenEnd[sourceIdx])
+                    {
+                        _wipeScreen[targetIdx] = _wipeScreenEnd[sourceIdx];
+                    }
+                    else
+                    {
+                        _wipeScreen[targetIdx] = newValue;
+                    }
+
+                    changed = true;
+                }
+            }
+
+            targetIdx++;
+            sourceIdx++;
+        }
+
+        return !changed;
+    }
+
+    private bool ExitColorTransform(int width, int height, int tics)
+    {
+        return false;
+    }
+
+    private bool InitializeMelt(int width, int height, int tics)
+    {
+        Array.Copy(_wipeScreenStart, 0, _wipeScreen, 0, Constants.ScreenWidth * Constants.ScreenHeight);
+
+        // makes this wipe faster (in theory)
+        // to have stuff in column-major format
+        ShittyColorMajorTransform(_wipeScreenStart, width / 2, height);
+        ShittyColorMajorTransform(_wipeScreenEnd, width / 2, height);
+
+        // setup initial column positions
+        // (y<0 => not ready to scroll yet)
+        _wipeMeltPos = new int[width];
+        _wipeMeltPos[0] = -(DoomRandom.M_Random() % 16);
+        for (var i = 1; i < width; i++)
+        {
+            var r = (DoomRandom.M_Random() % 3) - 1;
+            _wipeMeltPos[i] = _wipeMeltPos[i] switch
+            {
+                > 0 => 0,
+                -16 => -15,
+                _ => _wipeMeltPos[i - 1] + r
+            };
+        }
+
+
+        return false;
+    }
+
+    private void ShittyColorMajorTransform(byte[] array, int width, int height)
+    {
+        var dest = new byte[width * height * 2];
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                dest[x * height + y] = array[y * width + x];
+            }
+        }
+
+        Array.Copy(dest, 0, array, 0, dest.Length);
+    }
+
+    private bool DoMelt(int width, int height, int tics)
+    {
+        var done = true;
+        if (_wipeMeltPos is null)
+        {
+            DoomGame.Error("wipe_doMelt: y is not initialized!");
+            return false;
+        }
+
+        width /= 2;
+
+        while (tics-- > 0)
+        {
+            for (var i = 0; i < width; i++)
+            {
+                if (_wipeMeltPos[i] < 0)
+                {
+                    _wipeMeltPos[i]++; 
+                    done = false;
+                }
+                else if (_wipeMeltPos[i] < height)
+                {
+                    var dy = (_wipeMeltPos[i] < 16) ? _wipeMeltPos[i] + 1 : 8;
+                    if (_wipeMeltPos[i] + dy >= height)
+                    {
+                        dy = height - _wipeMeltPos[i];
+                    }
+
+                    var sourceIdx = i * height + _wipeMeltPos[i];
+                    var destIdx = _wipeMeltPos[i] * width + i;
+                    
+                    for (var j = dy; j > 0; j--)
+                    {
+                        _wipeScreen[destIdx] = _wipeScreenStart[sourceIdx++];
+                        destIdx += width;
+                    }
+
+                    _wipeMeltPos[i] += dy;
+                    sourceIdx = i * height;
+                    destIdx = _wipeMeltPos[i] * width + i;
+                    
+                    for (var j = height - _wipeMeltPos[i]; j > 0; j--)
+                    {
+                        _wipeScreen[destIdx] = _wipeScreenStart[sourceIdx++];
+                        destIdx += width;
+                    }
+
+                    done = false;
+                }
+            }
+        }
+
+        return done;
+    }
+
+    private bool ExitMelt(int width, int height, int tics)
+    {
+        _wipeMeltPos = null;
+        return false;
+    }
+
+    private void ReadScreen(byte[] target)
+    {
+        Array.Copy(_screens[0], 0, target, 0, Constants.ScreenWidth * Constants.ScreenHeight);
     }
 
     private void MarkRectangle(float x, float y, float width, float height)
@@ -238,7 +506,7 @@ public class Video
         AddToBox(_dirtyBox, x, y);
         AddToBox(_dirtyBox, x + width - 1, y + height - 1);
     }
-
+    
     // Bounding box functions
     private void ClearBox(IList<float> box)
     {

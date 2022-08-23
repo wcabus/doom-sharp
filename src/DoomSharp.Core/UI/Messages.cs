@@ -29,6 +29,21 @@ public static class Messages
             ? $"do you want to quickload the game named{Environment.NewLine}{Environment.NewLine}'{{0}}'?{Environment.NewLine}" + PressYesOrNo
             : $"VOULEZ-VOUS CHARGER LA SAUVEGARDE{Environment.NewLine}{Environment.NewLine}'{{0}}'?{Environment.NewLine}" + PressYesOrNo;
 
+    public static string NewGame =>
+        DoomGame.Instance.Language == GameLanguage.English
+            ? $"you can't start a new game{Environment.NewLine}while in a network game{Environment.NewLine}{Environment.NewLine}" + PressAnyKey
+            : $"VOUS NE POUVEZ PAS LANCER{Environment.NewLine}UN NOUVEAU JEU SUR RESEAU.{Environment.NewLine}{Environment.NewLine}" + PressAnyKey;
+
+    public static string Nightmare =>
+        DoomGame.Instance.Language == GameLanguage.English
+            ? $"are you sure? this skill level{Environment.NewLine}isn't even remotely fair.{Environment.NewLine}{Environment.NewLine}" + PressYesOrNo
+            : $"VOUS CONFIRMEZ? CE NIVEAU EST{Environment.NewLine}VRAIMENT IMPITOYABLE!{Environment.NewLine}" + PressYesOrNo;
+
+    public static string Shareware =>
+        DoomGame.Instance.Language == GameLanguage.English
+            ? $"this is the shareware version of doom.{Environment.NewLine}{Environment.NewLine}you need to order the entire trilogy.{Environment.NewLine}{Environment.NewLine}" + PressAnyKey
+            : $"CECI EST UNE VERSION SHAREWARE DE DOOM.{Environment.NewLine}{Environment.NewLine}VOUS DEVRIEZ COMMANDER LA TRILOGIE COMPLETE.{Environment.NewLine}{Environment.NewLine}" + PressAnyKey;
+
     public static string GenericQuitMessage =>
         DoomGame.Instance.Language == GameLanguage.English 
             ? $"are you sure you want to{Environment.NewLine}quit this great game?"

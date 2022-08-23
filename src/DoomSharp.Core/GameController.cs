@@ -1,31 +1,96 @@
-﻿using System;
+﻿using DoomSharp.Core.Data;
+using DoomSharp.Core.GameLogic;
+using DoomSharp.Core.Input;
+using DoomSharp.Core.Networking;
+using System;
 
 namespace DoomSharp.Core;
 
 public class GameController
 {
-    private string _demoName = "";
+    private int _saveGameSlot = 0;
+    private string _saveDescription = "";
+
+    private byte[] _demoData = Array.Empty<byte>();
+    private int _demoDataIdx = -1;
+    private int _demoEnd = -1;
+    private SkillLevel _d_skill;
+    private int _d_episode;
+    private int _d_map;
+
+    public GameController()
+    {
+        for (var i = 0; i < Constants.MaxPlayers; i++)
+        {
+            InitPlayer(i);
+        }
+    }
+
+    public GameAction GameAction { get; set; } = GameAction.Nothing;
+    public GameState GameState { get; set; } = GameState.Wipe;
+    public GameState WipeGameState { get; set; } = GameState.DemoScreen;
+
+    public SkillLevel GameSkill { get; set; }
+    public bool RespawnMonsters { get; set; }
+    public int GameEpisode { get; set; }
+    public int GameMap { get; set; }
+
+    public bool Paused { get; set; }
+    public bool SendPause { get; set; }
+    public bool SendSave { get; set; }
+    public bool UserGame { get; set; }
+
+    public bool TimingDemo { get; set; }
+    public int StartTime { get; set; }
+
+    public bool ViewActive { get; set; }
+
+    public bool DeathMatch { get; set; }
+    public bool NetGame { get; set; }
+    public bool[] PlayerInGame { get; } = new bool[Constants.MaxPlayers];
+    public Player[] Players { get; } = new Player[Constants.MaxPlayers];
+
+    public int ConsolePlayer { get; set; } = 0;
+    public int DisplayPlayer { get; set; } = 0;
+    public int GameTic { get; set; } = 0;
+    public int LevelStartTic { get; set; } = 0;
+    public int TotalKills { get; set; } = 0;
+    public int TotalItems { get; set; } = 0;
+    public int TotalSecrets { get; set; } = 0;
+
+    public string DemoName { get; set; } = "";
+    public bool DemoRecording { get; set; }
+    public bool DemoPlayback { get; set; }
+    public bool NetDemo { get; set; }
+    public bool SingleDemo { get; set; }
+
+    public const int NumKeys = 256;
+    public bool[] GameKeyDown { get; } = new bool[256];
 
     public void Ticker()
     {
         var buf = 0;
-        //ticcmd_t* cmd;
+        TicCommand cmd;
 
-        //// do player reborns if needed
-        //for (i = 0; i < MAXPLAYERS; i++)
-        //    if (playeringame[i] && players[i].playerstate == PST_REBORN)
-        //        G_DoReborn(i);
+        // do player reborns if needed
+        for (var i = 0; i < Constants.MaxPlayers; i++)
+        {
+            if (PlayerInGame[i] && Players[i].State == PlayerState.Reborn)
+            {
+                DoReborn(i);
+            }
+        }
 
         // do things to change the game state
-        while (DoomGame.Instance.GameAction != GameAction.Nothing)
+        while (GameAction != GameAction.Nothing)
         {
-            switch (DoomGame.Instance.GameAction)
+            switch (GameAction)
             {
                 case GameAction.LoadLevel:
-                    // G_DoLoadLevel();
+                    DoLoadLevel();
                     break;
                 case GameAction.NewGame:
-                    // G_DoNewGame();
+                    DoNewGame();
                     break;
                 case GameAction.LoadGame:
                     // G_DoLoadGame();
@@ -47,7 +112,7 @@ public class GameController
                     break;
                 case GameAction.Screenshot:
                     // M_ScreenShot();
-                    DoomGame.Instance.GameAction = GameAction.Nothing;
+                    GameAction = GameAction.Nothing;
                     break;
                 case GameAction.Nothing:
                     break;
@@ -56,20 +121,24 @@ public class GameController
 
         // get commands, check consistancy,
         // and build new consistancy check
-        buf = (DoomGame.Instance.GameTic / DoomGame.Instance.TicDup) % Constants.BackupTics;
+        buf = (GameTic / DoomGame.Instance.TicDup) % Constants.BackupTics;
 
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            //if (playeringame[i])
-            //{
-            //    cmd = &players[i].cmd;
+            if (PlayerInGame[i])
+            {
+                cmd = Players[i].Command;
 
             //    memcpy(cmd, &netcmds[i][buf], sizeof(ticcmd_t));
+                if (DemoPlayback)
+                {
+                    ReadDemoTicCommand(cmd);
+                }
 
-            //    if (demoplayback)
-            //        G_ReadDemoTiccmd(cmd);
-            //    if (demorecording)
-            //        G_WriteDemoTiccmd(cmd);
+                if (DemoRecording)
+                {
+                    WriteDemoTicCommand(cmd);
+                }
 
             //    // check for turbo cheats
             //    if (cmd->forwardmove > TURBOTHRESHOLD
@@ -78,7 +147,7 @@ public class GameController
             //        static char turbomessage[80];
             //        extern char* player_names[4];
             //        sprintf(turbomessage, "%s is turbo!", player_names[i]);
-            //        players[consoleplayer].message = turbomessage;
+            //        players[ConsolePlayer].message = turbomessage;
             //    }
 
             //    if (netgame && !netdemo && !(gametic % ticdup))
@@ -94,40 +163,47 @@ public class GameController
             //        else
             //            consistancy[i][buf] = rndindex;
             //    }
-            //}
+            }
         }
 
         // check for special buttons
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            //if (playeringame[i])
-            //{
-            //    if (players[i].cmd.buttons & BT_SPECIAL)
-            //    {
-            //        switch (players[i].cmd.buttons & BT_SPECIALMASK)
-            //        {
-            //            case BTS_PAUSE:
-            //                paused ^= 1;
-            //                if (paused)
-            //                    S_PauseSound();
-            //                else
-            //                    S_ResumeSound();
-            //                break;
+            if (PlayerInGame[i])
+            {
+                if ((Players[i].Command.Buttons & (int)ButtonCode.Special) != 0)
+                {
+                    switch (Players[i].Command.Buttons & (int)ButtonCode.SpecialMask)
+                    {
+                        case (int)ButtonCode.Pause:
+                            Paused = !Paused;
+                            if (Paused)
+                            {
+                                // S_PauseSound();
+                            }
+                            else
+                            {
+                                // S_ResumeSound();
+                            }
 
-            //            case BTS_SAVEGAME:
-            //                if (!savedescription[0])
-            //                    strcpy(savedescription, "NET GAME");
-            //                savegameslot =
-            //                (players[i].cmd.buttons & BTS_SAVEMASK) >> BTS_SAVESHIFT;
-            //                gameaction = ga_savegame;
-            //                break;
-            //        }
-            //    }
-            //}
+                            break;
+
+                        case (int)ButtonCode.SaveGame:
+                            if (string.IsNullOrWhiteSpace(_saveDescription))
+                            {
+                                _saveDescription = "NET GAME";
+                            }
+
+                            _saveGameSlot = (Players[i].Command.Buttons & (int)ButtonCode.SaveMask) >> (int)ButtonCode.SaveShift;
+                            GameAction = GameAction.SaveGame;
+                            break;
+                    }
+                }
+            }
         }
 
         // do main actions
-        switch (DoomGame.Instance.GameState)
+        switch (GameState)
         {
             case GameState.Level:
                 //P_Ticker();
@@ -150,10 +226,71 @@ public class GameController
         }
     }
 
+    //
+    // G_InitPlayer 
+    // Called at the start.
+    // Called by the game initialization functions.
+    //
+    public void InitPlayer(int player)
+    {
+        // set up the saved info         
+        Players[player] = new Player();
+
+        // clear everything else to defaults 
+        PlayerReborn(player);
+    }
+
+    private void PlayerReborn(int player)
+    {
+
+    }
+
+    private void DoReborn(int player)
+    {
+        if (!NetGame)
+        {
+            GameAction = GameAction.LoadLevel;
+        }
+        else
+        {
+            // respawn at the start
+
+            // first dissasociate the corpse 
+            // Players[player].mo->player = NULL;
+
+            // spawn at random spot if in death match 
+            if (DeathMatch)
+            {
+                // G_DeathMatchSpawnPlayer(playernum);
+                return;
+            }
+
+            //if (G_CheckSpot(playernum, &playerstarts[playernum]))
+            //{
+            //    P_SpawnPlayer(&playerstarts[playernum]);
+            //    return;
+            //}
+
+            // try to spawn at one of the other players spots 
+            for (var i = 0; i < Constants.MaxPlayers; i++)
+            {
+                //if (G_CheckSpot(playernum, &playerstarts[i]))
+                //{
+                //    playerstarts[i].type = playernum + 1;   // fake as other player 
+                //    P_SpawnPlayer(&playerstarts[i]);
+                //    playerstarts[i].type = i + 1;       // restore 
+                //    return;
+                //}
+                // he's going to be inside something.  Too bad.
+            }
+            // P_SpawnPlayer(&playerstarts[playernum]);
+        }
+    }
+
     public void DeferedPlayDemo(string demo)
     {
-        _demoName = demo;
-        DoomGame.Instance.GameAction = GameAction.PlayDemo;
+        DemoName = demo;
+        GameAction = GameAction.PlayDemo;
     }
 
     private void DoPlayDemo()
@@ -163,7 +300,7 @@ public class GameController
         var episode = 1;
         var map = 1;
 
-        DoomGame.Instance.GameAction = GameAction.Nothing;
+        GameAction = GameAction.Nothing;
         //demobuffer = demo_p = DoomGame.Instance.WadData.GetLumpName(_demoName, Constants.PuStatic);
         //if (*demo_p++ != VERSION)
         //{
@@ -179,7 +316,7 @@ public class GameController
         //respawnparm = *demo_p++;
         //fastparm = *demo_p++;
         //nomonsters = *demo_p++;
-        //consoleplayer = *demo_p++;
+        //ConsolePlayer = *demo_p++;
 
         //for (i = 0; i < MAXPLAYERS; i++)
         //    playeringame[i] = *demo_p++;
@@ -198,11 +335,34 @@ public class GameController
         //demoplayback = true;
     }
 
-    private void InitNew(SkillLevel skill, int episode, int map)
+    public void DeferedInitNew(SkillLevel skill, int episode, int map)
     {
-        if (DoomGame.Instance.Paused)
+        _d_skill = skill;
+        _d_episode = episode;
+        _d_map = map;
+        GameAction = GameAction.NewGame;
+    }
+
+    public void DoNewGame()
+    {
+        DemoPlayback = false;
+        NetDemo = false;
+        NetGame = false;
+        DeathMatch = false;
+        PlayerInGame[1] = PlayerInGame[2] = PlayerInGame[3] = false;
+        //respawnparm = false;
+        //fastparm = false;
+        //nomonsters = false;
+        ConsolePlayer = 0;
+        InitNew(_d_skill, _d_episode, _d_map);
+        GameAction = GameAction.Nothing;
+    }
+
+    public void InitNew(SkillLevel skill, int episode, int map)
+    {
+        if (Paused)
         {
-            DoomGame.Instance.Paused = false;
+            Paused = false;
             // S_ResumeSound();
         }
 
@@ -246,7 +406,7 @@ public class GameController
             map = 9;
         }
 
-        //M_ClearRandom();
+        DoomRandom.ClearRandom();
 
         //if (skill == sk_nightmare || respawnparm)
         //    respawnmonsters = true;
@@ -274,19 +434,19 @@ public class GameController
         // force players to be initialized upon first level load         
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            // players[i].playerstate = PST_REBORN;
+            Players[i].State = PlayerState.Reborn;
         }
 
-        //usergame = true;                // will be set false if a demo 
-        //paused = false;
-        //demoplayback = false;
-        //automapactive = false;
-        //viewactive = true;
-        //gameepisode = episode;
-        //gamemap = map;
-        //gameskill = skill;
+        UserGame = true;                // will be set false if a demo 
+        Paused = false;
+        DemoPlayback = false;
+        // AutomapActive = false;
+        ViewActive = true;
+        GameEpisode = episode;
+        GameMap = map;
+        GameSkill = skill;
 
-        //viewactive = true;
+        ViewActive = true;
 
         // set the sky map for the episode
         //if (DoomGame.Instance.GameMode == GameMode.Commercial)
@@ -320,6 +480,78 @@ public class GameController
         DoLoadLevel();
     }
 
+    private void ReadDemoTicCommand(TicCommand cmd)
+    {
+        if (_demoData[_demoDataIdx] == Constants.DemoMarker)
+        {
+            // end of demo data stream 
+            CheckDemoStatus();
+            return;
+        }
+
+        cmd.ForwardMove = (sbyte)_demoData[_demoDataIdx++];
+        cmd.SideMove = (sbyte)_demoData[_demoDataIdx++];
+        cmd.AngleTurn = (byte)(_demoData[_demoDataIdx++] << 8);
+        cmd.Buttons = _demoData[_demoDataIdx++];
+    }
+
+    private void WriteDemoTicCommand(TicCommand cmd)
+    {
+        if (GameKeyDown['q']) // press q to end demo recording 
+        {
+            CheckDemoStatus();
+        }
+
+        _demoData[_demoDataIdx++] = (byte)cmd.ForwardMove;
+        _demoData[_demoDataIdx++] = (byte)cmd.SideMove;
+        _demoData[_demoDataIdx++] = (byte)((cmd.AngleTurn + 128) >> 8);
+        _demoData[_demoDataIdx++] = cmd.Buttons;
+
+        _demoDataIdx -= 4;
+        if (_demoDataIdx > _demoEnd - 16)
+        {
+            // no more space 
+            CheckDemoStatus();
+            return;
+        }
+
+        ReadDemoTicCommand(cmd);         // make SURE it is exactly the same 
+    }
+
+    private void RecordDemo(string name)
+    {
+        UserGame = false;
+        DemoName = name + ".lmp";
+        var maxSize = 0x20000;
+        //i = M_CheckParm("-maxdemo");
+        //if (i && i < myargc - 1)
+        //    maxsize = atoi(myargv[i + 1]) * 1024;
+        _demoData = new byte[maxSize];
+        _demoEnd = maxSize;
+
+        DemoRecording = true;
+    }
+
+    private void BeginRecording()
+    {
+        _demoDataIdx = 0;
+
+        _demoData[_demoDataIdx++] = DoomGame.Version;
+        _demoData[_demoDataIdx++] = (byte)GameSkill;
+        _demoData[_demoDataIdx++] = (byte)GameEpisode;
+        _demoData[_demoDataIdx++] = (byte)GameMap;
+        _demoData[_demoDataIdx++] = (byte)(DeathMatch ? 1 : 0);
+        _demoData[_demoDataIdx++] = 0; // respawnparam
+        _demoData[_demoDataIdx++] = 0; // fastparm;
+        _demoData[_demoDataIdx++] = 0; // nomonsters;
+        _demoData[_demoDataIdx++] = (byte)ConsolePlayer;
+
+        for (var i = 0; i < Constants.MaxPlayers; i++)
+        {
+            _demoData[_demoDataIdx++] = (byte)(PlayerInGame[i] ? 1 : 0);
+        }
+    }
+
     private void DoLoadLevel()
     {
         //// Set the sky map.
@@ -343,24 +575,28 @@ public class GameController
         //        skytexture = R_TextureNumForName("SKY2");
         //}
 
-        //levelstarttic = gametic;        // for time calculation
+        LevelStartTic = GameTic; // for time calculation
 
-        //if (wipegamestate == GS_LEVEL)
-        //    wipegamestate = -1;             // force a wipe 
+        if (WipeGameState == GameState.Level)
+        {
+            WipeGameState = GameState.Wipe; // force a wipe 
+        }
 
-        // DoomGame.Instance.GameState = GameState.Level;
+        GameState = GameState.Level;
 
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            //if (playeringame[i] && players[i].playerstate == PST_DEAD)
-            //    players[i].playerstate = PST_REBORN;
+            if (PlayerInGame[i] && Players[i].State == PlayerState.Dead)
+            {
+                Players[i].State = PlayerState.Reborn;
+            }
             //memset(players[i].frags, 0, sizeof(players[i].frags));
         }
 
         // P_SetupLevel(gameepisode, gamemap, 0, gameskill);
-        //displayplayer = consoleplayer;		// view the guy you are playing    
-        //starttime = I_GetTime();
-        DoomGame.Instance.GameAction = GameAction.Nothing; 
+        DisplayPlayer = ConsolePlayer;		// view the guy you are playing    
+        StartTime = DoomGame.Instance.GetTime();
+        GameAction = GameAction.Nothing; 
         //Z_CheckHeap();
 
         //// clear cmd building stuff
@@ -370,5 +606,48 @@ public class GameController
         //sendpause = sendsave = paused = false; 
         //memset(mousebuttons, 0, sizeof(mousebuttons));
         //memset(joybuttons, 0, sizeof(joybuttons));
+    }
+
+    private bool CheckDemoStatus()
+    {
+        if (TimingDemo)
+        {
+            var endTime = DoomGame.Instance.GetTime();
+            DoomGame.Error($"timed {GameTic} gametics in {endTime - StartTime} realtics");
+            return true;
+        }
+
+        if (DemoPlayback)
+        {
+            if (SingleDemo)
+            {
+                DoomGame.Instance.Quit();
+                return true;
+            }
+
+            // Z_ChangeTag(demobuffer, PU_CACHE);
+            DemoPlayback = false;
+            NetDemo = false;
+            NetGame = false;
+            DeathMatch = false;
+            PlayerInGame[1] = PlayerInGame[2] = PlayerInGame[3] = false;
+            //respawnparm = false;
+            //fastparm = false;
+            //nomonsters = false;
+            ConsolePlayer = 0;
+            DoomGame.Instance.AdvanceDemo();
+            return true;
+        }
+
+        if (DemoRecording)
+        {
+            _demoData[_demoDataIdx++] = Constants.DemoMarker;
+            //M_WriteFile(demoname, demobuffer, demo_p - demobuffer);
+            //Z_Free(demobuffer);
+            DemoRecording = false;
+            DoomGame.Error($"Demo {DemoName} recorded");
+        }
+
+        return false;
     }
 }

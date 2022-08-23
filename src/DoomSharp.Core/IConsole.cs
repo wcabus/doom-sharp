@@ -11,4 +11,5 @@ public interface IConsole
     }
 
     void SetTitle(string title);
+    void Shutdown();
 }
