@@ -59,7 +59,8 @@ public class WadFileCollection : List<WadLump>, IDisposable
         if (this[lump].Data == null)
         {
             // read the lump in
-            ReadLump(lump, this[lump], tag);
+            ReadLump(lump, this[lump]);
+            ChangeTag(this[lump], tag);
         }
         else
         {
@@ -80,7 +81,7 @@ public class WadFileCollection : List<WadLump>, IDisposable
         return num;
     }
 
-    private int CheckNumForName(string name)
+    public int CheckNumForName(string name)
     {
         // scan backwards so patch lump files take precedence
         var i = LumpCount;
@@ -96,7 +97,18 @@ public class WadFileCollection : List<WadLump>, IDisposable
         return -1;
     }
 
-    private void ReadLump(int lump, WadLump destination, PurgeTag tag)
+    public int LumpLength(int lump)
+    {
+        if (lump >= LumpCount)
+        {
+            DoomGame.Error($"W_LumpLength: {lump} >= numlumps");
+            return -1;
+        }
+
+        return this[lump].Lump.Size;
+    }
+
+    public void ReadLump(int lump, WadLump destination)
     {
         if (lump < 0 || lump >= LumpCount)
         {
@@ -104,7 +116,6 @@ public class WadFileCollection : List<WadLump>, IDisposable
         }
 
         destination.File.ReadLumpData(destination);
-        destination.Tag = tag;
     }
 
     private void ChangeTag(WadLump lump, PurgeTag tag)

@@ -23,5 +23,11 @@ namespace DoomSharp.Windows
         {
             InitializeComponent();
         }
+
+        private void OnConsoleOutputChanged(object sender, TextChangedEventArgs e)
+        {
+            var box = e.Source as TextBox;
+            box!.CaretIndex = box.Text.Length;
+        }
     }
 }

@@ -19,6 +19,7 @@
                  AcceptsReturn="True"
                  Background="Black"
                  Foreground="Silver"
-                 Text="{Binding Path=ConsoleOutput}"/>
+                 Text="{Binding Path=ConsoleOutput}"
+                 TextChanged="OnConsoleOutputChanged"/>
     </DockPanel>
 </Window>

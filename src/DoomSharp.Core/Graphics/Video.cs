@@ -7,17 +7,17 @@ public class Video
     private IGraphics _graphics;
     
     private readonly byte[][] _screens = new byte[5][];
-    private readonly float[] _dirtyBox = new float[4];
+    private readonly Fixed[] _dirtyBox = new Fixed[4];
 
     private int _gamma = 0;
     private static readonly byte[][] GammaTable = new byte[5][];
 
-    private bool _wipeGo = false;
-    private byte[] _wipeScreenStart;
-    private byte[] _wipeScreenEnd;
-    private byte[] _wipeScreen;
+    private bool _wipeGo;
+    private byte[] _wipeScreenStart = Array.Empty<byte>();
+    private byte[] _wipeScreenEnd = Array.Empty<byte>();
+    private byte[] _wipeScreen = Array.Empty<byte>();
 
-    private int[]? _wipeMeltPos = null;
+    private int[]? _wipeMeltPos;
 
     static Video()
     {
@@ -115,7 +115,7 @@ public class Video
             _screens[i] = new byte[Constants.ScreenWidth * Constants.ScreenHeight];
         }
 
-        ClearBox(_dirtyBox);
+        BoundingBox.ClearBox(_dirtyBox);
     }
 
     public void ToggleGamma()
@@ -132,7 +132,7 @@ public class Video
     public void SetPalette(string paletteName, int paletteIndex = 0)
     {
         const int bytesPerPalette = 256 * 3;
-        var paletteLump = DoomGame.Instance.WadData.GetLumpName(paletteName, PurgeTag.Cache);
+        var paletteLump = DoomGame.Instance.WadData.GetLumpName(paletteName, PurgeTag.Cache)!;
         var palette = new byte[bytesPerPalette];
         var j = 0;
 
@@ -299,7 +299,6 @@ public class Video
 
     public bool WipeScreenEffect(WipeMethod wipeMethod, int x, int y, int width, int height, int tics)
     {
-        var rc = false;
         var wipeNo = (int)wipeMethod;
 
         var wipeFunctions = new Func<int, int, int, bool>[]
@@ -319,7 +318,7 @@ public class Video
 
         // do a piece of wipe-in
         MarkRectangle(0, 0, width, height);
-        rc = wipeFunctions[wipeNo * 3 + 1](width, height, tics);
+        var rc = wipeFunctions[wipeNo * 3 + 1](width, height, tics);
         //  V_DrawBlock(x, y, 0, width, height, wipe_scr); // DEBUG
 
         // final stuff
@@ -416,7 +415,6 @@ public class Video
             };
         }
 
-
         return false;
     }
 
@@ -501,37 +499,9 @@ public class Video
         Array.Copy(_screens[0], 0, target, 0, Constants.ScreenWidth * Constants.ScreenHeight);
     }
 
-    private void MarkRectangle(float x, float y, float width, float height)
+    private void MarkRectangle(int x, int y, int width, int height)
     {
-        AddToBox(_dirtyBox, x, y);
-        AddToBox(_dirtyBox, x + width - 1, y + height - 1);
-    }
-    
-    // Bounding box functions
-    private void ClearBox(IList<float> box)
-    {
-        box[2] = box[3] = float.MinValue;
-        box[0] = box[1] = float.MaxValue;
-    }
-
-    private void AddToBox(IList<float> box, float x, float y)
-    {
-        if (x < box[0])
-        {
-            box[0] = x;
-        }
-        else if (x > box[3])
-        {
-            box[3] = x;
-        }
-
-        if (y < box[1])
-        {
-            box[1] = y;
-        }
-        else if (y > box[2])
-        {
-            box[2] = y;
-        }
+        BoundingBox.AddToBox(_dirtyBox, new Fixed(x), new Fixed(y));
+        BoundingBox.AddToBox(_dirtyBox, new Fixed(x + width - 1), new Fixed(y + height - 1));
     }
 }

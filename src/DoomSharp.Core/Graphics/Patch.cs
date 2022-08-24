@@ -7,22 +7,22 @@
 /// and we compose textures from the TEXTURE1/2 lists
 /// of patches.
 /// </summary>
-public record Patch(short Width, short Height, short LeftOffset, short TopOffset, int[] ColumnOffsets, Column?[] Columns)
+public record Patch(ushort Width, ushort Height, short LeftOffset, short TopOffset, uint[] ColumnOffsets, Column?[] Columns)
 {
     public static Patch FromBytes(byte[] patchData)
     {
         using var stream = new MemoryStream(patchData, false);
         using var reader = new BinaryReader(stream);
 
-        var width = reader.ReadInt16();
-        var height = reader.ReadInt16();
+        var width = reader.ReadUInt16();
+        var height = reader.ReadUInt16();
         var left = reader.ReadInt16();
         var top = reader.ReadInt16();
 
-        var offsets = new int[width];
+        var offsets = new uint[width];
         for (var i = 0; i < width; i++)
         {
-            offsets[i] = reader.ReadInt32();
+            offsets[i] = reader.ReadUInt32();
         }
 
         var columns = new Column?[width];
