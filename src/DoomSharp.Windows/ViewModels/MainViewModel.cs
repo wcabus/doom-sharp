@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -89,13 +90,9 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     public void ScreenReady(byte[] output)
     {
-        var bufferIdx = 0;
-        foreach (var pixel in output)
-        {
-            _screenBuffer[bufferIdx++] = pixel;
-        }
-
-        Application.Current.Dispatcher.Invoke(() =>
+        Array.Copy(output, 0, _screenBuffer, 0, output.Length);
+        
+        Application.Current?.Dispatcher?.Invoke(() =>
         {
             var bitmap = _output;
             var switchOutput = false;

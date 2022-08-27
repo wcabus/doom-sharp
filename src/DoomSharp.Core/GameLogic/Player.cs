@@ -4,9 +4,10 @@ namespace DoomSharp.Core.GameLogic;
 
 public class Player
 {
-    public MapObject? MapObject { get; set; }
-    public PlayerState State { get; set; } = PlayerState.NotSet;
+    public PlayerState PlayerState { get; set; } = PlayerState.NotSet;
     public TicCommand Command { get; set; }
+
+    public MapObject? MapObject { get; set; }
 
     // Determine POV,
     //  including viewpoint bobbing during movement.
@@ -59,7 +60,7 @@ public class Player
     public int SecretCount { get; set; }
 
     // Hint messages.
-    public string Message { get; set; }
+    public string? Message { get; set; }
 
     // For screen flashing (red or bright).
     public int DamageCount { get; set; }

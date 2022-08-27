@@ -10,8 +10,6 @@ public static class Constants
     public const int ScreenMul = 1;
     public const float InvertedAspectRatio = 0.625f;
 
-    public const int MaxDrawSegs = 256;
-
     /// <summary>
     /// State updates, number of ticks / second
     /// </summary>
@@ -39,22 +37,64 @@ public static class Constants
     public const int ViewHeight = FracUnit * 41;
 
     // LineDef attributes
+
+    public static class Line
+    {
+        /// <summary>
+        /// Solid, is an obstacle.
+        /// </summary>
+        public const int Blocking = 1;
+
+        /// <summary>
+        /// Block monsters only.
+        /// </summary>
+        public const int BlockMonsters = 2;
+
+        /// <summary>
+        /// Backside will not be present at all if not two sided.
+        /// </summary>
+        public const int TwoSided = 4;
+
+        // If a texture is pegged, the texture will have
+        // the end exposed to air held constant at the
+        // top or bottom of the texture (stairs or pulled
+        // down things) and will move with a height change
+        // of one of the neighbor sectors.
+        // Unpegged textures allways have the first row of
+        // the texture at the top pixel of the line for both
+        // top and bottom textures (use next to windows).
+
+        /// <summary>
+        /// upper texture unpegged
+        /// </summary>
+        public const int DontPegTop = 8;
+
+        /// <summary>
+        /// lower texture unpegged
+        /// </summary>
+        public const int DontPegBottom = 16;
+
+        /// <summary>
+        /// In AutoMap: don't map as two-sided: IT'S A SECRET!
+        /// </summary>
+        public const int Secret = 32;
+
+        /// <summary>
+        /// Sound rendering: don't let sound cross two of these
+        /// </summary>
+        public const int SoundBlock = 64;
+
+        /// <summary>
+        /// Don't draw on the automap at all
+        /// </summary>
+        public const int DontDraw = 128;
+
+        /// <summary>
+        /// Set if already seen, thus drawn in automap.
+        /// </summary>
+        public const int Mapped = 256;
+    }
     
-    /// <summary>
-    /// Solid, is an obstacle.
-    /// </summary>
-    public const int LineBlocking = 1;
-
-    /// <summary>
-    /// Block monsters only.
-    /// </summary>
-    public const int LineBlockMonsters = 2;
-
-    /// <summary>
-    /// Backside will not be present at all if not two sided.
-    /// </summary>
-    public const int LineTwoSided = 4;
-
     // mapblocks are used to check movement
     // against lines and things
     public const int MapBlockunits = 128;
@@ -93,4 +133,38 @@ public static class Constants
         public const int Kill = 0x10000000; // kill game
         public const int CheckSum = 0x0fffffff;
     }
+
+    public static readonly string[] SpriteNames =
+    {
+        "TROO","SHTG","PUNG","PISG","PISF","SHTF","SHT2","CHGG","CHGF","MISG",
+        "MISF","SAWG","PLSG","PLSF","BFGG","BFGF","BLUD","PUFF","BAL1","BAL2",
+        "PLSS","PLSE","MISL","BFS1","BFE1","BFE2","TFOG","IFOG","PLAY","POSS",
+        "SPOS","VILE","FIRE","FATB","FBXP","SKEL","MANF","FATT","CPOS","SARG",
+        "HEAD","BAL7","BOSS","BOS2","SKUL","SPID","BSPI","APLS","APBX","CYBR",
+        "PAIN","SSWV","KEEN","BBRN","BOSF","ARM1","ARM2","BAR1","BEXP","FCAN",
+        "BON1","BON2","BKEY","RKEY","YKEY","BSKU","RSKU","YSKU","STIM","MEDI",
+        "SOUL","PINV","PSTR","PINS","MEGA","SUIT","PMAP","PVIS","CLIP","AMMO",
+        "ROCK","BROK","CELL","CELP","SHEL","SBOX","BPAK","BFUG","MGUN","CSAW",
+        "LAUN","PLAS","SHOT","SGN2","COLU","SMT2","GOR1","POL2","POL5","POL4",
+        "POL3","POL1","POL6","GOR2","GOR3","GOR4","GOR5","SMIT","COL1","COL2",
+        "COL3","COL4","CAND","CBRA","COL6","TRE1","TRE2","ELEC","CEYE","FSKU",
+        "COL5","TBLU","TGRN","TRED","SMBT","SMGT","SMRT","HDB1","HDB2","HDB3",
+        "HDB4","HDB5","HDB6","POB1","POB2","BRS1","TLMP","TLP2"
+    };
+
+    public const int MaxButtons = MaxPlayers * 4;
+    public const int ButtonTime = TicRate; // 1 second in ticks
+
+    /// <summary>
+    /// Max number of wall switches in a level
+    /// </summary>
+    public const int MaxSwitches = 50;
+
+    public const int MaxAnimations = 32;
+    public const int MaxLineAnimations = 64;
+
+    public const int NodeLeafSubSector = 0x8000;
+
+    public const int OnFloorZ = int.MinValue;
+    public const int OnCeilingZ = int.MaxValue;
 }

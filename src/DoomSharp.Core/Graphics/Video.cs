@@ -9,13 +9,13 @@ public class Video
     private readonly byte[][] _screens = new byte[5][];
     private readonly Fixed[] _dirtyBox = new Fixed[4];
 
-    private int _gamma = 0;
+    private int _gamma;
     private static readonly byte[][] GammaTable = new byte[5][];
 
-    private bool _wipeGo;
-    private byte[] _wipeScreenStart = Array.Empty<byte>();
-    private byte[] _wipeScreenEnd = Array.Empty<byte>();
-    private byte[] _wipeScreen = Array.Empty<byte>();
+    private static bool _wipeGo;
+    private static byte[] _wipeScreenStart = Array.Empty<byte>();
+    private static byte[] _wipeScreenEnd = Array.Empty<byte>();
+    private static byte[] _wipeScreen = Array.Empty<byte>();
 
     private int[]? _wipeMeltPos;
 
@@ -108,6 +108,8 @@ public class Video
         _graphics = graphics;
     }
 
+    public byte[][] Screens => _screens;
+
     public void Initialize()
     {
         for (var i = 0; i < 4; i++)
@@ -177,7 +179,7 @@ public class Video
 
         var destIdx = y * Constants.ScreenWidth + x;
         var sourceIdx = 0;
-        while (height-- > 0)
+        while (height-- != 0)
         {
             Array.Copy(src, sourceIdx, _screens[screen], destIdx, width);
             sourceIdx += width;
@@ -393,7 +395,8 @@ public class Video
 
     private bool InitializeMelt(int width, int height, int tics)
     {
-        Array.Copy(_wipeScreenStart, 0, _wipeScreen, 0, Constants.ScreenWidth * Constants.ScreenHeight);
+        // copy start screen to main screen
+        Array.Copy(_wipeScreenStart, 0, _wipeScreen, 0, width * height);
 
         // makes this wipe faster (in theory)
         // to have stuff in column-major format
@@ -407,12 +410,15 @@ public class Video
         for (var i = 1; i < width; i++)
         {
             var r = (DoomRandom.M_Random() % 3) - 1;
-            _wipeMeltPos[i] = _wipeMeltPos[i] switch
+            _wipeMeltPos[i] = _wipeMeltPos[i - 1] + r;
+            if (_wipeMeltPos[i] > 0)
             {
-                > 0 => 0,
-                -16 => -15,
-                _ => _wipeMeltPos[i - 1] + r
-            };
+                _wipeMeltPos[i] = 0;
+            }
+            else if (_wipeMeltPos[i] == -16)
+            {
+                _wipeMeltPos[i] = -15;
+            }
         }
 
         return false;
@@ -436,6 +442,7 @@ public class Video
     private bool DoMelt(int width, int height, int tics)
     {
         var done = true;
+
         if (_wipeMeltPos is null)
         {
             DoomGame.Error("wipe_doMelt: y is not initialized!");
@@ -464,9 +471,9 @@ public class Video
                     var sourceIdx = i * height + _wipeMeltPos[i];
                     var destIdx = _wipeMeltPos[i] * width + i;
                     
-                    for (var j = dy; j > 0; j--)
+                    for (var j = dy; j != 0; j--)
                     {
-                        _wipeScreen[destIdx] = _wipeScreenStart[sourceIdx++];
+                        _wipeScreen[destIdx] = _wipeScreenEnd[sourceIdx++];
                         destIdx += width;
                     }
 
@@ -474,7 +481,7 @@ public class Video
                     sourceIdx = i * height;
                     destIdx = _wipeMeltPos[i] * width + i;
                     
-                    for (var j = height - _wipeMeltPos[i]; j > 0; j--)
+                    for (var j = height - _wipeMeltPos[i]; j != 0; j--)
                     {
                         _wipeScreen[destIdx] = _wipeScreenStart[sourceIdx++];
                         destIdx += width;
@@ -499,9 +506,9 @@ public class Video
         Array.Copy(_screens[0], 0, target, 0, Constants.ScreenWidth * Constants.ScreenHeight);
     }
 
-    private void MarkRectangle(int x, int y, int width, int height)
+    public void MarkRectangle(int x, int y, int width, int height)
     {
-        BoundingBox.AddToBox(_dirtyBox, new Fixed(x), new Fixed(y));
-        BoundingBox.AddToBox(_dirtyBox, new Fixed(x + width - 1), new Fixed(y + height - 1));
+        BoundingBox.AddToBox(_dirtyBox, x, y);
+        BoundingBox.AddToBox(_dirtyBox, x + width - 1, y + height - 1);
     }
 }

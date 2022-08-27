@@ -15,20 +15,20 @@ public static class BoundingBox
 
     public static void AddToBox(Fixed[] box, Fixed x, Fixed y)
     {
-        if (x.IntVal < box[BoxLeft].IntVal)
+        if (x < box[BoxLeft])
         {
             box[BoxLeft] = x;
         }
-        else if (x.IntVal > box[BoxRight].IntVal)
+        else if (x > box[BoxRight])
         {
             box[BoxRight] = x;
         }
 
-        if (y.IntVal < box[BoxBottom].IntVal)
+        if (y < box[BoxBottom])
         {
             box[BoxBottom] = y;
         }
-        else if (y.IntVal > box[BoxTop].IntVal)
+        else if (y > box[BoxTop])
         {
             box[BoxTop] = y;
         }

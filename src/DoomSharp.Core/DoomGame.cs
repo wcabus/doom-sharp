@@ -5,6 +5,7 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
 using System.Runtime.InteropServices;
 using DoomSharp.Core.GameLogic;
+using System;
 
 namespace DoomSharp.Core;
 
@@ -61,7 +62,13 @@ public class DoomGame : IDisposable
     private int _demoPageTic = 0;
     private string _demoPageName = "";
 
+    // Display method "statics"
+    private bool _displayViewActiveState = false;
+    private bool _displayMenuActiveState = false;
+    private bool _displayInHelpScreensState = false;
+    private bool _displayFullscreen = false;
     private GameState _oldDisplayGameState = GameState.Wipe;
+    private int _displayBorderDrawCount;
     
     private DoomGame()
     {
@@ -77,7 +84,7 @@ public class DoomGame : IDisposable
         {
             IdentifyVersion();
 
-            //_modifiedGame = false;
+            ModifiedGame = false;
 
             var titleFormat = GameMode switch
             {
@@ -140,7 +147,7 @@ public class DoomGame : IDisposable
             _renderer.Initialize();
 
             _console.WriteLine(Environment.NewLine + "P_Init: Init Playloop state.");
-            // P_Init ();
+            _game.P_Init();
 
             _console.WriteLine("I_Init: Setting up machine state.");
             // I_Init ();
@@ -177,6 +184,7 @@ public class DoomGame : IDisposable
         }
     }
 
+    public bool ModifiedGame { get; private set; } = false;
     public GameMode GameMode { get; private set; } = GameMode.Indetermined;
     public GameState WipeGameState { get; private set; } = GameState.Wipe;
     public GameLanguage Language { get; private set; } = GameLanguage.English;
@@ -204,6 +212,7 @@ public class DoomGame : IDisposable
     public Video Video => _video;
     public HudController Hud => _hud!;
     public WadFileCollection WadData => _wadFiles!;
+    public MenuController Menu => _menu!;
 
     public static void SetConsole(IConsole console)
     {
@@ -220,21 +229,22 @@ public class DoomGame : IDisposable
 
     private void Display()
     {
-        var y = 0;
-        var wipe = false;
+        bool wipe;
 
-        //if (nodrawers)
-        //    return;                    // for comparative timing / profiling
+        if (Game.NoDrawers)
+        {
+            return;                    // for comparative timing / profiling
+        }
 
-        // redrawsbar = false;
+        var redrawsbar = false;
 
         // change the view size if needed
-        //if (setsizeneeded)
-        //{
-        //    R_ExecuteSetViewSize();
-        //    oldgamestate = -1;                      // force background redraw
-        //    borderdrawcount = 3;
-        //}
+        if (Renderer.SetSizeNeeded)
+        {
+            Renderer.ExecuteSetViewSize();
+            _oldDisplayGameState = GameState.Wipe; // force background redraw
+            _displayBorderDrawCount = 3;
+        }
 
         // save the current screen if about to wipe
         if (_game.GameState != _game.WipeGameState)
@@ -247,7 +257,7 @@ public class DoomGame : IDisposable
             wipe = false;
         }
 
-        if (_game.GameState == GameState.Level && _game.GameTic > 0)
+        if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
             // HU_Erase();
         }
@@ -266,14 +276,18 @@ public class DoomGame : IDisposable
                     // AM_Drawer();
                 }
 
-                //if (wipe || (viewheight != 200 && fullscreen))
-                //    redrawsbar = true;
-                
-                //if (inhelpscreensstate && !inhelpscreens)
-                //    redrawsbar = true;              // just put away the help screen
-                
-                //ST_Drawer(viewheight == 200, redrawsbar);
-                //fullscreen = viewheight == 200;
+                if (wipe || (Renderer.ViewHeight != 200 && _displayFullscreen))
+                {
+                    redrawsbar = true;
+                }
+
+                if (_displayInHelpScreensState && !Menu.InHelpScreens)
+                {
+                    redrawsbar = true;              // just put away the help screen
+                }
+
+                //ST_Drawer(Renderer.ViewHeight  == 200, redrawsbar);
+                _displayFullscreen = Renderer.ViewHeight == 200;
                 break;
 
             case GameState.Intermission:
@@ -293,7 +307,7 @@ public class DoomGame : IDisposable
         // draw the view directly
         if (_game.GameState == GameState.Level && !AutoMapActive && _game.GameTic != 0)
         {
-            // R_RenderPlayerView(&players[displayplayer]);
+            Renderer.RenderPlayerView(Game.Players[Game.DisplayPlayer]);
         }
 
         if (_game.GameState == GameState.Level && _game.GameTic != 0)
@@ -310,42 +324,43 @@ public class DoomGame : IDisposable
         // see if the border needs to be initially drawn
         if (_game.GameState == GameState.Level && _oldDisplayGameState != GameState.Level)
         {
-            // viewactivestate = false;        // view was not active
-            // R_FillBackScreen();    // draw the pattern into the back screen
+            _displayViewActiveState = false; // view was not active
+            Renderer.FillBackScreen(); // draw the pattern into the back screen
         }
 
         // see if the border needs to be updated to the screen
-        if (_game.GameState == GameState.Level && !AutoMapActive /*&& scaledviewwidth != 320*/)
+        if (_game.GameState == GameState.Level && !AutoMapActive && Renderer.ScaledViewWidth != 320)
         {
-            if (_menu!.IsActive || MenuActive /* || !viewactivestate*/)
+            if (_menu!.IsActive || MenuActive || !_displayViewActiveState)
             {
-                // borderdrawcount = 3;
+                _displayBorderDrawCount = 3;
             }
-            //if (borderdrawcount)
-            //{
-            //    R_DrawViewBorder();    // erase old menu stuff
-            //    borderdrawcount--;
-            //}
+            if (_displayBorderDrawCount != 0)
+            {
+                Renderer.DrawViewBorder(); // erase old menu stuff
+                _displayBorderDrawCount--;
+            }
         }
 
-        MenuActive = _menu!.IsActive;
-        // viewactivestate = _game.ViewActive;
-        InHelpScreensActive = _menu!.InHelpScreens;
+        _displayMenuActiveState = _menu!.IsActive;
+        _displayViewActiveState = _game.ViewActive;
+        _displayInHelpScreensState = _menu!.InHelpScreens;
         _oldDisplayGameState = _game.WipeGameState = _game.GameState;
 
         // draw pause pic
         if (_game.Paused)
         {
+            int y;
             if (AutoMapActive)
             {
                 y = 4;
             }
             else
             {
-                y = /*viewwindowy +*/ 4;
+                y = Renderer.ViewWindowY + 4;
             }
 
-            _video.DrawPatchDirect(/*viewwindowx + (scaledviewwidth - 68) / 2*/ 0, y, 0, WadData.GetLumpName("M_PAUSE", PurgeTag.Cache));
+            _video.DrawPatchDirect(Renderer.ViewWindowX + (Renderer.ScaledViewWidth - 68) / 2, y, 0, WadData.GetLumpName("M_PAUSE", PurgeTag.Cache));
         }
 
         // menus go directly to the screen
@@ -363,12 +378,12 @@ public class DoomGame : IDisposable
         _video.WipeEndScreen(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
 
         var wipeStart = GetTime() - 1;
-        var done = false;
-        var nowTime = 0;
-        var tics = 0;
+        bool done;
 
         do
         {
+            int nowTime;
+            int tics;
             do
             {
                 nowTime = GetTime();
@@ -608,7 +623,7 @@ public class DoomGame : IDisposable
         }
     }
 
-    private void NetUpdate()
+    public void NetUpdate()
     {
         // check time
         var nowTime = GetTime() / TicDup;
@@ -870,10 +885,8 @@ public class DoomGame : IDisposable
 
                 _nodeInGame[netnode] = false;
                 _game.PlayerInGame[netconsole] = false;
-                
-                //strcpy(exitmsg, "Player 1 left the game");
-                //exitmsg[7] += netconsole;
-                //players[consoleplayer].message = exitmsg;
+
+                Game.Players[Game.ConsolePlayer].Message = $"Player {netconsole} left the game";
 
                 if (_game.DemoRecording)
                 {
@@ -1144,7 +1157,7 @@ public class DoomGame : IDisposable
 
     private void DoAdvanceDemo()
     {
-        _game.Players[_game.ConsolePlayer].State = PlayerState.Alive; // not reborn
+        _game.Players[_game.ConsolePlayer].PlayerState = PlayerState.Alive; // not reborn
         _advancedemo = false; 
         _game.UserGame = false;               // no save / end game here
         _game.Paused = false;

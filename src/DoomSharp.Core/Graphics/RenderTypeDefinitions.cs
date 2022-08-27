@@ -1,5 +1,4 @@
 ﻿using DoomSharp.Core.GameLogic;
-using System.Drawing;
 using System.Text;
 
 namespace DoomSharp.Core.Graphics;
@@ -19,12 +18,9 @@ public record Vertex(Fixed X, Fixed Y);
 ///  position is prolly just buffered, not
 ///  updated.
 /// </summary>
-public class DegenMapObj
+public class DegenMapObject : MapObject
 {
-    public Fixed X { get; set; } = Fixed.Zero;
-    public Fixed Y { get; set; } = Fixed.Zero;
-    public Fixed Z { get; set; } = Fixed.Zero;
-    public Thinker? Thinker { get; set; }
+    
 }
 
 /// <summary>
@@ -43,13 +39,13 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
     public int[] BlockBox { get; } = new int[4];
 
     // origin for any sounds played by the sector
-    public DegenMapObj SoundOrigin { get; } = new();
+    public DegenMapObject SoundOrigin { get; } = new();
 
     // if == validcount, already checked
     public int ValidCount { get; set; }
 
     // list of mobjs in sector
-    public MapObject[]? ThingList { get; set; }
+    public MapObject? ThingList { get; set; }
 
     // thinker_t for reversable actions
     public Thinker? SpecialData { get; set; }
@@ -79,8 +75,12 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
     }
 }
 
-public record SideDef(Fixed TextureOffset, Fixed RowOffset, short TopTexture, short BottomTexture, short MidTexture, Sector Sector)
+public record SideDef(Fixed TextureOffset, Fixed RowOffset, Sector Sector)
 {
+    public int TopTexture { get; set; }
+    public int BottomTexture { get; set; }
+    public int MidTexture { get; set; }
+
     public static SideDef ReadFromWadData(BinaryReader reader, Sector[] sectors)
     {
         var textureOffset = reader.ReadInt16();
@@ -93,11 +93,13 @@ public record SideDef(Fixed TextureOffset, Fixed RowOffset, short TopTexture, sh
         return new SideDef(
             new Fixed(textureOffset << Constants.FracBits),
             new Fixed(rowOffset << Constants.FracBits),
-            (short)DoomGame.Instance.Renderer.TextureNumForName(topTexture),
-            (short)DoomGame.Instance.Renderer.TextureNumForName(bottomTexture),
-            (short)DoomGame.Instance.Renderer.TextureNumForName(midTexture),
             sectors[sector]
-        );
+        )
+        {
+            TopTexture = DoomGame.Instance.Renderer.TextureNumForName(topTexture),
+            BottomTexture = DoomGame.Instance.Renderer.TextureNumForName(bottomTexture),
+            MidTexture = DoomGame.Instance.Renderer.TextureNumForName(midTexture),
+        };
     }
 }
 
@@ -119,8 +121,8 @@ public class Line
         Special = special;
         Tag = tag;
 
-        Dx = new Fixed(v2.X.IntVal - v1.X.IntVal);
-        Dy = new Fixed(v2.Y.IntVal - v1.Y.IntVal);
+        Dx = v2.X - v1.X;
+        Dy = v2.Y - v1.Y;
     }
 
     // Vertices, from v1 to v2.
@@ -213,7 +215,7 @@ public record Segment(Vertex V1, Vertex V2, Fixed Offset, uint Angle, SideDef Si
 
         var frontSector = sideDef.Sector;
         Sector? backSector = null;
-        if ((lineDef.Flags & Constants.LineTwoSided) != 0)
+        if ((lineDef.Flags & Constants.Line.TwoSided) != 0)
         {
             backSector = sides[lineDef.SideNum[side ^ 1]].Sector;
         }

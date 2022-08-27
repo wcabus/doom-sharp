@@ -1,11 +1,7 @@
-﻿using System.Text;
-using DoomSharp.Core.Data;
-using DoomSharp.Core.Extensions;
+﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
-using System;
-using System.Xml.Linq;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -24,8 +20,6 @@ public class GameController
     private WorldMapInfo _wmInfo = new();
 
     private readonly short[][] _consistency = new short[Constants.MaxPlayers][];
-
-    private Sky _sky = new();
 
     private int _levelTime;
     private LinkedList<Thinker> _thinkers = new();
@@ -94,8 +88,23 @@ public class GameController
     private int _deathMatchStartIdx = 0;
     private MapThing[] _playerStarts = new MapThing[Constants.MaxPlayers];
 
+    private readonly int[] _switchList = new int[Constants.MaxSwitches * 2];
+    private int _numSwitches = -1;
+    private readonly Button[] _buttonList = new Button[Constants.MaxButtons];
+
+    private AnimatingItem[] _animations = new AnimatingItem[Constants.MaxAnimations];
+    private AnimatingItem? _lastAnimation = null;
+
+    private int _numLineSpecials;
+    private Line[] _lineSpecialList = new Line[Constants.MaxLineAnimations];
+
     public GameController()
     {
+        for (var i = 0; i < Constants.MaxButtons; i++)
+        {
+            _buttonList[i] = new();
+        }
+
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
             InitPlayer(i);
@@ -151,6 +160,23 @@ public class GameController
     public const int NumKeys = 256;
     public bool[] GameKeyDown { get; } = new bool[256];
 
+    public LinkedList<Thinker> Thinkers => _thinkers;
+
+    public int NumSectors => _numSectors;
+    public Sector[] Sectors => _sectors;
+
+    public int NumSides => _numSides;
+    public SideDef[] Sides => _sides;
+
+    public int NumNodes => _numNodes;
+    public Node[] Nodes => _nodes;
+
+    public int NumSubSectors => _numSubSectors;
+    public SubSector[] SubSectors => _subSectors;
+
+    public int NumSegments => _numSegments;
+    public Segment[] Segments => _segments;
+
     public void Ticker()
     {
         var buf = 0;
@@ -159,7 +185,7 @@ public class GameController
         // do player reborns if needed
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            if (PlayerInGame[i] && Players[i].State == PlayerState.Reborn)
+            if (PlayerInGame[i] && Players[i].PlayerState == PlayerState.Reborn)
             {
                 DoReborn(i);
             }
@@ -329,6 +355,89 @@ public class GameController
 
     }
 
+    /// <summary>
+    /// Returns false if the player cannot be respawned
+    /// at the given mapthing_t spot  
+    /// because something is occupying it 
+    /// </summary>
+    private bool CheckSpot(int playernum, MapThing mthing)
+    {
+        Fixed x;
+        Fixed y;
+        SubSector ss;
+        uint an;
+
+        if (Players[playernum].MapObject == null)
+        {
+            // first spawn of level, before corpses
+            for (var i = 0; i < playernum; i++)
+            {
+                if (Players[i].MapObject.X == (mthing.X << Constants.FracBits) && Players[i].MapObject.Y == (mthing.Y << Constants.FracBits))
+                {
+                    return false;
+                } 
+            }
+            return true;
+        }
+
+        x = mthing.X << Constants.FracBits;
+        y = mthing.Y << Constants.FracBits;
+
+        //if (!P_CheckPosition(Players[playernum].MapObject, x, y))
+        //{
+        //    return false;
+        //}
+
+        // flush an old corpse if needed 
+        if (_bodyQueueSlot >= BodyQueueSize)
+        {
+            P_RemoveMapObject(_bodyQueue[_bodyQueueSlot % BodyQueueSize]);
+        }
+        _bodyQueue[_bodyQueueSlot % BodyQueueSize] = Players[playernum].MapObject;
+        _bodyQueueSlot++;
+
+        // spawn a teleport fog 
+        ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+        an = (uint)((RenderEngine.Angle45 * (mthing.Angle / 45)) >> RenderEngine.AngleToFineShift);
+
+        P_SpawnMapObject(x + 20 * RenderEngine.FineCosine[an], y + 20 * RenderEngine.FineSine[an], ss.Sector.FloorHeight, MapObjectType.MT_TFOG);
+
+        if (Players[ConsolePlayer].ViewZ != 1)
+        {
+            // S_StartSound(mo, sfx_telept);   // don't start sound on first frame 
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Spawns a player at one of the random death match spots 
+    /// called at level load and each death 
+    /// </summary>
+    private void DeathMatchSpawnPlayer(int playerNum)
+    {
+        var selections = _deathMatchStartIdx;
+        if (selections < 4)
+        {
+            DoomGame.Error($"Only {selections} deathmatch spots, 4 required");
+            return;
+        }
+
+        for (var j = 0; j < 20; j++)
+        {
+            var i = DoomRandom.P_Random() % selections;
+            if (CheckSpot(playerNum, _deathMatchStarts[i]))
+            {
+                _deathMatchStarts[i].Type = (short)(playerNum + 1);
+                P_SpawnPlayer(_deathMatchStarts[i]);
+                return;
+            }
+        }
+
+        // no good spot, so the player will probably get stuck 
+        P_SpawnPlayer(_playerStarts[playerNum]);
+    }
+
     private void DoReborn(int player)
     {
         if (!NetGame)
@@ -340,12 +449,12 @@ public class GameController
             // respawn at the start
 
             // first dissasociate the corpse 
-            // Players[player].mo->player = NULL;
+            Players[player].MapObject!.Player = null;
 
             // spawn at random spot if in death match 
             if (DeathMatch)
             {
-                // G_DeathMatchSpawnPlayer(playernum);
+                DeathMatchSpawnPlayer(player);
                 return;
             }
 
@@ -516,7 +625,7 @@ public class GameController
         // force players to be initialized upon first level load         
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            Players[i].State = PlayerState.Reborn;
+            Players[i].PlayerState = PlayerState.Reborn;
         }
 
         UserGame = true;                // will be set false if a demo 
@@ -530,17 +639,18 @@ public class GameController
 
         ViewActive = true;
 
+        var sky = DoomGame.Instance.Renderer.Sky;
         // set the sky map for the episode
         if (DoomGame.Instance.GameMode == GameMode.Commercial)
         {
-            _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
+            sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
             if (GameMap < 12)
             {
-                _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
+                sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
             }
             else if (GameMap < 21)
             {
-                _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
+                sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
             }
         }
         else
@@ -548,16 +658,16 @@ public class GameController
             switch (episode)
             {
                 case 1:
-                    _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
+                    sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
                     break;
                 case 2:
-                    _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
+                    sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
                     break;
                 case 3:
-                    _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
+                    sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
                     break;
                 case 4: // Special Edition sky
-                    _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY4");
+                    sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY4");
                     break;
             }
         }
@@ -644,20 +754,21 @@ public class GameController
         //  a flat. The data is in the WAD only because
         //  we look for an actual index, instead of simply
         //  setting one.
-        _sky.FlatNum = DoomGame.Instance.Renderer.FlatNumForName(Sky.FlatName);
+        var sky = DoomGame.Instance.Renderer.Sky;
+        sky.FlatNum = DoomGame.Instance.Renderer.FlatNumForName(Sky.FlatName);
         
         // DOOM determines the sky texture to be used
         // depending on the current episode, and the game version.
         if (DoomGame.Instance.GameMode == GameMode.Commercial) // or Pack TNT/Plutonium
         {
-            _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
+            sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY3");
             if (GameMap < 12)
             {
-                _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
+                sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY1");
             }
             else if (GameMap < 21)
             {
-                _sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
+                sky.Texture = DoomGame.Instance.Renderer.TextureNumForName("SKY2");
             }
         }
 
@@ -672,9 +783,9 @@ public class GameController
 
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
-            if (PlayerInGame[i] && Players[i].State == PlayerState.Dead)
+            if (PlayerInGame[i] && Players[i].PlayerState == PlayerState.Dead)
             {
-                Players[i].State = PlayerState.Reborn;
+                Players[i].PlayerState = PlayerState.Reborn;
             }
 
             for (var j = 0; j < Players[i].Frags.Length; j++)
@@ -847,7 +958,7 @@ public class GameController
         }
     }
 
-    private void P_LoadSegs(int lump)
+    private void P_LoadSegments(int lump)
     {
         const int sizeOfMapSeg = 2 + 2 + 2 + 2 + 2 + 2;
         _numSegments = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapSeg;
@@ -945,9 +1056,220 @@ public class GameController
             if (spawn == false)
                 break;
 
-            // Do spawn all other stuff. 
-            // P_SpawnMapThing(mt);
+            // Do spawn all other stuff.
+            P_SpawnMapThing(mt);
         }
+    }
+
+    /// <summary>
+    /// Called when a player is spawned on the level.
+    /// Most of the player structure stays unchanged
+    ///  between levels.
+    /// </summary>
+    private void P_SpawnPlayer(MapThing mthing)
+    {
+        Fixed x;
+        Fixed y;
+        Fixed z;
+
+        int i;
+
+        // not playing?
+        if (!PlayerInGame[mthing.Type - 1])
+        {
+            return;
+        }
+
+        var p = Players[mthing.Type - 1];
+
+        if (p.PlayerState == PlayerState.Reborn)
+        {
+            PlayerReborn(mthing.Type - 1);
+        }
+
+        x = mthing.X << Constants.FracBits;
+        y = mthing.Y << Constants.FracBits;
+        z = Constants.OnFloorZ;
+        var mobj = P_SpawnMapObject(x, y, z, MapObjectType.MT_PLAYER);
+
+        // set color translations for player sprites
+        if (mthing.Type > 1)
+        {
+            mobj.Flags |= (mthing.Type - 1) << (int)MapObjectFlag.MF_TRANSSHIFT;
+        }
+
+        mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
+        mobj.Player = p;
+        mobj.Health = p.Health;
+
+        p.MapObject = mobj;
+        p.PlayerState = PlayerState.Alive;
+        p.Refire = 0;
+        p.Message = null;
+        p.DamageCount = 0;
+        p.BonusCount = 0;
+        p.ExtraLight = 0;
+        p.FixedColorMap = 0;
+        p.ViewHeight = Constants.ViewHeight;
+
+        // setup gun psprite
+        // P_SetupPsprites(p);
+
+        // give all cards in death match mode
+        if (DeathMatch)
+        {
+            for (i = 0; i < (int)KeyCardType.NumberOfKeyCards; i++)
+            {
+                p.Cards[i] = true;
+            }
+        }
+
+        if (mthing.Type - 1 == ConsolePlayer)
+        {
+            // wake up the status bar
+            // ST_Start();
+            // wake up the heads up text
+            // HU_Start();
+        }
+    }
+
+    private void P_SpawnMapThing(MapThing mthing)
+    {
+        int i;
+        int bit;
+        Fixed x;
+        Fixed y;
+        Fixed z;
+
+        // count deathmatch start positions
+        if (mthing.Type == 11)
+        {
+            if (_deathMatchStartIdx < 10)
+            {
+                _deathMatchStarts[_deathMatchStartIdx++] = mthing;
+            }
+            return;
+        }
+
+        // check for players specially
+        if (mthing.Type <= 4)
+        {
+            // save spots for respawning in network games
+            _playerStarts[mthing.Type - 1] = mthing;
+            if (!DeathMatch)
+            {
+                P_SpawnPlayer(mthing);
+            }
+
+            return;
+        }
+
+        // check for appropriate skill level
+        if (!NetGame && (mthing.Options & 16) != 0)
+        {
+            return;
+        }
+
+        bit = GameSkill switch
+        {
+            SkillLevel.Baby => 1,
+            SkillLevel.Nightmare => 4,
+            _ => 1 << ((int)GameSkill - 1)
+        };
+
+        if ((mthing.Options & bit) == 0)
+        {
+            return;
+        }
+
+        // find which type to spawn
+        var moInfo = MapObjectInfo.Find(mthing.Type);
+        if (moInfo is null)
+        {
+            DoomGame.Error($"P_SpawnMapThing: Unknown type {mthing.Type} at ({mthing.X}, {mthing.Y})");
+            return;
+        }
+
+        // don't spawn keycards and players in deathmatch
+        if (DeathMatch && (moInfo.Value.Flags & MapObjectFlag.MF_NOTDMATCH) != 0)
+        {
+            return;
+        }
+
+        //// don't spawn any monsters if -nomonsters
+        //if (NoMonsters
+        //    && (i == MT_SKULL
+        //        || (mobjinfo[i].flags & MF_COUNTKILL)))
+        //{
+        //    return;
+        //}
+
+        // spawn it
+        x = new Fixed(mthing.X << Constants.FracBits);
+        y = new Fixed(mthing.Y << Constants.FracBits);
+
+        if ((moInfo.Value.Flags & MapObjectFlag.MF_SPAWNCEILING) != 0)
+        {
+            z = Constants.OnCeilingZ;
+        }
+        else
+        {
+            z = Constants.OnFloorZ;
+        }
+
+        var mobj = P_SpawnMapObject(x, y, z, moInfo.Value.Type);
+        mobj.Spawnpoint = mthing;
+
+        if (mobj.Tics > 0)
+        {
+            mobj.Tics = 1 + (DoomRandom.P_Random() % mobj.Tics);
+        }
+        if ((mobj.Flags & (int)MapObjectFlag.MF_COUNTKILL) != 0)
+        {
+            TotalKills++;
+        }
+
+        if ((mobj.Flags & (int)MapObjectFlag.MF_COUNTITEM) != 0)
+        {
+            TotalItems++;
+        }
+
+        mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
+        if ((mthing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
+        {
+            mobj.Flags |= (int)MapObjectFlag.MF_AMBUSH;
+        }
+    }
+
+    private MapObject P_SpawnMapObject(Fixed x, Fixed y, Fixed z, MapObjectType type)
+    {
+        return new MapObject();
+    }
+
+    private void P_RemoveMapObject(MapObject mobj)
+    {
+        if ((mobj.Flags & (int)MapObjectFlag.MF_SPECIAL) != 0
+            && (mobj.Flags & (int)MapObjectFlag.MF_DROPPED) == 0
+            && (mobj.Type != MapObjectType.MT_INV)
+            && (mobj.Type != MapObjectType.MT_INS))
+        {
+            //itemrespawnque[iquehead] = mobj->spawnpoint;
+            //itemrespawntime[iquehead] = leveltime;
+            //iquehead = (iquehead + 1) & (ITEMQUESIZE - 1);
+
+            //// lose one off the end?
+            //if (iquehead == iquetail)
+            //    iquetail = (iquetail + 1) & (ITEMQUESIZE - 1);
+        }
+
+        //// unlink from sector and block lists
+        //P_UnsetThingPosition(mobj);
+
+        //// stop any playing sound
+        //S_StopSound(mobj);
+
+        //// free block
+        //P_RemoveThinker((thinker_t*)mobj);
     }
 
     /// <summary>
@@ -969,20 +1291,20 @@ public class GameController
             var ld = Line.ReadFromWadData(reader, _vertices);
             _lines[i] = ld;
 
-            if (ld.Dx.IntVal == 0)
+            if (ld.Dx == 0)
             {
                 ld.SlopeType = SlopeType.Vertical;
             }
-            else if (ld.Dy.IntVal != 0)
+            else if (ld.Dy != 0)
             {
                 ld.SlopeType = SlopeType.Horizontal;
             }
             else
             {
-                ld.SlopeType = Fixed.Div(ld.Dy, ld.Dx).IntVal > 0 ? SlopeType.Positive : SlopeType.Negative;
+                ld.SlopeType = ld.Dy / ld.Dx > 0 ? SlopeType.Positive : SlopeType.Negative;
             }
 
-            if (ld.V1.X.IntVal < ld.V2.X.IntVal)
+            if (ld.V1.X < ld.V2.X)
             {
                 ld.BoundingBox[BoundingBox.BoxLeft] = ld.V1.X;
                 ld.BoundingBox[BoundingBox.BoxRight] = ld.V2.X;
@@ -993,7 +1315,7 @@ public class GameController
                 ld.BoundingBox[BoundingBox.BoxRight] = ld.V1.X;
             }
 
-            if (ld.V1.Y.IntVal < ld.V2.Y.IntVal)
+            if (ld.V1.Y < ld.V2.Y)
             {
                 ld.BoundingBox[BoundingBox.BoxBottom] = ld.V1.Y;
                 ld.BoundingBox[BoundingBox.BoxTop] = ld.V2.Y;
@@ -1015,22 +1337,7 @@ public class GameController
             }
         }
     }
-
-    /*
-    // A LineDef, as used for editing, and as input
-    // to the BSP builder.
-    typedef struct
-    {
-      short		v1;
-      short		v2;
-      short		flags;
-      short		special;
-      short		tag;
-      // sidenum[1] will be -1 if one sided
-      short		sidenum[2];		
-    } maplinedef_t;
-     */
-
+    
     private void P_LoadSideDefs(int lump)
     {
         const int mapSideDefSize = 2 + 2 + 8 + 8 + 8 + 2; // size of mapsidedef_t struct
@@ -1136,23 +1443,23 @@ public class GameController
             }
 
             // set the degenmobj_t to the middle of the bounding box
-            sector.SoundOrigin.X = new Fixed((boundingBox[BoundingBox.BoxRight].IntVal + boundingBox[BoundingBox.BoxLeft].IntVal) / 2);
-            sector.SoundOrigin.Y = new Fixed((boundingBox[BoundingBox.BoxTop].IntVal + boundingBox[BoundingBox.BoxBottom].IntVal) / 2);
+            sector.SoundOrigin.X = (boundingBox[BoundingBox.BoxRight] + boundingBox[BoundingBox.BoxLeft]) / 2;
+            sector.SoundOrigin.Y = (boundingBox[BoundingBox.BoxTop] + boundingBox[BoundingBox.BoxBottom]) / 2;
 
             // adjust bounding box to map blocks
-            var block = (boundingBox[BoundingBox.BoxTop].IntVal - _blockMapOriginY.IntVal + Constants.MaxRadius) >> Constants.MapBlockShift;
+            var block = (boundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
             block = block >= _blockMapHeight ? _blockMapHeight - 1 : block;
             sector.BlockBox[BoundingBox.BoxTop] = block;
 
-            block = (boundingBox[BoundingBox.BoxBottom].IntVal - _blockMapOriginY.IntVal - Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
             block = block < 0 ? 0 : block;
             sector.BlockBox[BoundingBox.BoxBottom] = block;
 
-            block = (boundingBox[BoundingBox.BoxRight].IntVal - _blockMapOriginX.IntVal + Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
             block = block >= _blockMapWidth ? _blockMapWidth - 1 : block;
             sector.BlockBox[BoundingBox.BoxRight] = block;
 
-            block = (boundingBox[BoundingBox.BoxLeft].IntVal - _blockMapOriginX.IntVal - Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
             block = block < 0 ? 0 : block;
             sector.BlockBox[BoundingBox.BoxLeft] = block;
         }
@@ -1198,7 +1505,7 @@ public class GameController
         P_LoadLineDefs(lumpNum + MapLumps.LineDefs);
         P_LoadSubSectors(lumpNum + MapLumps.SubSectors);
         P_LoadNodes(lumpNum + MapLumps.Nodes);
-        P_LoadSegs(lumpNum + MapLumps.Segs);
+        P_LoadSegments(lumpNum + MapLumps.Segs);
 
         _rejectMatrix = DoomGame.Instance.WadData.GetLumpNum(lumpNum + MapLumps.Reject, PurgeTag.Level)!;
         P_GroupLines();
@@ -1215,7 +1522,7 @@ public class GameController
                 if (PlayerInGame[i])
                 {
                     Players[i].MapObject = null;
-                    // DeathMatchSpawnPlayer(i);
+                    DeathMatchSpawnPlayer(i);
                 }
             }
         }
@@ -1232,14 +1539,186 @@ public class GameController
         // preload graphics
         if (PreCache)
         {
-            // R_PrecacheLevel();
+            DoomGame.Instance.Renderer.PreCacheLevel();
+        }
+    }
+
+    private void P_InitSwitchList()
+    {
+        var episode = 1;
+        if (DoomGame.Instance.GameMode == GameMode.Registered)
+        {
+            episode = 2;
+        }
+        else if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            episode = 3;
+        }
+
+        for (int i = 0, index = 0; i < Constants.MaxSwitches; i++)
+        {
+            if (SwitchControl.PredefinedSwitchList[i].Episode == 0)
+            {
+                _numSwitches = index / 2;
+                _switchList[index] = -1;
+                break;
+            }
+
+            if (SwitchControl.PredefinedSwitchList[i].Episode <= episode)
+            {
+                _switchList[index++] = DoomGame.Instance.Renderer.TextureNumForName(SwitchControl.PredefinedSwitchList[i].Name1);
+                _switchList[index++] = DoomGame.Instance.Renderer.TextureNumForName(SwitchControl.PredefinedSwitchList[i].Name2);
+            }
         }
     }
 
     public void P_Init()
     {
-        //P_InitSwitchList();
-        //P_InitPicAnims();
-        //R_InitSprites(sprnames);
+        P_InitSwitchList();
+        P_InitPicAnims();
+        DoomGame.Instance.Renderer.InitSprites(Constants.SpriteNames);
+    }
+
+    /// <summary>
+    /// Function that changes wall texture.
+    /// Tell it if switch is ok to use again (1=yes, it's a button).
+    /// </summary>
+    private void P_ChangeSwitchTexture(Line line, bool useAgain)
+    {
+        if (!useAgain)
+        {
+            line.Special = 0;
+        }
+
+        var texTop = _sides[line.SideNum[0]].TopTexture;
+        var texMid = _sides[line.SideNum[0]].MidTexture;
+        var texBot = _sides[line.SideNum[0]].BottomTexture;
+
+        var sound = 0; // TODO sfx_swtchon
+
+        // EXIT SWITCH?
+        if (line.Special == 11)
+        {
+            // sound = sfx_swtchx;
+        }
+
+        for (var i = 0; i < _numSwitches * 2; i++)
+        {
+            if (_switchList[i] == texTop)
+            {
+                // S_StartSound(_buttonList->soundorg, sound);
+                _sides[line.SideNum[0]].TopTexture = _switchList[i ^ 1];
+
+                if (useAgain)
+                {
+                    P_StartButton(line, ButtonWhere.Top, _switchList[i], Constants.ButtonTime);
+                }
+
+                return;
+            }
+
+            if (_switchList[i] == texMid)
+            {
+                // S_StartSound(buttonlist->soundorg, sound);
+                _sides[line.SideNum[0]].MidTexture = _switchList[i ^ 1];
+
+                if (useAgain)
+                {
+                    P_StartButton(line, ButtonWhere.Middle, _switchList[i], Constants.ButtonTime);
+                }
+
+                return;
+            }
+                
+            if (_switchList[i] == texBot)
+            {
+                // S_StartSound(buttonlist->soundorg, sound);
+                _sides[line.SideNum[0]].BottomTexture = _switchList[i ^ 1];
+
+                if (useAgain)
+                {
+                    P_StartButton(line, ButtonWhere.Bottom, _switchList[i], Constants.ButtonTime);
+                }
+
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Start a button counting down until it turns off.
+    /// </summary>
+    private void P_StartButton(Line line, ButtonWhere w, int texture, int time)
+    {
+        // See if button is already pressed
+        for (var i = 0; i < Constants.MaxButtons; i++)
+        {
+            if (_buttonList[i].Timer != 0 && _buttonList[i].Line == line)
+            {
+                return;
+            }
+        }
+
+        for (var i = 0; i < Constants.MaxButtons; i++)
+        {
+            if (_buttonList[i].Timer == 0)
+            {
+                _buttonList[i].Line = line;
+                _buttonList[i].Where = w;
+                _buttonList[i].Texture = texture;
+                _buttonList[i].Timer = time;
+                _buttonList[i].SoundOrigin = line.FrontSector?.SoundOrigin;
+                return;
+            }
+        }
+
+        DoomGame.Error("P_StartButton: no button slots left!");
+    }
+
+    private void P_InitPicAnims()
+    {
+        //	Init animation
+        for (var i = 0; i < Constants.MaxAnimations; i++)
+        {
+            _animations[i] = new AnimatingItem();
+        }
+
+        for (var i = 0; i < AnimationDefinition.Definitions.Length; i++)
+        {
+            _lastAnimation = _animations[i];
+            var animDef = AnimationDefinition.Definitions[i];
+            if (animDef.IsTexture)
+            {
+                // different episode ?
+                if (DoomGame.Instance.Renderer.CheckTextureNumForName(animDef.StartName) == -1)
+                {
+                    continue;
+                }
+
+                _lastAnimation.PicNum = DoomGame.Instance.Renderer.TextureNumForName(animDef.EndName);
+                _lastAnimation.BasePic = DoomGame.Instance.Renderer.TextureNumForName(animDef.StartName);
+            }
+            else
+            {
+                if (DoomGame.Instance.WadData.CheckNumForName(animDef.StartName) == -1)
+                {
+                    continue;
+                }
+
+                _lastAnimation.PicNum = DoomGame.Instance.Renderer.FlatNumForName(animDef.EndName);
+                _lastAnimation.BasePic = DoomGame.Instance.Renderer.FlatNumForName(animDef.StartName);
+            }
+
+            _lastAnimation.IsTexture = animDef.IsTexture;
+            _lastAnimation.NumPics = _lastAnimation.PicNum - _lastAnimation.BasePic + 1;
+
+            if (_lastAnimation.NumPics < 2)
+            {
+                DoomGame.Error($"P_InitPicAnims: bad cycle from {animDef.StartName} to {animDef.EndName}");
+                return;
+            }
+
+            _lastAnimation.Speed = animDef.Speed;
+        }
     }
 }
