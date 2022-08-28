@@ -442,424 +442,453 @@ public struct MapObjectInfo
             RaiseState = StateNum.S_SARG_RAISE1
         });
 
-        /*
-         {		// MT_HEAD
-	3005,		// doomednum
-	S_HEAD_STND,		// spawnstate
-	400,		// spawnhealth
-	S_HEAD_RUN1,		// seestate
-	sfx_cacsit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_HEAD_PAIN,		// painstate
-	128,		// painchance
-	sfx_dmpain,		// painsound
-	0,		// meleestate
-	S_HEAD_ATK1,		// missilestate
-	S_HEAD_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_cacdth,		// deathsound
-	8,		// speed
-	31*FRACUNIT,		// radius
-	56*FRACUNIT,		// height
-	400,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL,		// flags
-	S_HEAD_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_HEAD,
+            DoomedNum = 3005,
+            SpawnState = StateNum.S_HEAD_STND,
+            SpawnHealth = 400,
+            SeeState = StateNum.S_HEAD_RUN1,
+            SeeSound = SoundType.sfx_cacsit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_HEAD_PAIN,
+            PainChance = 128,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_HEAD_ATK1,
+            DeathState = StateNum.S_HEAD_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_cacdth,
+            Speed = 8,
+            Radius = 31 * Constants.FracUnit,
+            Height = 56 * Constants.FracUnit,
+            Mass = 400,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_FLOAT | MapObjectFlag.MF_NOGRAVITY | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_HEAD_RAISE1
+        });
 
-    {		// MT_BRUISER
-	3003,		// doomednum
-	S_BOSS_STND,		// spawnstate
-	1000,		// spawnhealth
-	S_BOSS_RUN1,		// seestate
-	sfx_brssit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_BOSS_PAIN,		// painstate
-	50,		// painchance
-	sfx_dmpain,		// painsound
-	S_BOSS_ATK1,		// meleestate
-	S_BOSS_ATK1,		// missilestate
-	S_BOSS_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_brsdth,		// deathsound
-	8,		// speed
-	24*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	1000,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_BOSS_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BRUISER,
+            DoomedNum = 3003,
+            SpawnState = StateNum.S_BOSS_STND,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_BOSS_RUN1,
+            SeeSound = SoundType.sfx_brssit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_BOSS_PAIN,
+            PainChance = 50,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_BOSS_ATK1,
+            MissileState = StateNum.S_BOSS_ATK1,
+            DeathState = StateNum.S_BOSS_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_brsdth,
+            Speed = 8,
+            Radius = 24 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 1000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_BOSS_RAISE1
+        });
 
-    {		// MT_BRUISERSHOT
-	-1,		// doomednum
-	S_BRBALL1,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_firsht,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_BRBALLX1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_firxpl,		// deathsound
-	15*FRACUNIT,		// speed
-	6*FRACUNIT,		// radius
-	8*FRACUNIT,		// height
-	100,		// mass
-	8,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BRUISERSHOT,
+            DoomedNum = -1,
+            SpawnState = StateNum.S_BRBALL1,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_firsht,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_BRBALLX1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_firxpl,
+            Speed = 15 * Constants.FracUnit,
+            Radius = 6 * Constants.FracUnit,
+            Height = 8 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 8,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_MISSILE | MapObjectFlag.MF_DROPOFF | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_KNIGHT
-	69,		// doomednum
-	S_BOS2_STND,		// spawnstate
-	500,		// spawnhealth
-	S_BOS2_RUN1,		// seestate
-	sfx_kntsit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_BOS2_PAIN,		// painstate
-	50,		// painchance
-	sfx_dmpain,		// painsound
-	S_BOS2_ATK1,		// meleestate
-	S_BOS2_ATK1,		// missilestate
-	S_BOS2_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_kntdth,		// deathsound
-	8,		// speed
-	24*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	1000,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_BOS2_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_KNIGHT,
+            DoomedNum = 69,
+            SpawnState = StateNum.S_BOS2_STND,
+            SpawnHealth = 500,
+            SeeState = StateNum.S_BOS2_RUN1,
+            SeeSound = SoundType.sfx_kntsit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_BOS2_PAIN,
+            PainChance = 50,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_BOS2_ATK1,
+            MissileState = StateNum.S_BOS2_ATK1,
+            DeathState = StateNum.S_BOS2_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_kntdth,
+            Speed = 8,
+            Radius = 24 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 1000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_BOS2_RAISE1
+        });
 
-    {		// MT_SKULL
-	3006,		// doomednum
-	S_SKULL_STND,		// spawnstate
-	100,		// spawnhealth
-	S_SKULL_RUN1,		// seestate
-	0,		// seesound
-	8,		// reactiontime
-	sfx_sklatk,		// attacksound
-	S_SKULL_PAIN,		// painstate
-	256,		// painchance
-	sfx_dmpain,		// painsound
-	0,		// meleestate
-	S_SKULL_ATK1,		// missilestate
-	S_SKULL_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_firxpl,		// deathsound
-	8,		// speed
-	16*FRACUNIT,		// radius
-	56*FRACUNIT,		// height
-	50,		// mass
-	3,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_SKULL,
+            DoomedNum = 3006,
+            SpawnState = StateNum.S_SKULL_STND,
+            SpawnHealth = 100,
+            SeeState = StateNum.S_SKULL_RUN1,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_sklatk,
+            PainState = StateNum.S_SKULL_PAIN,
+            PainChance = 256,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_SKULL_ATK1,
+            DeathState = StateNum.S_SKULL_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_firxpl,
+            Speed = 8,
+            Radius = 16 * Constants.FracUnit,
+            Height = 56 * Constants.FracUnit,
+            Mass = 50,
+            Damage = 3,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_FLOAT | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_SPIDER
-	7,		// doomednum
-	S_SPID_STND,		// spawnstate
-	3000,		// spawnhealth
-	S_SPID_RUN1,		// seestate
-	sfx_spisit,		// seesound
-	8,		// reactiontime
-	sfx_shotgn,		// attacksound
-	S_SPID_PAIN,		// painstate
-	40,		// painchance
-	sfx_dmpain,		// painsound
-	0,		// meleestate
-	S_SPID_ATK1,		// missilestate
-	S_SPID_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_spidth,		// deathsound
-	12,		// speed
-	128*FRACUNIT,		// radius
-	100*FRACUNIT,		// height
-	1000,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_SPIDER,
+            DoomedNum = 7,
+            SpawnState = StateNum.S_SPID_STND,
+            SpawnHealth = 3000,
+            SeeState = StateNum.S_SPID_RUN1,
+            SeeSound = SoundType.sfx_spisit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_shotgn,
+            PainState = StateNum.S_SPID_PAIN,
+            PainChance = 40,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_SPID_ATK1,
+            DeathState = StateNum.S_SPID_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_spidth,
+            Speed = 12,
+            Radius = 128 * Constants.FracUnit,
+            Height = 100 * Constants.FracUnit,
+            Mass = 1000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_BABY
-	68,		// doomednum
-	S_BSPI_STND,		// spawnstate
-	500,		// spawnhealth
-	S_BSPI_SIGHT,		// seestate
-	sfx_bspsit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_BSPI_PAIN,		// painstate
-	128,		// painchance
-	sfx_dmpain,		// painsound
-	0,		// meleestate
-	S_BSPI_ATK1,		// missilestate
-	S_BSPI_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_bspdth,		// deathsound
-	12,		// speed
-	64*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	600,		// mass
-	0,		// damage
-	sfx_bspact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_BSPI_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BABY,
+            DoomedNum = 68,
+            SpawnState = StateNum.S_BSPI_STND,
+            SpawnHealth = 500,
+            SeeState = StateNum.S_BSPI_RUN1,
+            SeeSound = SoundType.sfx_bspsit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_BSPI_PAIN,
+            PainChance = 128,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_BSPI_ATK1,
+            DeathState = StateNum.S_BSPI_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_bspdth,
+            Speed = 12,
+            Radius = 64 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 600,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_bspact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_BSPI_RAISE1
+        });
 
-    {		// MT_CYBORG
-	16,		// doomednum
-	S_CYBER_STND,		// spawnstate
-	4000,		// spawnhealth
-	S_CYBER_RUN1,		// seestate
-	sfx_cybsit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_CYBER_PAIN,		// painstate
-	20,		// painchance
-	sfx_dmpain,		// painsound
-	0,		// meleestate
-	S_CYBER_ATK1,		// missilestate
-	S_CYBER_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_cybdth,		// deathsound
-	16,		// speed
-	40*FRACUNIT,		// radius
-	110*FRACUNIT,		// height
-	1000,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_CYBORG,
+            DoomedNum = 16,
+            SpawnState = StateNum.S_CYBER_STND,
+            SpawnHealth = 4000,
+            SeeState = StateNum.S_CYBER_RUN1,
+            SeeSound = SoundType.sfx_cybsit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_CYBER_PAIN,
+            PainChance = 20,
+            PainSound = SoundType.sfx_dmpain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_CYBER_ATK1,
+            DeathState = StateNum.S_CYBER_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_cybdth,
+            Speed = 16,
+            Radius = 40 * Constants.FracUnit,
+            Height = 110 * Constants.FracUnit,
+            Mass = 1000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_PAIN
-	71,		// doomednum
-	S_PAIN_STND,		// spawnstate
-	400,		// spawnhealth
-	S_PAIN_RUN1,		// seestate
-	sfx_pesit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_PAIN_PAIN,		// painstate
-	128,		// painchance
-	sfx_pepain,		// painsound
-	0,		// meleestate
-	S_PAIN_ATK1,		// missilestate
-	S_PAIN_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_pedth,		// deathsound
-	8,		// speed
-	31*FRACUNIT,		// radius
-	56*FRACUNIT,		// height
-	400,		// mass
-	0,		// damage
-	sfx_dmact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL,		// flags
-	S_PAIN_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_PAIN,
+            DoomedNum = 71,
+            SpawnState = StateNum.S_PAIN_STND,
+            SpawnHealth = 400,
+            SeeState = StateNum.S_PAIN_RUN1,
+            SeeSound = SoundType.sfx_pesit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_PAIN_PAIN,
+            PainChance = 128,
+            PainSound = SoundType.sfx_pepain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_PAIN_ATK1,
+            DeathState = StateNum.S_PAIN_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_pedth,
+            Speed = 8,
+            Radius = 31 * Constants.FracUnit,
+            Height = 56 * Constants.FracUnit,
+            Mass = 400,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_dmact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_FLOAT | MapObjectFlag.MF_NOGRAVITY | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_PAIN_RAISE1
+        });
 
-    {		// MT_WOLFSS
-	84,		// doomednum
-	S_SSWV_STND,		// spawnstate
-	50,		// spawnhealth
-	S_SSWV_RUN1,		// seestate
-	sfx_sssit,		// seesound
-	8,		// reactiontime
-	0,		// attacksound
-	S_SSWV_PAIN,		// painstate
-	170,		// painchance
-	sfx_popain,		// painsound
-	0,		// meleestate
-	S_SSWV_ATK1,		// missilestate
-	S_SSWV_DIE1,		// deathstate
-	S_SSWV_XDIE1,		// xdeathstate
-	sfx_ssdth,		// deathsound
-	8,		// speed
-	20*FRACUNIT,		// radius
-	56*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_posact,		// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_SSWV_RAISE1		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_WOLFSS,
+            DoomedNum = 84,
+            SpawnState = StateNum.S_SSWV_STND,
+            SpawnHealth = 50,
+            SeeState = StateNum.S_SSWV_RUN1,
+            SeeSound = SoundType.sfx_sssit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_SSWV_PAIN,
+            PainChance = 170,
+            PainSound = SoundType.sfx_popain,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_SSWV_ATK1,
+            DeathState = StateNum.S_SSWV_DIE1,
+            XDeathState = StateNum.S_SSWV_XDIE1,
+            DeathSound = SoundType.sfx_ssdth,
+            Speed = 8,
+            Radius = 20 * Constants.FracUnit,
+            Height = 56 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_posact,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_SSWV_RAISE1
+        });
 
-    {		// MT_KEEN
-	72,		// doomednum
-	S_KEENSTND,		// spawnstate
-	100,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_KEENPAIN,		// painstate
-	256,		// painchance
-	sfx_keenpn,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_COMMKEEN,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_keendt,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	72*FRACUNIT,		// height
-	10000000,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY|MF_SHOOTABLE|MF_COUNTKILL,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_KEEN,
+            DoomedNum = 72,
+            SpawnState = StateNum.S_KEENSTND,
+            SpawnHealth = 100,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_KEENPAIN,
+            PainChance = 256,
+            PainSound = SoundType.sfx_keenpn,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_COMMKEEN,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_keendt,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 72 * Constants.FracUnit,
+            Mass = 10000000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY | MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_COUNTKILL,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_BOSSBRAIN
-	88,		// doomednum
-	S_BRAIN,		// spawnstate
-	250,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_BRAIN_PAIN,		// painstate
-	255,		// painchance
-	sfx_bospn,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_BRAIN_DIE1,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_bosdth,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	10000000,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SHOOTABLE,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BOSSBRAIN,
+            DoomedNum = 88,
+            SpawnState = StateNum.S_BRAIN,
+            SpawnHealth = 250,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_BRAIN_PAIN,
+            PainChance = 255,
+            PainSound = SoundType.sfx_bospn,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_BRAIN_DIE1,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_bosdth,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 10000000,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SHOOTABLE,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_BOSSSPIT
-	89,		// doomednum
-	S_BRAINEYE,		// spawnstate
-	1000,		// spawnhealth
-	S_BRAINEYESEE,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	32*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_NOSECTOR,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BOSSSPIT,
+            DoomedNum = 89,
+            SpawnState = StateNum.S_BRAINEYE,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_BRAINEYESEE,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 32 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_NOSECTOR,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_BOSSTARGET
-	87,		// doomednum
-	S_NULL,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	32*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_NOSECTOR,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_BOSSTARGET,
+            DoomedNum = 87,
+            SpawnState = StateNum.S_NULL,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 32 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_NOSECTOR,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_SPAWNSHOT
-	-1,		// doomednum
-	S_SPAWN1,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_bospit,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_firxpl,		// deathsound
-	10*FRACUNIT,		// speed
-	6*FRACUNIT,		// radius
-	32*FRACUNIT,		// height
-	100,		// mass
-	3,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_NOCLIP,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_SPAWNSHOT,
+            DoomedNum = -1,
+            SpawnState = StateNum.S_SPAWN1,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_bospit,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_firxpl,
+            Speed = 10 * Constants.FracUnit,
+            Radius = 6 * Constants.FracUnit,
+            Height = 32 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 3,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_MISSILE | MapObjectFlag.MF_DROPOFF | MapObjectFlag.MF_NOGRAVITY | MapObjectFlag.MF_NOCLIP,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_SPAWNFIRE
-	-1,		// doomednum
-	S_SPAWNFIRE1,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
-
-         */
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_SPAWNFIRE,
+            DoomedNum = -1,
+            SpawnState = StateNum.S_SPAWNFIRE1,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
         _predefinedTypes.Add(new MapObjectInfo
         {
@@ -1197,35 +1226,34 @@ public struct MapObjectInfo
             RaiseState = StateNum.S_NULL
         });
 
-        /*
-    {		// MT_EXTRABFG
-	-1,		// doomednum
-	S_BFGEXP,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
-
-         */
-
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_EXTRABFG,
+            DoomedNum = -1,
+            SpawnState = StateNum.S_BFGEXP,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_firxpl,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
+        
         _predefinedTypes.Add(new MapObjectInfo
         {
             Type = MapObjectType.MT_MISC0,
@@ -3130,682 +3158,732 @@ public struct MapObjectInfo
             RaiseState = StateNum.S_NULL
         });
 
-        /*
-         {		// MT_MISC61
-	22,		// doomednum
-	S_HEAD_DIE6,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC61,
+            DoomedNum = 22,
+            SpawnState = StateNum.S_HEAD_DIE6,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC62
-	15,		// doomednum
-	S_PLAY_DIE7,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC62,
+            DoomedNum = 15,
+            SpawnState = StateNum.S_PLAY_DIE7,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC63
-	18,		// doomednum
-	S_POSS_DIE5,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC63,
+            DoomedNum = 18,
+            SpawnState = StateNum.S_POSS_DIE5,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC64
-	21,		// doomednum
-	S_SARG_DIE6,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC64,
+            DoomedNum = 21,
+            SpawnState = StateNum.S_SARG_DIE6,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC65
-	23,		// doomednum
-	S_SKULL_DIE6,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC65,
+            DoomedNum = 23,
+            SpawnState = StateNum.S_SKULL_DIE6,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC66
-	20,		// doomednum
-	S_TROO_DIE5,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC66,
+            DoomedNum = 20,
+            SpawnState = StateNum.S_TROO_DIE5,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC67
-	19,		// doomednum
-	S_SPOS_DIE5,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC67,
+            DoomedNum = 19,
+            SpawnState = StateNum.S_SPOS_DIE5,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC68
-	10,		// doomednum
-	S_PLAY_XDIE9,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC68,
+            DoomedNum = 10,
+            SpawnState = StateNum.S_PLAY_XDIE9,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC69
-	12,		// doomednum
-	S_PLAY_XDIE9,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC69,
+            DoomedNum = 12,
+            SpawnState = StateNum.S_PLAY_XDIE9,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC70
-	28,		// doomednum
-	S_HEADSONSTICK,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC70,
+            DoomedNum = 28,
+            SpawnState = StateNum.S_HEADSONSTICK,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC71
-	24,		// doomednum
-	S_GIBS,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	0,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC71,
+            DoomedNum = 24,
+            SpawnState = StateNum.S_GIBS,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = 0,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC72
-	27,		// doomednum
-	S_HEADONASTICK,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC72,
+            DoomedNum = 27,
+            SpawnState = StateNum.S_HEADSONSTICK,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC73
-	29,		// doomednum
-	S_HEADCANDLES,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC73,
+            DoomedNum = 29,
+            SpawnState = StateNum.S_HEADCANDLES,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC74
-	25,		// doomednum
-	S_DEADSTICK,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC74,
+            DoomedNum = 25,
+            SpawnState = StateNum.S_DEADSTICK,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC75
-	26,		// doomednum
-	S_LIVESTICK,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC75,
+            DoomedNum = 26,
+            SpawnState = StateNum.S_LIVESTICK,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC76
-	54,		// doomednum
-	S_BIGTREE,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	32*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC76,
+            DoomedNum = 54,
+            SpawnState = StateNum.S_BIGTREE,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 32 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC77
-	70,		// doomednum
-	S_BBAR1,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC77,
+            DoomedNum = 70,
+            SpawnState = StateNum.S_BBAR1,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC78
-	73,		// doomednum
-	S_HANGNOGUTS,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	88*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC78,
+            DoomedNum = 73,
+            SpawnState = StateNum.S_HANGNOGUTS,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 88 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC79
-	74,		// doomednum
-	S_HANGBNOBRAIN,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	88*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC79,
+            DoomedNum = 74,
+            SpawnState = StateNum.S_HANGBNOBRAIN,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 88 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC80
-	75,		// doomednum
-	S_HANGTLOOKDN,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC80,
+            DoomedNum = 75,
+            SpawnState = StateNum.S_HANGTLOOKDN,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC81
-	76,		// doomednum
-	S_HANGTSKULL,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC81,
+            DoomedNum = 76,
+            SpawnState = StateNum.S_HANGTSKULL,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC82
-	77,		// doomednum
-	S_HANGTLOOKUP,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC82,
+            DoomedNum = 77,
+            SpawnState = StateNum.S_HANGTLOOKUP,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC83
-	78,		// doomednum
-	S_HANGTNOBRAIN,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	16*FRACUNIT,		// radius
-	64*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC83,
+            DoomedNum = 78,
+            SpawnState = StateNum.S_HANGTNOBRAIN,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 16 * Constants.FracUnit,
+            Height = 64 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPAWNCEILING | MapObjectFlag.MF_NOGRAVITY,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC84
-	79,		// doomednum
-	S_COLONGIBS,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC84,
+            DoomedNum = 79,
+            SpawnState = StateNum.S_COLONGIBS,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC85
-	80,		// doomednum
-	S_SMALLPOOL,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP,		// flags
-	S_NULL		// raisestate
-    },
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC85,
+            DoomedNum = 80,
+            SpawnState = StateNum.S_SMALLPOOL,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP,
+            RaiseState = StateNum.S_NULL
+        });
 
-    {		// MT_MISC86
-	81,		// doomednum
-	S_BRAINSTEM,		// spawnstate
-	1000,		// spawnhealth
-	S_NULL,		// seestate
-	sfx_None,		// seesound
-	8,		// reactiontime
-	sfx_None,		// attacksound
-	S_NULL,		// painstate
-	0,		// painchance
-	sfx_None,		// painsound
-	S_NULL,		// meleestate
-	S_NULL,		// missilestate
-	S_NULL,		// deathstate
-	S_NULL,		// xdeathstate
-	sfx_None,		// deathsound
-	0,		// speed
-	20*FRACUNIT,		// radius
-	16*FRACUNIT,		// height
-	100,		// mass
-	0,		// damage
-	sfx_None,		// activesound
-	MF_NOBLOCKMAP,		// flags
-	S_NULL		// raisestate
-    }
-         */
+        _predefinedTypes.Add(new MapObjectInfo
+        {
+            Type = MapObjectType.MT_MISC86,
+            DoomedNum = 81,
+            SpawnState = StateNum.S_BRAINSTEM,
+            SpawnHealth = 1000,
+            SeeState = StateNum.S_NULL,
+            SeeSound = SoundType.sfx_None,
+            ReactionTime = 8,
+            AttackSound = SoundType.sfx_None,
+            PainState = StateNum.S_NULL,
+            PainChance = 0,
+            PainSound = SoundType.sfx_None,
+            MeleeState = StateNum.S_NULL,
+            MissileState = StateNum.S_NULL,
+            DeathState = StateNum.S_NULL,
+            XDeathState = StateNum.S_NULL,
+            DeathSound = SoundType.sfx_None,
+            Speed = 0,
+            Radius = 20 * Constants.FracUnit,
+            Height = 16 * Constants.FracUnit,
+            Mass = 100,
+            Damage = 0,
+            ActiveSound = SoundType.sfx_None,
+            Flags = MapObjectFlag.MF_NOBLOCKMAP,
+            RaiseState = StateNum.S_NULL
+        });
     }
 }
