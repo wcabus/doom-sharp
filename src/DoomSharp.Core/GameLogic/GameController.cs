@@ -98,6 +98,9 @@ public class GameController
     private int _numLineSpecials;
     private Line[] _lineSpecialList = new Line[Constants.MaxLineAnimations];
 
+    private Ceiling?[] _activeCeilings = new Ceiling?[Constants.MaxCeilings];
+    private Platform?[] _activePlats = new Platform?[Constants.MaxPlats];
+
     public GameController()
     {
         for (var i = 0; i < Constants.MaxButtons; i++)
@@ -911,7 +914,7 @@ public class GameController
         if (!NetGame
             && DoomGame.Instance.MenuActive
             && !DemoPlayback
-            && Players[ConsolePlayer].ViewZ != new Fixed(1))
+            && Players[ConsolePlayer].ViewZ != 1)
         {
             return;
         }
@@ -1095,7 +1098,7 @@ public class GameController
         // set color translations for player sprites
         if (mthing.Type > 1)
         {
-            mobj.Flags |= (mthing.Type - 1) << (int)MapObjectFlag.MF_TRANSSHIFT;
+            mobj.Flags |= (MapObjectFlag)((mthing.Type - 1) << (int)MapObjectFlag.MF_TRANSSHIFT);
         }
 
         mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
@@ -1224,12 +1227,12 @@ public class GameController
         {
             mobj.Tics = 1 + (DoomRandom.P_Random() % mobj.Tics);
         }
-        if ((mobj.Flags & (int)MapObjectFlag.MF_COUNTKILL) != 0)
+        if ((mobj.Flags & MapObjectFlag.MF_COUNTKILL) != 0)
         {
             TotalKills++;
         }
 
-        if ((mobj.Flags & (int)MapObjectFlag.MF_COUNTITEM) != 0)
+        if ((mobj.Flags & MapObjectFlag.MF_COUNTITEM) != 0)
         {
             TotalItems++;
         }
@@ -1237,7 +1240,7 @@ public class GameController
         mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
         if ((mthing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
         {
-            mobj.Flags |= (int)MapObjectFlag.MF_AMBUSH;
+            mobj.Flags |= MapObjectFlag.MF_AMBUSH;
         }
     }
 
@@ -1248,8 +1251,8 @@ public class GameController
 
     private void P_RemoveMapObject(MapObject mobj)
     {
-        if ((mobj.Flags & (int)MapObjectFlag.MF_SPECIAL) != 0
-            && (mobj.Flags & (int)MapObjectFlag.MF_DROPPED) == 0
+        if ((mobj.Flags & MapObjectFlag.MF_SPECIAL) != 0
+            && (mobj.Flags & MapObjectFlag.MF_DROPPED) == 0
             && (mobj.Type != MapObjectType.MT_INV)
             && (mobj.Type != MapObjectType.MT_INS))
         {
@@ -1477,7 +1480,7 @@ public class GameController
 
         // Initial height of PointOfView
         // will be set by player think.
-        Players[ConsolePlayer].ViewZ = new Fixed(1);
+        Players[ConsolePlayer].ViewZ = 1;
 
         // Make sure all sounds are stopped before Z_FreeTags.
         // S_Start();
@@ -1531,7 +1534,7 @@ public class GameController
         // iquehead = iquetail = 0;
 
         // set up world state
-        // P_SpawnSpecials();
+        P_SpawnSpecials();
 
         // build subsector connect matrix
         //	UNUSED P_ConnectSubsectors ();
@@ -1720,5 +1723,123 @@ public class GameController
 
             _lastAnimation.Speed = animDef.Speed;
         }
+    }
+
+    private void P_SpawnSpecials()
+    {
+        var episode = 1;
+        if (DoomGame.Instance.WadData.CheckNumForName("TEXTURE2") >= 0)
+        {
+            episode = 2;
+        }
+
+        //// See if -TIMER needs to be used;
+        //LevelTimer = false;
+
+        //i = M_CheckParm("-avg");
+        //if (i && deathmatch)
+        //{
+        //    levelTimer = true;
+        //    levelTimeCount = 20 * 60 * 35;
+        //}
+
+        //i = M_CheckParm("-timer");
+        //if (i && deathmatch)
+        //{
+        //    int time;
+        //    time = atoi(myargv[i + 1]) * 60 * 35;
+        //    levelTimer = true;
+        //    levelTimeCount = time;
+        //}
+
+        //	Init special SECTORs.
+        foreach (var sector in Sectors.Where(x => x.Special != 0))
+        {
+            switch (sector.Special)
+            {
+                case 1:
+                    // FLICKERING LIGHTS
+                    //P_SpawnLightFlash(sector);
+                    break;
+
+                case 2:
+                    // STROBE FAST
+                   // P_SpawnStrobeFlash(sector, FASTDARK, 0);
+                    break;
+
+                case 3:
+                    // STROBE SLOW
+                   // P_SpawnStrobeFlash(sector, SLOWDARK, 0);
+                    break;
+
+                case 4:
+                    // STROBE FAST/DEATH SLIME
+                   // P_SpawnStrobeFlash(sector, FASTDARK, 0);
+                    sector.Special = 4;
+                    break;
+
+                case 8:
+                    // GLOWING LIGHT
+                   // P_SpawnGlowingLight(sector);
+                    break;
+                case 9:
+                    // SECRET SECTOR
+                    TotalSecrets++;
+                    break;
+
+                case 10:
+                    // DOOR CLOSE IN 30 SECONDS
+                   // P_SpawnDoorCloseIn30(sector);
+                    break;
+
+                case 12:
+                    // SYNC STROBE SLOW
+                   // P_SpawnStrobeFlash(sector, SLOWDARK, 1);
+                    break;
+
+                case 13:
+                    // SYNC STROBE FAST
+                   // P_SpawnStrobeFlash(sector, FASTDARK, 1);
+                    break;
+
+                case 14:
+                    // DOOR RAISE IN 5 MINUTES
+                   // P_SpawnDoorRaiseIn5Mins(sector, i);
+                    break;
+
+                case 17:
+                   // P_SpawnFireFlicker(sector);
+                    break;
+            }
+        }
+
+
+        //	Init line EFFECTs
+        _numLineSpecials = 0;
+        foreach (var line in _lines.Where(x => x.Special == 48))
+        {
+            // EFFECT FIRSTCOL SCROLL+
+            _lineSpecialList[_numLineSpecials++] = line;
+            break;
+        }
+
+        //	Init other misc stuff
+        for (var i = 0; i < Constants.MaxCeilings; i++)
+        {
+            _activeCeilings[i] = null;
+        }
+
+        for (var i = 0; i < Constants.MaxPlats; i++)
+        {
+            _activePlats[i] = null;
+        }
+
+        for (var i = 0; i < Constants.MaxButtons; i++)
+        {
+            _buttonList[i] = new Button();
+        }
+
+        // UNUSED: no horizonal sliders.
+        //	P_InitSlidingDoorFrames();
     }
 }

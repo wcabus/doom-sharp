@@ -885,13 +885,16 @@ public class MenuController
         // FIXME - does not work. Remove anyway?
         // fprintf(stderr, "M_ChangeDetail: low detail mode n.a.\n");
 
-        return;
+        DoomGame.Instance.Renderer.SetViewSize(ScreenBlocks, DetailLevel);
 
-        /*R_SetViewSize (screenblocks, detailLevel);
-        if (!detailLevel)
-        players[consoleplayer].message = DETAILHI;
+        if (!DetailLevel)
+        {
+            DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = Messages.DetailHigh;
+        }
         else
-        players[consoleplayer].message = DETAILLO;*/
+        {
+            DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = Messages.DetailLow;
+        }
     }
 
     private void SizeDisplay(int choice)
@@ -914,8 +917,7 @@ public class MenuController
                 break;
         }
 
-
-        // R_SetViewSize(ScreenBlocks, DetailLevel);
+        DoomGame.Instance.Renderer.SetViewSize(ScreenBlocks, DetailLevel);
     }
 
     private void DrawSoundMenu()

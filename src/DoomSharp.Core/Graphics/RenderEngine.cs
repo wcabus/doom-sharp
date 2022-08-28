@@ -2149,11 +2149,11 @@ public class RenderEngine
 
     private int _extraLight;
 
-    private Action? _colFunc = null;
-    private Action? _baseColFunc = null;
-    private Action? _fuzzColFunc = null;
-    private Action? _transColFunc = null;
-    private Action? _spanFunc = null;
+    private Action _colFunc = () => { };
+    private Action _baseColFunc = () => { };
+    private Action _fuzzColFunc = () => { };
+    private Action _transColFunc = () => { };
+    private Action _spanFunc = () => { };
 
     //
     // All drawing to the view buffer is accomplished in this file.
@@ -2165,7 +2165,6 @@ public class RenderEngine
     //
 
 
-    private byte[] _viewImage = Array.Empty<byte>();
     public int ViewWidth { get; private set; }
     public int ScaledViewWidth { get; private set; }
     public int ViewHeight { get; private set; }
@@ -2216,10 +2215,12 @@ public class RenderEngine
     private readonly int[] _screenHeightArray = new int[Constants.ScreenWidth];
 
     public const int MaxVisSprites = 128;
-    private VisSprite[] _visSprites = new VisSprite[MaxVisSprites];
+    private readonly VisSprite?[] _visSprites = new VisSprite?[MaxVisSprites];
     private int _visSpriteIdx = -1;
-    private int _newVisSprite;
-    private VisSprite _overflowSprite = new VisSprite();
+    private int _newVisSprite = 0;
+    private VisSprite _overflowSprite = new();
+
+    private VisSprite _sortedHead = new();
 
     private int _firstFlat;
     private int _lastFlat;
@@ -2267,7 +2268,7 @@ public class RenderEngine
     private Action<int, int>? _ceilingFunc;
 
     public const int MaxVisPlanes = 128;
-    private VisPlane[] _visPlanes = new VisPlane[MaxVisPlanes];
+    private VisPlane?[] _visPlanes = new VisPlane?[MaxVisPlanes];
     private int _lastVisPlaneIdx = -1;
     private VisPlane? _floorPlane;
     private VisPlane? _ceilingPlane;
@@ -2325,7 +2326,7 @@ public class RenderEngine
     public const int MaxDrawSegs = 256;
 
     private int _drawSegIdx = -1;
-    private DrawSegment[] _drawSegments = new DrawSegment[MaxDrawSegs];
+    private readonly DrawSegment?[] _drawSegments = new DrawSegment?[MaxDrawSegs];
 
     public const int MaxSegs = 32;
 
@@ -2335,7 +2336,7 @@ public class RenderEngine
     // column drawing
     // Source is the top of the column to scale.
     //
-    private byte[]? _dcColorMap;
+    private readonly byte[] _dcColorMap = new byte[256];
     private int _dcX;
     private int _dcYl;
     private int _dcYh;
@@ -2354,7 +2355,7 @@ public class RenderEngine
     private int _dsX1;
     private int _dsX2;
 
-    private byte[]? _dsColorMap;
+    private readonly byte[] _dsColorMap = new byte[256];
 
     private Fixed _dsXFrac;
     private Fixed _dsYFrac;
@@ -2366,6 +2367,17 @@ public class RenderEngine
 
     // just for profiling
     private int _dsCount;
+
+    // Used for sprites and masked mid textures.
+    // Masked means: partly transparent, i.e. stored
+    //  in posts/runs of opaque pixels.
+    private int[]? _mFloorClip;
+    private int? _mFloorClipIdx;
+    private int[]? _mCeilingClip;
+    private int? _mCeilingClipIdx;
+
+    private Fixed _sprYScale;
+    private Fixed _sprTopScreen;
 
     static RenderEngine()
     {
@@ -2387,19 +2399,9 @@ public class RenderEngine
             _zLight[i] = new int[MaxLightZ];
         }
 
-        for (var i = 0; i < MaxDrawSegs; i++)
-        {
-            _drawSegments[i] = new DrawSegment();
-        }
-
         for (var i = 0; i < MaxSegs; i++)
         {
             _solidSegments[i] = new ClipWallSegment();
-        }
-
-        for (var i = 0; i < MaxVisSprites; i++)
-        {
-            _visSprites[i] = new VisSprite();
         }
     }
 
@@ -2431,20 +2433,17 @@ public class RenderEngine
         DoomGame.Console.Write($"{Environment.NewLine}InitColormaps");
     }
 
-    private byte[] GetColumn(int tex, int col)
+    private Column GetColumn(int tex, int col)
     {
         col &= _textureWidthMask[tex];
         var lump = _textureColumnLump[tex][col];
         var ofs = _textureColumnOfs[tex][col];
-        var colData = Array.Empty<byte>();
 
         if (lump > 0)
         {
             var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!;
-            colData = new byte[data.Length - ofs];
-            Array.Copy(data, ofs, colData, 0, data.Length - ofs);
-            
-            return colData;
+            var patch = Patch.FromBytes(data);
+            return patch.GetColumnByOffset(ofs) ?? new Column(0xff, 0, Array.Empty<byte>());
         }
 
         if (_textureComposite[tex] == null)
@@ -2452,9 +2451,9 @@ public class RenderEngine
             GenerateComposite(tex);
         }
 
-        colData = new byte[_textureComposite[tex]!.Length - ofs];
+        var colData = new byte[_textureComposite[tex]!.Length - ofs];
         Array.Copy(_textureComposite[tex]!, ofs, colData, 0, _textureComposite[tex]!.Length - ofs);
-        return colData;
+        return new Column(0xff, 0, colData);
     }
 
     // Initializes the texture list
@@ -2595,8 +2594,13 @@ public class RenderEngine
     /// Clip and draw a column
     ///  from a patch into a cached post.
     /// </summary>
-    private void DrawColumnInCache(Column patch, byte[] cache, ushort cacheOffset, int originY, int cacheHeight)
+    private void DrawColumnInCache(Column? patch, byte[] cache, ushort cacheOffset, int originY, int cacheHeight)
     {
+        if (patch is null) 
+        {
+            return; 
+        }
+
         while (patch.TopDelta != 0xff)
         {
             var count = (int)patch.Length;
@@ -2615,10 +2619,10 @@ public class RenderEngine
 
             if (count > 0)
             {
-                Array.Copy(patch.Pixels, 0, cache, cacheOffset, count);
+                Array.Copy(patch.Pixels, 0, cache, cacheOffset + position, count);
             }
 
-            // patch = (column_t*)((byte*)patch + patch->length + 4);
+            patch = patch.Next ?? new Column(0xff, 0, Array.Empty<byte>());
         }
     }
 
@@ -2661,7 +2665,7 @@ public class RenderEngine
                 }
 
                 var patchCol = realPatch.Columns[x - x1];
-                DrawColumnInCache(patchCol!, block, colOfs[x], patch.OriginY, texture.Height);
+                DrawColumnInCache(patchCol, block, colOfs[x], patch.OriginY, texture.Height);
             }
         }
 
@@ -2706,7 +2710,7 @@ public class RenderEngine
             {
                 patchCount[x]++;
                 colLump[x] = (short)patch.Patch;
-                colOfs[x] = (ushort)(realPatch.ColumnOffsets[x - x1] + 3);
+                colOfs[x] = (ushort)realPatch.ColumnOffsets[x - x1];
             }
         }
 
@@ -2848,7 +2852,7 @@ public class RenderEngine
     ///  because it might be in the middle of a refresh.
     /// The change will take effect next refresh.
     /// </summary>
-    private void SetViewSize(int blocks, bool highDetail)
+    public void SetViewSize(int blocks, bool highDetail)
     {
         SetSizeNeeded = true;
         _setBlocks = blocks;
@@ -3389,9 +3393,14 @@ public class RenderEngine
             return;
         }
 
-        if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
+        //if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
+        //    return;
+        //}
+
+        if (_dcSource is null)
         {
-            DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
             return;
         }
 
@@ -3403,7 +3412,7 @@ public class RenderEngine
         // Determine scaling,
         //  which is the only mapping to be done.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
 
         // Inner loop that does the actual texture mapping,
         //  e.g. a DDA-lile scaling.
@@ -3412,7 +3421,7 @@ public class RenderEngine
         {
             // Re-map color indices from wall texture column
             //  using a lighting/special effects LUT.
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap![_dcSource![(frac >> Constants.FracBits) & 127]];
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[_dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127]];
 
             dest += Constants.ScreenWidth;
             frac += fracStep;
@@ -3430,9 +3439,14 @@ public class RenderEngine
             return;
         }
 
-        if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
+        //if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
+        //    return;
+        //}
+
+        if (_dcSource is null)
         {
-            DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
             return;
         }
 
@@ -3443,12 +3457,12 @@ public class RenderEngine
         var dest2 = _yLookup[_dcYl] + _columnOfs[_dcX + 1];
 
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
 
         do
         {
             DoomGame.Instance.Video.Screens[0][dest2] = 
-                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap![_dcSource![(frac >> Constants.FracBits) & 127]];
+                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[_dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127]];
 
             dest += Constants.ScreenWidth;
             dest2 += Constants.ScreenWidth;
@@ -3501,11 +3515,11 @@ public class RenderEngine
             return;
         }
 
-        if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
-        {
-            DoomGame.Error($"R_DrawFuzzColumn: {_dcYl} to {_dcYh} at {_dcX}");
-            return;
-        }
+        //if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh >= Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawFuzzColumn: {_dcYl} to {_dcYh} at {_dcX}");
+        //    return;
+        //}
 
         // Keep till detailshift bug in blocky mode fixed,
         //  or blocky mode removed.
@@ -3537,7 +3551,7 @@ public class RenderEngine
 
         // Looks familiar.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
 
         // Looks like an attempt at dithering,
         //  using the colormap #6 (of 0-31, a bit
@@ -3573,7 +3587,7 @@ public class RenderEngine
     //  of the BaronOfHell, the HellKnight, uses
     //  identical sprites, kinda brightened up.
     //
-    private byte[] _dcTranslation = Array.Empty<byte>();
+    private readonly byte[] _dcTranslation = new byte[256];
     private byte[] _translationTables = Array.Empty<byte>();
 
     private void DrawTranslatedColumn()
@@ -3584,9 +3598,14 @@ public class RenderEngine
             return;
         }
 
-        if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh > Constants.ScreenHeight)
+        //if (_dcX >= Constants.ScreenWidth || _dcYl < 0 || _dcYh > Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
+        //    return;
+        //}
+
+        if (_dcSource is null)
         {
-            DoomGame.Error($"R_DrawColumn: {_dcYl} to {_dcYh} at {_dcX}");
             return;
         }
 
@@ -3613,7 +3632,7 @@ public class RenderEngine
 
         // Looks familiar.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
 
         // Here we do an additional index re-mapping.
         do
@@ -3623,7 +3642,7 @@ public class RenderEngine
             //  used with PLAY sprites.
             // Thus the "green" ramp of the player 0 sprite
             //  is mapped to gray, red, black/indigo. 
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap![_dcTranslation[_dcSource![frac >> Constants.FracBits]]];
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcTranslation[_dcSource[_dcSourceIdx.GetValueOrDefault() + frac >> Constants.FracBits]]];
             dest += Constants.ScreenWidth;
 
             frac += fracStep;
@@ -3677,9 +3696,14 @@ public class RenderEngine
     // Draws the actual span.
     private void DrawSpan()
     {
-        if (_dsX2 < _dsX1 || _dsX1 < 0 || _dsX2 >= Constants.ScreenWidth || _dsY > Constants.ScreenHeight)
+        //if (_dsX2 < _dsX1 || _dsX1 < 0 || _dsX2 >= Constants.ScreenWidth || _dsY > Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawSpan: {_dsX1} to {_dsX2} at {_dsY}");
+        //    return;
+        //}
+
+        if (_dsColorMap is null || _dsSource is null)
         {
-            DoomGame.Error($"R_DrawSpan: {_dsX1} to {_dsX2} at {_dsY}");
             return;
         }
 
@@ -3698,7 +3722,7 @@ public class RenderEngine
 
             // Lookup pixel from flat texture tile,
             //  re-index using light/colormap.
-            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap![_dsSource![spot]];
+            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
 
             // Next step in u,v.
             xFrac += _dsXStep;
@@ -3711,9 +3735,14 @@ public class RenderEngine
     //
     private void DrawSpanLow()
     {
-        if (_dsX2 < _dsX1 || _dsX1 < 0 || _dsX2 >= Constants.ScreenWidth || _dsY > Constants.ScreenHeight)
+        //if (_dsX2 < _dsX1 || _dsX1 < 0 || _dsX2 >= Constants.ScreenWidth || _dsY > Constants.ScreenHeight)
+        //{
+        //    DoomGame.Error($"R_DrawSpan: {_dsX1} to {_dsX2} at {_dsY}");
+        //    return;
+        //}
+
+        if (_dsColorMap is null || _dsSource is null)
         {
-            DoomGame.Error($"R_DrawSpan: {_dsX1} to {_dsX2} at {_dsY}");
             return;
         }
 
@@ -3728,11 +3757,11 @@ public class RenderEngine
         var count = _dsX2 - _dsX1;
         do
         {
-            var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
+            var spot = (((int)yFrac >> (16 - 6)) & (63 * 64)) + (((int)xFrac >> 16) & 63);
             // Lowres/blocky mode does it twice,
             //  while scale is adjusted appropriately.
-            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap![_dsSource![spot]];
-            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap![_dsSource![spot]];
+            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
+            DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
 
             xFrac += _dsXStep;
             yFrac += _dsYStep;
@@ -3801,7 +3830,7 @@ public class RenderEngine
         var dest = DoomGame.Instance.Video.Screens[1];
         var destIdx = 0;
 
-        for (var y = 0; y < Constants.ScreenWidth - StatusBarHeight; y++)
+        for (var y = 0; y < (Constants.ScreenHeight - StatusBarHeight); y++)
         {
             for (var x = 0; x < Constants.ScreenWidth / 64; x++)
             {
@@ -3928,7 +3957,7 @@ public class RenderEngine
         while ((nodenum & Constants.NodeLeafSubSector) == 0)
         {
             var node = DoomGame.Instance.Game.Nodes[nodenum];
-            var side = PointOnSide(x, y, node) ? 1 : 0;
+            var side = PointOnSide(x, y, node);
             nodenum = node.Children[side];
         }
 
@@ -4010,6 +4039,11 @@ public class RenderEngine
 
     private void ClearDrawSegs()
     {
+        for (var i = 0; i < _drawSegments.Length; i++)
+        {
+            _drawSegments[i] = null;
+        }
+
         _drawSegIdx = 0;
     }
 
@@ -4037,11 +4071,6 @@ public class RenderEngine
         // scale will be unit scale at SCREENWIDTH/2 distance
         _baseXScale = FineCosine[angle] / _centerXFrac;
         _baseYScale = -(FineSine[angle] / _centerXFrac);
-    }
-
-    private void ClearSprites()
-    {
-        _visSpriteIdx = 0;
     }
 
     // BSP Rendering
@@ -4092,11 +4121,11 @@ public class RenderEngine
     private Fixed _bottomStep;
 
     private int[]? _wallLights;
-    private int[]? _maskedTextureCol;
+    private int[]? _internalMaskedTextureCol;
 
     private int[]? MaskedTextureCol
     {
-        get => _maskedTextureCol;
+        get => _internalMaskedTextureCol;
         set
         {
             MaskedTextureColIdx = null;
@@ -4105,7 +4134,7 @@ public class RenderEngine
                 MaskedTextureColIdx = 0;
             }
 
-            _maskedTextureCol = value;
+            _internalMaskedTextureCol = value;
         }
     }
 
@@ -4113,6 +4142,96 @@ public class RenderEngine
 
     public const int HeightBits = 12;
     public const int HeightUnit = 1 << HeightBits;
+
+    private void RenderMaskedSegmentRange(DrawSegment ds, int x1, int x2)
+    {
+        // Calculate light table.
+        // Use different light tables
+        //   for horizontal / vertical / diagonal. Diagonal?
+        // OPTIMIZE: get rid of LIGHTSEGSHIFT globally
+        _currentLine = ds.CurrentLine!;
+        _frontSector = _currentLine.FrontSector;
+        _backSector = _currentLine.BackSector;
+        
+        var texNum = _textureTranslation[_currentLine.SideDef.MidTexture];
+        var lightNum = (_frontSector.LightLevel >> LightSegShift) + _extraLight;
+
+        if (_currentLine.V1.Y == _currentLine.V2.Y)
+        {
+            lightNum--;
+        }
+        else if (_currentLine.V1.X == _currentLine.V2.X)
+        {
+            lightNum++;
+        }
+
+        _wallLights = lightNum switch
+        {
+            < 0 => _scaleLight[0],
+            >= LightLevels => _scaleLight[LightLevels - 1],
+            _ => _scaleLight[lightNum]
+        };
+
+        MaskedTextureCol = ds.MaskedTextureCol;
+        MaskedTextureColIdx = ds.MaskedTextureColIdx;
+
+        _rwScaleStep = ds.ScaleStep;
+        _sprYScale = (int)ds.Scale1 + (x1 - ds.X1) * (int)_rwScaleStep;
+        _mFloorClip = ds.SpriteBottomClip;
+        _mFloorClipIdx = ds.SpriteBottomClipIdx;
+        _mCeilingClip = ds.SpriteTopClip;
+        _mCeilingClipIdx = ds.SpriteTopClipIdx;
+
+        // find positioning
+        if ((_currentLine.LineDef.Flags & Constants.Line.DontPegBottom) != 0)
+        {
+            _dcTextureMid = _frontSector.FloorHeight > _backSector!.FloorHeight ? _frontSector.FloorHeight : _backSector.FloorHeight;
+            _dcTextureMid = _dcTextureMid + _textureHeight[texNum] - _viewZ;
+        }
+        else
+        {
+            _dcTextureMid = _frontSector.CeilingHeight < _backSector!.CeilingHeight ? _frontSector.CeilingHeight : _backSector.CeilingHeight;
+            _dcTextureMid = _dcTextureMid - _viewZ;
+        }
+
+        _dcTextureMid += _currentLine.SideDef.RowOffset;
+
+        if (_fixedColorMapIdx != null)
+        {
+            Array.Copy(_colorMaps, _fixedColorMapIdx.Value, _dcColorMap, 0, 256);
+            // dc_colormap = fixedcolormap;
+        }
+
+        // draw the columns
+        for (_dcX = x1; _dcX <= x2; _dcX++)
+        {
+            // calculate lighting
+            if (MaskedTextureCol![MaskedTextureColIdx.GetValueOrDefault() + _dcX] != short.MaxValue)
+            {
+                if (_fixedColorMapIdx == null)
+                {
+                    var index = _sprYScale >> LightScaleShift;
+
+                    if (index >= MaxLightScale)
+                    {
+                        index = MaxLightScale - 1;
+                    }
+
+                    Array.Copy(_colorMaps, _wallLights[index], _dcColorMap, 0, 256);
+                    // dc_colormap = _wallLights[index];
+                }
+
+                _sprTopScreen = _centerYFrac - (_dcTextureMid * _sprYScale);
+                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_sprYScale));
+
+                // draw the texture
+                var col = GetColumn(texNum, MaskedTextureCol[MaskedTextureColIdx.GetValueOrDefault() + _dcX]);
+                DrawMaskedColumn(col);
+                MaskedTextureCol[MaskedTextureColIdx.GetValueOrDefault() + _dcX] = short.MaxValue;
+            }
+            _sprYScale += _rwScaleStep;
+        }
+    }
 
     /// <summary>
     /// Draws zero, one, or two textures (and possibly a masked
@@ -4183,7 +4302,7 @@ public class RenderEngine
             {
                 // calculate texture offset
                 var angle = (_rwCenterAngle + _xToViewAngle[_rwX]) >> AngleToFineShift;
-                textureColumn = _rwOffset - (FineTangent[angle % FineTangent.Length] * _rwDistance);
+                textureColumn = _rwOffset - (FineTangent[angle] * _rwDistance);
                 textureColumn >>= Constants.FracBits;
                 // calculate lighting
                 var index = (uint)(_rwScale >> LightScaleShift);
@@ -4193,10 +4312,9 @@ public class RenderEngine
                     index = MaxLightScale - 1;
                 }
 
-                _dcColorMap = new byte[256];
                 Array.Copy(_colorMaps, _wallLights![index], _dcColorMap, 0, 256);
                 _dcX = _rwX;
-                _dcIScale = new Fixed((int)(0xffffffffu / _rwScale));
+                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_rwScale));
             }
 
             // draw the wall tiers
@@ -4206,8 +4324,18 @@ public class RenderEngine
                 _dcYl = yl;
                 _dcYh = yh;
                 _dcTextureMid = _rwMidTextureMid;
-                _dcSource = GetColumn(_midTexture, textureColumn);
-                _colFunc?.Invoke();
+
+                var column = GetColumn(_midTexture, textureColumn);
+                var pixels = new List<byte>();
+                do
+                {
+                    pixels.AddRange(column.Pixels);
+                    column = column.Next;
+                } while (column != null);
+
+                _dcSource = pixels.ToArray();
+                _dcSourceIdx = 0;
+                _colFunc();
                 _ceilingClip[_rwX] = ViewHeight;
                 _floorClip[_rwX] = -1;
             }
@@ -4231,8 +4359,18 @@ public class RenderEngine
                         _dcYl = yl;
                         _dcYh = mid;
                         _dcTextureMid = _rwTopTextureMid;
-                        _dcSource = GetColumn(_topTexture, textureColumn);
-                        _colFunc?.Invoke();
+
+                        var column = GetColumn(_topTexture, textureColumn);
+                        var pixels = new List<byte>();
+                        do
+                        {
+                            pixels.AddRange(column.Pixels);
+                            column = column.Next;
+                        } while (column != null);
+
+                        _dcSource = pixels.ToArray();
+                        _dcSourceIdx = 0;
+                        _colFunc();
                         _ceilingClip[_rwX] = mid;
                     }
                     else
@@ -4266,8 +4404,18 @@ public class RenderEngine
                         _dcYl = mid;
                         _dcYh = yh;
                         _dcTextureMid = _rwBottomTextureMid;
-                        _dcSource = GetColumn(_bottomTexture, textureColumn);
-                        _colFunc?.Invoke();
+                        
+                        var column = GetColumn(_bottomTexture, textureColumn);
+                        var pixels = new List<byte>();
+                        do
+                        {
+                            pixels.AddRange(column.Pixels);
+                            column = column.Next;
+                        } while (column != null);
+
+                        _dcSource = pixels.ToArray();
+                        _dcSourceIdx = 0;
+                        _colFunc.Invoke();
                         _floorClip[_rwX] = mid;
                     }
                     else
@@ -4288,7 +4436,7 @@ public class RenderEngine
                 {
                     // save texturecol
                     //  for backdrawing of masked mid texture
-                    _maskedTextureCol![_rwX] = textureColumn;
+                    MaskedTextureCol![MaskedTextureColIdx.GetValueOrDefault() + _rwX] = textureColumn;
                 }
             }
 
@@ -4338,7 +4486,9 @@ public class RenderEngine
         var sineVal = FineSine[distAngle >> AngleToFineShift];
         _rwDistance = hyp * sineVal;
 
-        var ds = _drawSegments[_drawSegIdx];
+        var ds = new DrawSegment();
+        _drawSegments[_drawSegIdx] = ds;
+
         ds.X1 = _rwX = start;
         ds.X2 = stop;
         ds.CurrentLine = _currentLine;
@@ -4350,7 +4500,7 @@ public class RenderEngine
         if (stop > start)
         {
             ds.Scale2 = ScaleFromGlobalAngle(_viewAngle + _xToViewAngle[stop]);
-            ds.ScaleStep = _rwScaleStep = (ds.Scale2 - _rwScale) / (stop - start);
+            ds.ScaleStep = _rwScaleStep = (int)(ds.Scale2 - _rwScale) / (stop - start);
         }
         else
         {
@@ -4640,7 +4790,15 @@ public class RenderEngine
         // save sprite clipping info
         if (((ds.Silhouette & SilhouetteTop) != 0 || _maskedTexture) && ds.SpriteTopClip == null)
         {
-            Array.Copy(_ceilingClip, start, _openings, _lastOpeningIdx, 2 * (_rwStopX - start));
+            var count = 2 * (_rwStopX - start);
+
+            // TODO Check bugfix: clip to _ceilingClip max size
+            if (start + count > _ceilingClip.Length)
+            {
+                count = _ceilingClip.Length - start;
+            }
+
+            Array.Copy(_ceilingClip, start, _openings, _lastOpeningIdx, count);
 
             ds.SpriteTopClip = _openings;
             ds.SpriteTopClipIdx = _lastOpeningIdx - start;
@@ -4649,7 +4807,15 @@ public class RenderEngine
 
         if (((ds.Silhouette & SilhouetteBottom) != 0 || _maskedTexture) && ds.SpriteBottomClip == null)
         {
-            Array.Copy(_floorClip, start, _openings, _lastOpeningIdx, 2 * (_rwStopX - start));
+            var count = 2 * (_rwStopX - start);
+
+            // TODO Check bugfix: clip to _ceilingClip max size
+            if (start + count > _floorClip.Length)
+            {
+                count = _floorClip.Length - start;
+            }
+
+            Array.Copy(_floorClip, start, _openings, _lastOpeningIdx, count);
 
             ds.SpriteBottomClip = _openings;
             ds.SpriteBottomClipIdx = _lastOpeningIdx - start;
@@ -5070,62 +5236,7 @@ public class RenderEngine
 
         return true;
     }
-
-    /// <summary>
-    /// Generates a vissprite for a thing
-    ///  if it might be visible.
-    /// </summary>
-    private void ProjectSprite(MapObject thing)
-    {
-        // TODO https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/r_things.c
-    }
-
-    /// <summary>
-    /// During BSP traversal, this adds sprites by sector.
-    /// </summary>
-    private void AddSprites(Sector? sec)
-    {
-        if (sec is null)
-        {
-            return;
-        }
-
-        // BSP is traversed by subsector.
-        // A sector might have been split into several
-        //  subsectors during BSP building.
-        // Thus we check whether its already added.
-        if (sec.ValidCount == _validCount)
-        {
-            return;
-        }
-
-        // Well, now it will be done.
-        sec.ValidCount = _validCount;
-
-        var lightNum = (sec.LightLevel >> LightSegShift) + _extraLight;
-
-        if (lightNum < 0)
-        {
-            _spriteLights = _scaleLight[0];
-        }
-        else if (lightNum >= LightLevels)
-        {
-            _spriteLights = _scaleLight[LightLevels - 1];
-        }
-        else
-        {
-            _spriteLights = _scaleLight[lightNum];
-        }
-
-        // Handle all things in sector.
-        var thing = sec.ThingList;
-        while (thing != null)
-        {
-            ProjectSprite(thing);
-            thing = thing.SectorNext;
-        }
-    }
-
+        
     /// <summary>
     /// Determine floor/ceiling planes.
     /// Add sprites of things in sector.
@@ -5176,26 +5287,26 @@ public class RenderEngine
     ///  check point against partition plane.
     /// Returns side 0 (front) or 1 (back).
     /// </summary>
-    private bool PointOnSide(Fixed x, Fixed y, Node node)
+    private int PointOnSide(Fixed x, Fixed y, Node node)
     {
         if (node.Dx == 0)
         {
             if (x <= node.X)
             {
-                return node.Dy > 0;
+                return node.Dy > 0 ? 1 : 0;
             }
 
-            return node.Dy < 0;
+            return node.Dy < 0 ? 1 : 0;
         }
 
         if (node.Dy == 0)
         {
             if (y <= node.Y)
             {
-                return node.Dx < 0;
+                return node.Dx < 0 ? 1 : 0;
             }
 
-            return node.Dx > 0;
+            return node.Dx > 0 ? 1 : 0;
         }
 
         var dx = (x - node.X);
@@ -5207,10 +5318,10 @@ public class RenderEngine
             if (((node.Dy ^ dx) & 0x80000000) != 0)
             {
                 // (left is negative)
-                return true;
+                return 1;
             }
 
-            return false;
+            return 0;
         }
 
         var left = (node.Dy >> Constants.FracBits) * dx;
@@ -5219,12 +5330,67 @@ public class RenderEngine
         if (right < left)
         {
             // front side
-            return false;
+            return 0;
         }
 
         // back side
-        return true;
+        return 1;
     }
+
+    private int PointOnSegSide(Fixed x, Fixed y, Segment line)
+    {
+        var lx = line.V1.X;
+        var ly = line.V1.Y;
+
+        var ldx = line.V2.X - lx;
+        var ldy = line.V2.Y - ly;
+
+        if (ldx == 0)
+        {
+            if (x <= lx)
+            {
+                return ldy > 0 ? 1 : 0;
+            }
+
+            return ldy < 0 ? 1 : 0;
+        }
+
+        if (ldy == 0)
+        {
+            if (y <= ly)
+            {
+                return ldx < 0 ? 1 : 0;
+            }
+
+            return ldx > 0 ? 1 : 0;
+        }
+
+        var dx = (x - lx);
+        var dy = (y - ly);
+
+        // Try to quickly decide by looking at sign bits.
+        if (((ldy ^ ldx ^ dx ^ dy) & 0x80000000) != 0)
+        {
+            if (((ldy ^ dx) & 0x80000000) != 0)
+            {
+                // (left is negative)
+                return 1;
+            }
+            return 0;
+        }
+
+        var left = (ldy >> Constants.FracBits) * dx;
+        var right = dy * (ldx >> Constants.FracBits);
+
+        if (right < left)
+        {
+            // front side
+            return 0;
+        }
+        // back side
+        return 1;
+    }
+
 
     /// <summary>
     /// Renders all subsectors below a given node,
@@ -5251,7 +5417,7 @@ public class RenderEngine
         var bsp = DoomGame.Instance.Game.Nodes[bspNum];
 
         // Decide which side the view point is on.
-        var side = PointOnSide(_viewX, _viewY, bsp) ? 1 : 0;
+        var side = PointOnSide(_viewX, _viewY, bsp);
 
         // Recursively divide front space.
         RenderBSPNode(bsp.Children[side]);
@@ -5276,11 +5442,11 @@ public class RenderEngine
     {
         Fixed distance;
 
-        if (x2 < x1 || x1 < 0 || x2 >= ViewWidth || (uint)y > ViewHeight)
-        {
-            DoomGame.Error($"R_MapPlane: {x1}, {x2} at {y}");
-            return;
-        }
+        //if (x2 < x1 || x1 < 0 || x2 >= ViewWidth || (uint)y > ViewHeight)
+        //{
+        //    DoomGame.Error($"R_MapPlane: {x1}, {x2} at {y}");
+        //    return;
+        //}
 
         if (_planeHeight != _cachedHeight[y])
         {
@@ -5303,9 +5469,7 @@ public class RenderEngine
 
         if (_fixedColorMapIdx != null)
         {
-            var colorMap = new byte[256];
-            Array.Copy(_colorMaps, _fixedColorMapIdx.Value, colorMap, 0, 256);
-            _dsColorMap = colorMap;
+            Array.Copy(_colorMaps, _fixedColorMapIdx.Value, _dsColorMap, 0, 256);
         }
         else
         {
@@ -5316,9 +5480,7 @@ public class RenderEngine
                 index = MaxLightZ - 1;
             }
 
-            var colorMap = new byte[256]; 
-            Array.Copy(_colorMaps, _planeZLight![index], colorMap, 0, 256);
-            _dsColorMap = colorMap;
+            Array.Copy(_colorMaps, _planeZLight![index], _dsColorMap, 0, 256);
         }
 
         _dsY = y;
@@ -5326,7 +5488,7 @@ public class RenderEngine
         _dsX2 = x2;
 
         // high or low detail
-        _spanFunc?.Invoke();
+        _spanFunc();
     }
 
     private VisPlane? FindPlane(Fixed height, int picNum, int lightLevel)
@@ -5368,7 +5530,6 @@ public class RenderEngine
         check.LightLevel = lightLevel;
         check.MinX = Constants.ScreenWidth;
         check.MaxX = -1;
-        check.FillTop(0xff);
 
         _visPlanes[vpIdx] = check;
 
@@ -5423,14 +5584,13 @@ public class RenderEngine
         }
 
         // make a new visplane
-        var newPlane = _visPlanes[_lastVisPlaneIdx];
+        var newPlane = new VisPlane();
+        
         newPlane.Height = pl.Height;
         newPlane.PicNum = pl.PicNum;
         newPlane.LightLevel = pl.LightLevel;
-
         newPlane.MinX = start;
         newPlane.MaxX = stop;
-        newPlane.FillTop(0xff);
 
         _visPlanes[_lastVisPlaneIdx++] = newPlane;
 
@@ -5464,28 +5624,27 @@ public class RenderEngine
 
     private void DrawPlanes()
     {
-        if (_drawSegIdx > MaxDrawSegs)
-        {
-            DoomGame.Error($"R_DrawPlanes: drawsegs overflow ({_drawSegIdx})");
-            return;
-        }
+        //if (_drawSegIdx > MaxDrawSegs)
+        //{
+        //    DoomGame.Error($"R_DrawPlanes: drawsegs overflow ({_drawSegIdx})");
+        //    return;
+        //}
 
-        if (_lastVisPlaneIdx > MaxVisPlanes)
-        {
-            DoomGame.Error($"R_DrawPlanes: visplane overflow ({_lastVisPlaneIdx})");
-            return;
-        }
+        //if (_lastVisPlaneIdx > MaxVisPlanes)
+        //{
+        //    DoomGame.Error($"R_DrawPlanes: visplane overflow ({_lastVisPlaneIdx})");
+        //    return;
+        //}
 
-        if (_lastOpeningIdx > MaxOpenings)
-        {
-            DoomGame.Error($"R_DrawPlanes: opening overflow ({_lastOpeningIdx})");
-            return;
-        }
+        //if (_lastOpeningIdx > MaxOpenings)
+        //{
+        //    DoomGame.Error($"R_DrawPlanes: opening overflow ({_lastOpeningIdx})");
+        //    return;
+        //}
 
-        for (var i = 0; i < _lastVisPlaneIdx; i++)
-        {
-            var pl = _visPlanes[i];
-            if (pl.MinX > pl.MaxX)
+        foreach (var pl in _visPlanes.Where(x => x != null)) 
+        { 
+            if (pl!.MinX > pl.MaxX)
             {
                 continue;
             }
@@ -5499,7 +5658,8 @@ public class RenderEngine
                 //  i.e. colormaps[0] is used.
                 // Because of this hack, sky is not affected
                 //  by INVUL inverse mapping.
-                _dcColorMap = _colorMaps;
+                Array.Copy(_colorMaps, 0, _dcColorMap, 0, 256);
+                
                 _dcTextureMid = Sky.TextureMid;
                 
                 for (var x = pl.MinX; x <= pl.MaxX; x++)
@@ -5511,7 +5671,8 @@ public class RenderEngine
                     {
                         var angle = (_viewAngle + _xToViewAngle[x]) >> Sky.AngleToSkyShift;
                         _dcX = x;
-                        _dcSource = GetColumn(Sky.Texture, (int)angle);
+                        _dcSource = GetColumn(Sky.Texture, (int)angle).Pixels;
+                        _dcSourceIdx = 0;
                         _colFunc?.Invoke();
                     }
                 }
@@ -5706,33 +5867,568 @@ public class RenderEngine
         return scale;
     }
 
-    private void DrawMasked()
+    // Sprites
+
+    private void DrawMaskedColumn(Column? column)
     {
-        //vissprite_t* spr;
-        //drawseg_t* ds;
+        if (_mFloorClip is null || _mCeilingClip is null || column is null)
+        {
+            return;
+        }
 
-        //R_SortVisSprites();
+        var baseTextureMid = _dcTextureMid;
 
-        //if (vissprite_p > vissprites)
+        for (; column.TopDelta != 0xff;)
+        {
+            // calculate unclipped screen coordinates
+            //  for post
+            int topscreen = _sprTopScreen + _sprYScale * column.TopDelta;
+            int bottomscreen = topscreen + _sprYScale * column.Length;
+
+            _dcYl = (topscreen + Constants.FracUnit - 1) >> Constants.FracBits;
+            _dcYh = (bottomscreen - 1) >> Constants.FracBits;
+
+            if (_dcYh >= _mFloorClip[_mFloorClipIdx.GetValueOrDefault() + _dcX])
+            {
+                _dcYh = _mFloorClip[_mFloorClipIdx.GetValueOrDefault() + _dcX] - 1;
+            }
+
+            if (_dcYl <= _mCeilingClip[_mCeilingClipIdx.GetValueOrDefault() + _dcX])
+            {
+                _dcYl = _mCeilingClip[_mCeilingClipIdx.GetValueOrDefault() + _dcX] + 1;
+            }
+
+            if (_dcYl <= _dcYh)
+            {
+                _dcSource = column.Pixels;
+                _dcSourceIdx = 0;
+                _dcTextureMid = baseTextureMid - (column.TopDelta << Constants.FracBits);
+                // dc_source = (byte *)column + 3 - column->topdelta;
+
+                // Drawn by either R_DrawColumn
+                //  or (SHADOW) R_DrawFuzzColumn.
+                _colFunc?.Invoke();
+            }
+            column = column.Next ?? new Column(0xff, 0, Array.Empty<byte>());
+        }
+
+        _dcTextureMid = baseTextureMid; // Reset when done
+    }
+
+    //
+    // R_DrawVisSprite
+    //  mfloorclip and mceilingclip should also be set.
+    //
+    private void DrawVisSprite(VisSprite vis, int x1, int x2)
+    {
+        var patch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(vis.Patch + _firstSpriteLump, PurgeTag.Cache)!);
+
+        if (vis.Colormap != null)
+        {
+            Array.Copy(vis.Colormap, 0, _dcColorMap, 0, 256);
+        }
+
+        if (vis.Colormap == null)
+        {
+            // NULL colormap = shadow draw
+            _colFunc = _fuzzColFunc;
+        }
+        else if ((vis.MapObjectFlags & MapObjectFlag.MF_TRANSLATION) != 0)
+        {
+            _colFunc = DrawTranslatedColumn;
+            var sourceIdx = (int)(vis.MapObjectFlags & MapObjectFlag.MF_TRANSLATION) >> ((int)MapObjectFlag.MF_TRANSSHIFT - 8);
+            Array.Copy(_translationTables, sourceIdx, _dcTranslation, 0, 256);
+            //dc_translation = translationtables - 256 +
+            //                 ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT - 8));
+        }
+
+        _dcIScale = Math.Abs(vis.XiScale) >> _detailShift;
+        _dcTextureMid = vis.TextureMid;
+        var frac = vis.StartFrac;
+        _sprYScale = vis.Scale;
+        _sprTopScreen = _centerYFrac - (_dcTextureMid * _sprYScale);
+
+        for (_dcX = vis.X1; _dcX <= vis.X2; _dcX++, frac += vis.XiScale)
+        {
+            var textureColumn = frac >> Constants.FracBits;
+            //# ifdef RANGECHECK
+            //            if (texturecolumn < 0 || texturecolumn >= SHORT(patch->width))
+            //                I_Error("R_DrawSpriteRange: bad texturecolumn");
+            //#endif
+            var column = patch.GetColumnByOffset(patch.ColumnOffsets[textureColumn]);
+            DrawMaskedColumn(column);
+        }
+
+        _colFunc = _baseColFunc;
+    }
+
+    private const int MinZ = Constants.FracUnit * 4;
+
+    /// <summary>
+    /// During BSP traversal, this adds sprites by sector.
+    /// </summary>
+    private void AddSprites(Sector? sec)
+    {
+        if (sec is null)
+        {
+            return;
+        }
+
+        // BSP is traversed by subsector.
+        // A sector might have been split into several
+        //  subsectors during BSP building.
+        // Thus we check whether its already added.
+        if (sec.ValidCount == _validCount)
+        {
+            return;
+        }
+
+        // Well, now it will be done.
+        sec.ValidCount = _validCount;
+
+        var lightNum = (sec.LightLevel >> LightSegShift) + _extraLight;
+
+        if (lightNum < 0)
+        {
+            _spriteLights = _scaleLight[0];
+        }
+        else if (lightNum >= LightLevels)
+        {
+            _spriteLights = _scaleLight[LightLevels - 1];
+        }
+        else
+        {
+            _spriteLights = _scaleLight[lightNum];
+        }
+
+        // Handle all things in sector.
+        var thing = sec.ThingList;
+        while (thing != null)
+        {
+            ProjectSprite(thing);
+            thing = thing.SectorNext;
+        }
+    }
+
+
+    /// <summary>
+    /// Generates a vissprite for a thing if it might be visible
+    /// </summary>
+    private void ProjectSprite(MapObject thing)
+    {
+        // transform the origin point
+        var tr_x = thing.X - _viewX;
+        var tr_y = thing.Y - _viewY;
+
+        var gxt = tr_x * _viewCos;
+        var gyt = -(tr_y * _viewSin);
+
+        var tz = gxt - gyt;
+
+        // thing is behind view plane?
+        if (tz < MinZ)
+        {
+            return;
+        }
+
+        var xscale = _projection / tz;
+
+        gxt = -(tr_x * _viewSin);
+        gyt = tr_y * _viewCos;
+        var tx = -(gyt + gxt);
+
+        // too far off the side?
+        if (Math.Abs(tx) > (tz << 2))
+        {
+            return;
+        }
+
+        // decide which patch to use for sprite relative to player
+//# ifdef RANGECHECK
+//        if ((unsigned)thing->sprite >= numsprites)
+//            I_Error("R_ProjectSprite: invalid sprite number %i ",
+//                 thing->sprite);
+//#endif
+        var sprdef = _sprites[(int)thing.Sprite];
+//# ifdef RANGECHECK
+//        if ((thing->frame & FF_FRAMEMASK) >= sprdef->numframes)
+//            I_Error("R_ProjectSprite: invalid sprite frame %i : %i ",
+//                 thing->sprite, thing->frame);
+//#endif
+        var sprframe = sprdef.Frames[thing.Frame & SpriteFrame.FrameMask];
+        
+        int lump;
+        bool flip;
+        if (sprframe.Rotate == true)
+        {
+            // choose a different rotation based on player view
+            var ang = PointToAngle(thing.X, thing.Y);
+            var rot = (ang - thing.Angle + (uint)(Angle45 / 2) * 9) >> 29;
+            lump = sprframe.Lumps[rot];
+            flip = sprframe.Flip[rot];
+        }
+        else
+        {
+            // use single rotation for all views
+            lump = sprframe.Lumps[0];
+            flip = sprframe.Flip[0];
+        }
+
+        // calculate edges of the shape
+        tx -= _spriteOffset[lump];
+        var x1 = (_centerXFrac + (tx * xscale)) >> Constants.FracBits;
+
+        // off the right side?
+        if (x1 > ViewWidth)
+        {
+            return;
+        }
+
+        tx += _spriteWidth[lump];
+        var x2 = ((_centerXFrac + (tx * xscale)) >> Constants.FracBits) - 1;
+
+        // off the left side
+        if (x2 < 0)
+        {
+            return;
+        }
+
+        // store information in a vissprite
+        var vis = NewVisSprite();
+        vis.MapObjectFlags = thing.Flags;
+        vis.Scale = xscale << _detailShift;
+        vis.GX = thing.X;
+        vis.GY = thing.Y;
+        vis.GZ = thing.Z;
+        vis.GZTop = thing.Z + _spriteTopOffset[lump];
+        vis.TextureMid = vis.GZTop - _viewZ;
+        vis.X1 = x1 < 0 ? 0 : x1;
+        vis.X2 = x2 >= ViewWidth ? ViewWidth - 1 : x2;
+        var iscale = Constants.FracUnit / xscale;
+
+        if (flip)
+        {
+            vis.StartFrac = _spriteWidth[lump] - 1;
+            vis.XiScale = -iscale;
+        }
+        else
+        {
+            vis.StartFrac = 0;
+            vis.XiScale = iscale;
+        }
+
+        if (vis.X1 > x1)
+        {
+            vis.StartFrac += (int)vis.XiScale * (vis.X1 - x1);
+        }
+        vis.Patch = lump;
+
+        // get light level
+        if ((thing.Flags & MapObjectFlag.MF_SHADOW) != 0)
+        {
+            // shadow draw
+            vis.Colormap = null;
+        }
+        else if (_fixedColorMapIdx != null)
+        {
+            // fixed map
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, _fixedColorMapIdx.Value, colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+        else if ((thing.Frame & SpriteFrame.FullBright) != 0)
+        {
+            // full bright
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, 0, colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+        else
+        {
+            // diminished light
+            var index = xscale >> (LightScaleShift - _detailShift);
+
+            if (index >= MaxLightScale)
+            {
+                index = MaxLightScale - 1;
+            }
+
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, _spriteLights[index], colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+    }
+
+    private void ClearSprites()
+    {
+        _visSpriteIdx = 0;
+        _newVisSprite = 0;
+    }
+
+    private VisSprite NewVisSprite()
+    {
+        if (_visSpriteIdx == MaxVisSprites)
+        {
+            return _overflowSprite;
+        }
+
+        var vp = new VisSprite();
+        _visSprites[_visSpriteIdx++] = vp;
+        
+        return vp;
+    }
+
+    private void DrawPlayerSprites()
+    {
+        // get light level
+        var lightnum = -1; // TODO (_viewPlayer.MapObject.SubSector.Sector.LightLevel >> LightSegShift) + _extraLight;
+
+        if (lightnum < 0)
+        {
+            _spriteLights = _scaleLight[0];
+        }
+        else if (lightnum >= LightLevels)
+        {
+            _spriteLights = _scaleLight[LightLevels - 1];
+        }
+        else
+        {
+            _spriteLights = _scaleLight[lightnum];
+        }
+
+        // clip to screen bounds
+        _mFloorClip = _screenHeightArray;
+        _mFloorClipIdx = 0;
+
+        _mCeilingClip = _negoneArray;
+        _mCeilingClipIdx = 0;
+
+        //// add all active psprites
+        //for (var i = 0; i < NumPlayerSprites; i++)
         //{
-        //    // draw all vissprites back to front
-        //    for (spr = vsprsortedhead.next;
-        //         spr != &vsprsortedhead;
-        //         spr = spr->next)
-        //    {
+        //    var psp = _viewPlayer.PSprites[i];
 
-        //        R_DrawSprite(spr);
+        //    if (psp->state != 0)
+        //    {
+        //        DrawPlayerSprite(psp);
         //    }
         //}
+    }
 
-        //// render any remaining masked mid textures
-        //for (ds = ds_p - 1; ds >= drawsegs; ds--)
-        //    if (ds->maskedtexturecol)
-        //        R_RenderMaskedSegRange(ds, ds->x1, ds->x2);
+    private void SortVisSprites()
+    {
+        var count = _newVisSprite;
 
-        //// draw the psprites on top of everything
-        ////  but does not draw on side views
-        //if (!viewangleoffset)
-        //    R_DrawPlayerSprites();
+        if (count == 0)
+        {
+            return;
+        }
+
+        var unsorted = new VisSprite();
+        unsorted.Next = unsorted.Prev = unsorted;
+        for (var i = 0; i < count; i++)
+        {
+            _visSprites[i].Next = i == count - 1 ? _visSprites[0] : _visSprites[i + 1];
+            _visSprites[i].Prev = i == 0 ? _visSprites[count - 1] : _visSprites[i - 1];
+        }
+
+        _visSprites[0].Prev = unsorted;
+        unsorted.Next = _visSprites[0];
+        _visSprites[count - 1].Next = unsorted;
+        unsorted.Prev = _visSprites[count - 1];
+
+        // pull the vissprites out by scale
+        //best = 0;		// shut up the compiler warning
+
+        Fixed bestscale;
+        _sortedHead.Next = _sortedHead.Prev = _sortedHead;
+
+        VisSprite? best = null;
+        for (var i = 0; i < count; i++)
+        {
+            bestscale = int.MaxValue;
+            for (var ds = unsorted.Next; ds != unsorted; ds = ds.Next)
+            {
+                if (ds.Scale < bestscale)
+                {
+                    bestscale = ds.Scale;
+                    best = ds;
+                }
+            }
+            best.Next.Prev = best.Prev;
+            best.Prev.Next = best.Next;
+            best.Next = _sortedHead;
+            best.Prev = _sortedHead.Prev;
+            _sortedHead.Prev.Next = best;
+            _sortedHead.Prev = best;
+        }
+    }
+
+    private void DrawSprite(VisSprite sprite)
+    {
+        var clipbot = new int[Constants.ScreenWidth];
+        var cliptop = new int[Constants.ScreenWidth];
+
+        Fixed scale, lowScale;
+
+        for (var x = sprite.X1; x <= sprite.X2; x++)
+        {
+            clipbot[x] = cliptop[x] = -2;
+        }
+
+        // Scan drawsegs from end to start for obscuring segs.
+        // The first drawseg that has a greater scale
+        //  is the clip seg.
+        for (var i = _drawSegIdx - 1; i >= 0; i--)
+        {
+            var ds = _drawSegments[i];
+            if (ds is null)
+            {
+                continue;
+            }
+
+            // determine if the drawseg obscures the sprite
+            if (ds.X1 > sprite.X2
+                || ds.X2 < sprite.X1
+                || (ds.Silhouette == 0 && ds.MaskedTextureCol == null))
+            {
+                // does not cover sprite
+                continue;
+            }
+
+            var r1 = ds.X1 < sprite.X1 ? sprite.X1 : ds.X1;
+            var r2 = ds.X2 > sprite.X2 ? sprite.X2 : ds.X2;
+
+            if (ds.Scale1 > ds.Scale2)
+            {
+                lowScale = ds.Scale2;
+                scale = ds.Scale1;
+            }
+            else
+            {
+                lowScale = ds.Scale1;
+                scale = ds.Scale2;
+            }
+
+            if (scale < sprite.Scale
+                || (lowScale < sprite.Scale
+                    && PointOnSegSide(sprite.GX, sprite.GY, ds.CurrentLine!) == 0))
+            {
+                // masked mid texture?
+                if (ds.MaskedTextureCol != null)
+                {
+                    RenderMaskedSegmentRange(ds, r1, r2);
+                }
+                // seg is behind sprite
+                continue;
+            }
+
+            // clip this piece of the sprite
+            var silhouette = ds.Silhouette;
+
+            if (sprite.GZ >= ds.BottomSilhouetteHeight)
+            {
+                silhouette &= ~SilhouetteBottom;
+            }
+
+            if (sprite.GZTop <= ds.TopSilhouetteHeight)
+            {
+                silhouette &= ~SilhouetteTop;
+            }
+
+            if (silhouette == 1)
+            {
+                // bottom sil
+                for (var x = r1; x <= r2; x++)
+                {
+                    if (clipbot[x] == -2)
+                    {
+                        clipbot[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
+                    }
+                }
+            }
+            else if (silhouette == 2)
+            {
+                // top sil
+                for (var x = r1; x <= r2; x++)
+                {
+                    if (cliptop[x] == -2)
+                    {
+                        cliptop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
+                    }
+                }
+            }
+            else if (silhouette == 3)
+            {
+                // both
+                for (var x = r1; x <= r2; x++)
+                {
+                    if (clipbot[x] == -2)
+                    {
+                        clipbot[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
+                    }
+
+                    if (cliptop[x] == -2)
+                    {
+                        cliptop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
+                    }
+                }
+            }
+        }
+
+        // all clipping has been performed, so draw the sprite
+
+        // check for unclipped columns
+        for (var x = sprite.X1; x <= sprite.X2; x++)
+        {
+            if (clipbot[x] == -2)
+            {
+                clipbot[x] = ViewHeight;
+            }
+
+            if (cliptop[x] == -2)
+            {
+                cliptop[x] = -1;
+            }
+        }
+
+        _mFloorClip = clipbot;
+        _mFloorClipIdx = 0;
+        
+        _mCeilingClip = cliptop;
+        _mCeilingClipIdx = 0;
+        DrawVisSprite(sprite, sprite.X1, sprite.X2);
+    }
+
+    private void DrawMasked()
+    {
+        SortVisSprites();
+
+        if (_newVisSprite > 0)
+        {
+            // draw all vissprites back to front
+            for (var spr = _sortedHead.Next; spr != null && spr != _sortedHead; spr = spr?.Next)
+            {
+                DrawSprite(spr);
+            }
+        }
+
+        // render any remaining masked mid textures
+        for (var i = _drawSegIdx - 1; i >= 0; i--)
+        {
+            var ds = _drawSegments[i];
+            if (ds?.MaskedTextureCol is null)
+            {
+                continue;
+            }
+            RenderMaskedSegmentRange(ds, ds.X1, ds.X2);
+        }
+
+        // draw the psprites on top of everything
+        // but does not draw on side views
+        if (_viewAngleOffset == 0)
+        { 
+            DrawPlayerSprites();
+        }
     }
 }

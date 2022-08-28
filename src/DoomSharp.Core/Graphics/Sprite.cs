@@ -8,6 +8,9 @@ public class Sprite
 
 public class SpriteFrame
 {
+    public const int FullBright = 0x8000;
+    public const int FrameMask = 0x7FFF;
+
     public bool? Rotate { get; set; }
 
     /// <summary>

@@ -1,4 +1,6 @@
-﻿namespace DoomSharp.Core.Graphics;
+﻿using DoomSharp.Core.GameLogic;
+
+namespace DoomSharp.Core.Graphics;
 
 /// <summary>
 /// A vissprite_t is a thing
@@ -37,5 +39,5 @@ public class VisSprite
     //  maxbright frames as well
     public byte[]? Colormap { get; set; }
 
-    public int MapObjectFlags { get; set; }
+    public MapObjectFlag MapObjectFlags { get; set; }
 }

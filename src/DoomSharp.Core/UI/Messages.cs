@@ -54,6 +54,16 @@ public static class Messages
             ? "(press y to quit)"
             : "(APPUYEZ SUR Y POUR REVENIR AU OS.)";
 
+    public static string DetailHigh =>
+        DoomGame.Instance.Language == GameLanguage.English
+            ? "High detail"
+            : "GRAPHISMES MAXIMUM";
+
+    public static string DetailLow =>
+        DoomGame.Instance.Language == GameLanguage.English
+            ? "Low detail"
+            : "GRAPHISMES MINIMUM";
+
     public static IEnumerable<string> QuitMessages 
     {
         get

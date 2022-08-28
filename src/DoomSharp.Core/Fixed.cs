@@ -16,7 +16,7 @@ public readonly struct Fixed
     public override string ToString()
     {
         var leftVal = (short)(_value >> 16);
-        var rightVal = (ushort)((uint)_value & 0b1111_1111_1111_1111);
+        var rightVal = Math.Abs((short)(_value & 0b1111_1111_1111_1111));
         if (rightVal == 0)
         {
             return leftVal.ToString();
@@ -27,7 +27,7 @@ public readonly struct Fixed
 
     public static Fixed Div2(Fixed a, Fixed b)
     {
-        var c = ((double)a._value) / ((double)b._value) * Constants.FracUnit;
+        var c = 1.0 * a._value / b._value * Constants.FracUnit;
 
         if (c is >= 2147483648.0 or < -2147483648.0)
         {
@@ -55,8 +55,7 @@ public readonly struct Fixed
 
     public static Fixed operator *(Fixed a, Fixed b)
     {
-        var newIntVal = (a._value * b._value) >> Constants.FracBits;
-        return new Fixed(newIntVal);
+        return new Fixed((int)((1L * a._value * b._value) >> Constants.FracBits));
     }
 
     public static Fixed operator /(Fixed a, Fixed b)

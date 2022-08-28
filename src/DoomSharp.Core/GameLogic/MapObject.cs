@@ -110,7 +110,7 @@ public class MapObject : Thinker
 
     public int Tics { get; set; }	// state tic counter
     public State? State { get; set; }
-    public int Flags { get; set; }
+    public MapObjectFlag Flags { get; set; }
     public int Health { get; set; }
 
     // Movement direction, movement generation (zig-zagging).

@@ -13,6 +13,8 @@ public class VisPlane
         Pad2 = 0;
         Pad3 = 0;
         Pad4 = 0;
+
+        FillTop(0xff);
     }
 
     public Fixed Height { get; set; }
@@ -85,12 +87,12 @@ public class VisPlane
         }
     }
 
-    public void FillTop(byte value)
+    private void FillTop(byte value)
     {
-        Top[0] = value;
-        //for (var i = 0; i < Top.Length; i++)
-        //{
-        //    Top[i] = value;
-        //}
+        // Top[0] = value;
+        for (var i = 0; i < Top.Length; i++)
+        {
+            Top[i] = value;
+        }
     }
 }

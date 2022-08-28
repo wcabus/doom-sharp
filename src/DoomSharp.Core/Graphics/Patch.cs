@@ -62,4 +62,20 @@ public record Patch(ushort Width, ushort Height, short LeftOffset, short TopOffs
 
         return new Patch(width, height, left, top, offsets, columns);
     }
+
+    public Column? GetColumnByOffset(uint offset)
+    {
+        var i = 0;
+        foreach (var columnOffset in ColumnOffsets)
+        {
+            if (columnOffset == offset)
+            {
+                return Columns[i];
+            }
+
+            i++;
+        }
+
+        return null;
+    }
 }

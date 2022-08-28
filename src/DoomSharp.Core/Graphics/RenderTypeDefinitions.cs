@@ -27,8 +27,10 @@ public class DegenMapObject : MapObject
 /// The SECTORS record, at runtime.
 /// Stores things/mobjs.
 /// </summary>
-public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, short CeilingPic, short LightLevel, short Special, short Tag)
+public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, short CeilingPic, short LightLevel, short Tag)
 {
+    public short Special { get; set; }
+
     // 0 = untraversed, 1,2 = sndlines -1
     public int SoundTraversed { get; set; }
 
@@ -70,8 +72,10 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
             (short)DoomGame.Instance.Renderer.FlatNumForName(floorPic),
             (short)DoomGame.Instance.Renderer.FlatNumForName(ceilingPic),
             lightLevel,
-            special,
-            tag);
+            tag)
+        {
+            Special = special
+        };
     }
 }
 
