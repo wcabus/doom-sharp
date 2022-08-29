@@ -1,5 +1,4 @@
-﻿using DoomSharp.Core.Graphics;
-using DoomSharp.Core.Networking;
+﻿using DoomSharp.Core.Networking;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -14,7 +13,7 @@ public class Player
     }
 
     public PlayerState PlayerState { get; set; } = PlayerState.NotSet;
-    public TicCommand Command { get; set; }
+    public TicCommand Command { get; set; } = new();
 
     public MapObject? MapObject { get; set; }
 
@@ -58,7 +57,7 @@ public class Player
 
     // Bit flags, for cheats and debug.
     // See cheat_t, above.
-    public int Cheats { get; set; }
+    public CheatType Cheats { get; set; }
 
     // Refired shots are less accurate.
     public int Refire { get; set; }
@@ -76,7 +75,7 @@ public class Player
     public int BonusCount { get; set; }
 
     // Who did damage (NULL for floors/ceilings).
-    // mobj_t* attacker;
+    public MapObject? Attacker { get; set; }
 
     // So gun flashes light up areas.
     public int ExtraLight { get; set; }

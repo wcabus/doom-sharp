@@ -451,7 +451,7 @@ public class MenuController
                     var saveChar = char.ToUpper((char)ch);
                     if (saveChar != 32)
                     {
-                        if ((saveChar - Constants.HuFontStart) < 0 || (saveChar - Constants.HuFontStart) >= Constants.HuFontSize)
+                        if ((saveChar - HudController.HuFontStart) < 0 || (saveChar - HudController.HuFontStart) >= HudController.HuFontSize)
                         {
                             break; // invalid char (not in font)
                         }
@@ -1348,10 +1348,10 @@ public class MenuController
         var width = 0;
 
         message = message.ToUpperInvariant();
-        for (var i = 0; i < message.Length; i++)
+        foreach (var letter in message)
         {
-            var c = message[i] - Constants.HuFontStart;
-            if (c is < 0 or >= Constants.HuFontSize)
+            var c = letter - HudController.HuFontStart;
+            if (c is < 0 or >= HudController.HuFontSize)
             {
                 width += 4;
             }
@@ -1382,8 +1382,8 @@ public class MenuController
                 continue;
             }
 
-            var drawC = c - Constants.HuFontStart;
-            if (drawC is < 0 or >= Constants.HuFontSize)
+            var drawC = c - HudController.HuFontStart;
+            if (drawC is < 0 or >= HudController.HuFontSize)
             {
                 cx += 4;
                 continue;

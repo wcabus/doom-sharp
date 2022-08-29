@@ -28,6 +28,7 @@ public class DoomGame : IDisposable
     private readonly NetworkController _network = new();
     private MenuController? _menu;
     private HudController? _hud;
+    private readonly StatusBar _statusBar = new();
 
     private bool _singleTics = false; // debug flag to cancel adaptiveness
 
@@ -160,9 +161,9 @@ public class DoomGame : IDisposable
 
             _console.WriteLine("HU_Init: Setting up heads up display.");
             _hud = new HudController();
-
+            
             _console.WriteLine("ST_Init: Init status bar.");
-            // ST_Init();
+            _statusBar.Init();
 
             if (_game.GameAction != GameAction.LoadGame)
             {
@@ -213,6 +214,7 @@ public class DoomGame : IDisposable
     public HudController Hud => _hud!;
     public WadFileCollection WadData => _wadFiles!;
     public MenuController Menu => _menu!;
+    public StatusBar StatusBar => _statusBar;
 
     public static void SetConsole(IConsole console)
     {
@@ -259,7 +261,7 @@ public class DoomGame : IDisposable
 
         if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
-            // HU_Erase();
+            DoomGame.Instance.Hud.Erase();
         }
 
         // do buffered drawing
@@ -286,7 +288,7 @@ public class DoomGame : IDisposable
                     redrawsbar = true;              // just put away the help screen
                 }
 
-                //ST_Drawer(Renderer.ViewHeight  == 200, redrawsbar);
+                _statusBar.Drawer(Renderer.ViewHeight == 200, redrawsbar);
                 _displayFullscreen = Renderer.ViewHeight == 200;
                 break;
 
@@ -312,7 +314,7 @@ public class DoomGame : IDisposable
 
         if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
-            // HU_Drawer();
+            DoomGame.Instance.Hud.Drawer();
         }
 
         // clean up border stuff
@@ -611,7 +613,7 @@ public class DoomGame : IDisposable
                     for (var j = 0; j < Constants.MaxPlayers; j++)
                     {
                         var cmd = _netCommands[j][buf];
-                        cmd.ChatChar = 0;
+                        cmd.ChatChar = (char)0;
                         if ((cmd.Buttons & ButtonCode.Special) != 0)
                         {
                             cmd.Buttons = 0;

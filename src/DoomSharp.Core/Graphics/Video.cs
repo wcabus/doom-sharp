@@ -511,4 +511,19 @@ public class Video
         BoundingBox.AddToBox(_dirtyBox, x, y);
         BoundingBox.AddToBox(_dirtyBox, x + width - 1, y + height - 1);
     }
+
+    public void CopyRectangle(int srcX, int srcY, int srcScreen, int width, int height, int destX, int destY, int destScreen)
+    {
+        MarkRectangle(destX, destY, width, height);
+
+        var src = Constants.ScreenWidth * srcY + srcX;
+        var dest = Constants.ScreenWidth * destY + destX;
+
+        for (; height > 0; height--)
+        {
+            Array.Copy(_screens[srcScreen], src, _screens[destScreen], dest, width);
+            src += Constants.ScreenWidth;
+            dest += Constants.ScreenWidth;
+        }
+    }
 }

@@ -121,10 +121,6 @@ public static class Constants
     // follow a player exclusively for 3 seconds
     public const int BaseThreshold = 100;
 
-    public const char HuFontStart = '!';
-    public const char HuFontEnd = '_';
-    public const int HuFontSize = HuFontEnd - HuFontStart + 1;
-
     public static class NetCommands
     {
         public const uint Exit = 0x80000000;

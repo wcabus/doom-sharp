@@ -3,6 +3,7 @@ using System.Text;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Extensions;
 using DoomSharp.Core.GameLogic;
+using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core.Graphics;
 
@@ -2110,8 +2111,6 @@ public class RenderEngine
     public const int MaxHeight = 832;
     public const int FieldOfView = 2048;
 
-    public const int StatusBarHeight = 32;
-
     private int _viewAngleOffset;
 
     // increment every time a check is made
@@ -3796,7 +3795,7 @@ public class RenderEngine
         }
         else
         {
-            ViewWindowY = (Constants.ScreenHeight - StatusBarHeight - height) >> 1;
+            ViewWindowY = (Constants.ScreenHeight - StatusBar.Height - height) >> 1;
         }
 
         // Pre-calculate all row offsets.
@@ -3831,7 +3830,7 @@ public class RenderEngine
         var dest = DoomGame.Instance.Video.Screens[1];
         var destIdx = 0;
 
-        for (var y = 0; y < (Constants.ScreenHeight - StatusBarHeight); y++)
+        for (var y = 0; y < (Constants.ScreenHeight - StatusBar.Height); y++)
         {
             for (var x = 0; x < Constants.ScreenWidth / 64; x++)
             {
@@ -3922,7 +3921,7 @@ public class RenderEngine
             return;
         }
 
-        var top = ((Constants.ScreenHeight - StatusBarHeight) - ViewHeight) / 2;
+        var top = ((Constants.ScreenHeight - StatusBar.Height) - ViewHeight) / 2;
         var side = (Constants.ScreenWidth - ScaledViewWidth) / 2;
 
         // copy top and one line of left side 
@@ -3943,7 +3942,7 @@ public class RenderEngine
         }
 
         // ? 
-        DoomGame.Instance.Video.MarkRectangle(0, 0, Constants.ScreenWidth, Constants.ScreenHeight - StatusBarHeight);
+        DoomGame.Instance.Video.MarkRectangle(0, 0, Constants.ScreenWidth, Constants.ScreenHeight - StatusBar.Height);
     }
 
     public SubSector PointInSubSector(Fixed x, Fixed y)
@@ -5804,7 +5803,7 @@ public class RenderEngine
         }
     }
 
-    private uint PointToAngle2(Fixed x1, Fixed y1, Fixed x2, Fixed y2)
+    public uint PointToAngle2(Fixed x1, Fixed y1, Fixed x2, Fixed y2)
     {
         _viewX = x1;
         _viewY = y1;

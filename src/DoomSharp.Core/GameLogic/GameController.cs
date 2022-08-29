@@ -2,6 +2,7 @@
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
+using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -182,6 +183,7 @@ public class GameController
 
     public int NumSegments => _numSegments;
     public Segment[] Segments => _segments;
+    public bool AutomapActive { get; set; }
 
     public void Ticker()
     {
@@ -323,9 +325,9 @@ public class GameController
         {
             case GameState.Level:
                 P_Ticker();
-                //ST_Ticker();
+                DoomGame.Instance.StatusBar.Ticker();
                 //AM_Ticker();
-                //HU_Ticker();
+                DoomGame.Instance.Hud.Ticker();
                 break;
 
             case GameState.Intermission:
@@ -1160,9 +1162,9 @@ public class GameController
         if (mthing.Type - 1 == ConsolePlayer)
         {
             // wake up the status bar
-            // ST_Start();
+            DoomGame.Instance.StatusBar.Start();
             // wake up the heads up text
-            // HU_Start();
+            DoomGame.Instance.Hud.Start();
         }
     }
 
