@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Extensions;
 using DoomSharp.Core.GameLogic;
@@ -5878,12 +5879,12 @@ public class RenderEngine
 
         var baseTextureMid = _dcTextureMid;
 
-        for (; column.TopDelta != 0xff;)
+        for (; column.TopDelta != 0xff; )
         {
             // calculate unclipped screen coordinates
             //  for post
-            int topscreen = _sprTopScreen + _sprYScale * column.TopDelta;
-            int bottomscreen = topscreen + _sprYScale * column.Length;
+            int topscreen = _sprTopScreen + (int)_sprYScale * column.TopDelta;
+            int bottomscreen = topscreen + (int)_sprYScale * column.Length;
 
             _dcYl = (topscreen + Constants.FracUnit - 1) >> Constants.FracBits;
             _dcYh = (bottomscreen - 1) >> Constants.FracBits;
@@ -5907,7 +5908,7 @@ public class RenderEngine
 
                 // Drawn by either R_DrawColumn
                 //  or (SHADOW) R_DrawFuzzColumn.
-                _colFunc?.Invoke();
+                _colFunc();
             }
             column = column.Next ?? new Column(0xff, 0, Array.Empty<byte>());
         }
@@ -5963,53 +5964,7 @@ public class RenderEngine
     }
 
     private const int MinZ = Constants.FracUnit * 4;
-
-    /// <summary>
-    /// During BSP traversal, this adds sprites by sector.
-    /// </summary>
-    private void AddSprites(Sector? sec)
-    {
-        if (sec is null)
-        {
-            return;
-        }
-
-        // BSP is traversed by subsector.
-        // A sector might have been split into several
-        //  subsectors during BSP building.
-        // Thus we check whether its already added.
-        if (sec.ValidCount == _validCount)
-        {
-            return;
-        }
-
-        // Well, now it will be done.
-        sec.ValidCount = _validCount;
-
-        var lightNum = (sec.LightLevel >> LightSegShift) + _extraLight;
-
-        if (lightNum < 0)
-        {
-            _spriteLights = _scaleLight[0];
-        }
-        else if (lightNum >= LightLevels)
-        {
-            _spriteLights = _scaleLight[LightLevels - 1];
-        }
-        else
-        {
-            _spriteLights = _scaleLight[lightNum];
-        }
-
-        // Handle all things in sector.
-        var thing = sec.ThingList;
-        while (thing != null)
-        {
-            ProjectSprite(thing);
-            thing = thing.SectorNext;
-        }
-    }
-
+    private const int BaseYCenter = 100;
 
     /// <summary>
     /// Generates a vissprite for a thing if it might be visible
@@ -6159,6 +6114,52 @@ public class RenderEngine
         }
     }
 
+    /// <summary>
+    /// During BSP traversal, this adds sprites by sector.
+    /// </summary>
+    private void AddSprites(Sector? sec)
+    {
+        if (sec is null)
+        {
+            return;
+        }
+
+        // BSP is traversed by subsector.
+        // A sector might have been split into several
+        //  subsectors during BSP building.
+        // Thus we check whether its already added.
+        if (sec.ValidCount == _validCount)
+        {
+            return;
+        }
+
+        // Well, now it will be done.
+        sec.ValidCount = _validCount;
+
+        var lightNum = (sec.LightLevel >> LightSegShift) + _extraLight;
+
+        if (lightNum < 0)
+        {
+            _spriteLights = _scaleLight[0];
+        }
+        else if (lightNum >= LightLevels)
+        {
+            _spriteLights = _scaleLight[LightLevels - 1];
+        }
+        else
+        {
+            _spriteLights = _scaleLight[lightNum];
+        }
+
+        // Handle all things in sector.
+        var thing = sec.ThingList;
+        while (thing != null)
+        {
+            ProjectSprite(thing);
+            thing = thing.SectorNext;
+        }
+    }
+
     private void ClearSprites()
     {
         _visSpriteIdx = 0;
@@ -6176,6 +6177,99 @@ public class RenderEngine
         _visSprites[_visSpriteIdx++] = vp;
         
         return vp;
+    }
+
+    private void DrawPlayerSprite(PlayerSprite psp)
+    {
+        if (_viewPlayer is null || psp.State == null)
+        {
+            return;
+        }
+
+        // decide which patch to use
+        var sprite = _sprites[(int)psp.State.Sprite];
+        var spriteFrame = sprite.Frames[psp.State.Frame & SpriteFrame.FrameMask];
+        var lump = spriteFrame.Lumps[0];
+        var flip = spriteFrame.Flip[0];
+
+        // calculate edges of the shape
+        var tx = psp.SX - (160 * Constants.FracUnit);
+        tx -= _spriteOffset[lump];
+
+        var x1 = (_centerXFrac + (tx * _pSpriteScale)) >> Constants.FracBits;
+
+        // off the right side
+        if (x1 > ViewWidth)
+        {
+            return;
+        }
+
+        tx += _spriteWidth[lump];
+        var x2 = ((_centerXFrac + (tx * _pSpriteScale)) >> Constants.FracBits) - 1;
+
+        // off the left side
+        if (x2 < 0)
+        {
+            return;
+        }
+
+        // store information in a vissprite
+        var vis = new VisSprite()
+        {
+            MapObjectFlags = 0,
+            TextureMid = (BaseYCenter << Constants.FracBits) + Constants.FracUnit / 2 - (psp.SY - _spriteTopOffset[lump]),
+            X1 = x1 < 0 ? 0 : x1,
+            X2 = x2 >= ViewWidth ? ViewWidth - 1 : x2,
+            Scale = _pSpriteScale << _detailShift
+        };
+
+        if (flip)
+        {
+            vis.XiScale = -_pSpriteIScale;
+            vis.StartFrac = _spriteWidth[lump] - 1;
+        }
+        else
+        {
+            vis.XiScale = _pSpriteIScale;
+            vis.StartFrac = 0;
+        }
+
+        if (vis.X1 > x1)
+        {
+            vis.StartFrac += (int)vis.XiScale * (vis.X1 - x1);
+        }
+
+        vis.Patch = lump;
+
+        if (_viewPlayer.Powers[(int)PowerUpType.Invisibility] > 4 * 32 || 
+            (_viewPlayer.Powers[(int)PowerUpType.Invisibility] & 8) != 0)
+        {
+            // shadow draw
+            vis.Colormap = null;
+        }
+        else if (_fixedColorMapIdx != null)
+        {
+            // fixed color
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, _fixedColorMapIdx.Value, colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+        else if ((psp.State.Frame & SpriteFrame.FullBright) != 0)
+        {
+            // full bright
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, 0, colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+        else
+        {
+            // local light
+            var colorMap = new byte[256];
+            Array.Copy(_colorMaps, _spriteLights[MaxLightScale - 1], colorMap, 0, 256);
+            vis.Colormap = colorMap;
+        }
+
+        DrawVisSprite(vis, vis.X1, vis.X2);
     }
 
     private void DrawPlayerSprites()
@@ -6203,16 +6297,19 @@ public class RenderEngine
         _mCeilingClip = _negoneArray;
         _mCeilingClipIdx = 0;
 
-        //// add all active psprites
-        //for (var i = 0; i < NumPlayerSprites; i++)
-        //{
-        //    var psp = _viewPlayer.PSprites[i];
+        if (_viewPlayer != null)
+        {
+            // add all active psprites
+            for (var i = 0; i < (int)PlayerSpriteType.NumPlayerSprites; i++)
+            {
+                var psp = _viewPlayer.PlayerSprites[i];
 
-        //    if (psp->state != 0)
-        //    {
-        //        DrawPlayerSprite(psp);
-        //    }
-        //}
+                if (psp?.State != null)
+                {
+                    DrawPlayerSprite(psp);
+                }
+            }
+        }
     }
 
     private void SortVisSprites()

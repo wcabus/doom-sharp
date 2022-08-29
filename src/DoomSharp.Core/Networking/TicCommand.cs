@@ -1,4 +1,6 @@
-﻿namespace DoomSharp.Core.Networking;
+﻿using DoomSharp.Core.Input;
+
+namespace DoomSharp.Core.Networking;
 
 public struct TicCommand
 {
@@ -7,5 +9,5 @@ public struct TicCommand
     public byte AngleTurn { get; set; }
     public short Consistency { get; set; }
     public byte ChatChar { get; set; }
-    public byte Buttons { get; set; }
+    public ButtonCode Buttons { get; set; }
 }

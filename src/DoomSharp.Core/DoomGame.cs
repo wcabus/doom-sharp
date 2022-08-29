@@ -612,7 +612,7 @@ public class DoomGame : IDisposable
                     {
                         var cmd = _netCommands[j][buf];
                         cmd.ChatChar = 0;
-                        if ((cmd.Buttons & (int)ButtonCode.Special) != 0)
+                        if ((cmd.Buttons & ButtonCode.Special) != 0)
                         {
                             cmd.Buttons = 0;
                         }

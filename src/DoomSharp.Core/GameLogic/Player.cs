@@ -1,9 +1,18 @@
-﻿using DoomSharp.Core.Networking;
+﻿using DoomSharp.Core.Graphics;
+using DoomSharp.Core.Networking;
 
 namespace DoomSharp.Core.GameLogic;
 
 public class Player
 {
+    public Player()
+    {
+        for (var i = 0; i < PlayerSprites.Length; i++)
+        {
+            PlayerSprites[i] = new PlayerSprite();
+        }
+    }
+
     public PlayerState PlayerState { get; set; } = PlayerState.NotSet;
     public TicCommand Command { get; set; }
 
@@ -33,7 +42,7 @@ public class Player
     public bool Backpack { get; set; }
 
     // Frags, kills of other players.
-    public int[] Frags { get; } = new int[Constants.MaxPlayers];
+    public int[] Frags { get; set; } = new int[Constants.MaxPlayers];
     public WeaponType ReadyWeapon { get; set; }
 
     // Is wp_nochange if not changing.
@@ -44,8 +53,8 @@ public class Player
     public int[] MaxAmmo { get; } = new int[(int)AmmoType.NumAmmo];
 
     // True if button down last tic.
-    public int AttackDown { get; set; }
-    public int UseDown { get; set; }
+    public bool AttackDown { get; set; }
+    public bool UseDown { get; set; }
 
     // Bit flags, for cheats and debug.
     // See cheat_t, above.
@@ -81,7 +90,7 @@ public class Player
     public int ColorMap { get; set; }
 
     // Overlay view sprites (gun, etc).
-    // pspdef_t psprites[NUMPSPRITES];
+    public PlayerSprite[] PlayerSprites { get; } = new PlayerSprite[(int)PlayerSpriteType.NumPlayerSprites];
 
     // True if secret level has been done.
     public bool DidSecret { get; set; }

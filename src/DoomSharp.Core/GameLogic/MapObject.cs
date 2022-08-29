@@ -68,6 +68,21 @@ namespace DoomSharp.Core.GameLogic;
 
 public class MapObject : Thinker
 {
+    public MapObject()
+    {
+
+    }
+
+    public MapObject(MapObjectInfo info)
+    {
+        Type = info.Type;
+        Info = info;
+        Radius = info.Radius;
+        Height = info.Height;
+        Flags = info.Flags;
+        Health = info.SpawnHealth;
+    }
+
     // Info for drawing: position.
     public Fixed X { get; set; } = Fixed.Zero;
     public Fixed Y { get; set; } = Fixed.Zero;

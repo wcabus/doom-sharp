@@ -7,6 +7,9 @@ namespace DoomSharp.Core.GameLogic;
 
 public class GameController
 {
+    public static readonly int[] MaxAmmo = { 200, 50, 300, 50 };
+    public static readonly int[] ClipAmmo = { 10, 4, 20, 1 };
+
     private int _saveGameSlot = 0;
     private string _saveDescription = "";
 
@@ -21,7 +24,7 @@ public class GameController
 
     private readonly short[][] _consistency = new short[Constants.MaxPlayers][];
 
-    private int _levelTime;
+    public int LevelTime { get; private set; }
     private LinkedList<Thinker> _thinkers = new();
 
     public const int BodyQueueSize = 32;
@@ -70,7 +73,7 @@ public class GameController
     private Fixed _blockMapOriginX = Fixed.Zero;
     private Fixed _blockMapOriginY = Fixed.Zero;
     // For thing chains
-    private MapObject[][] _blockLinks = Array.Empty<MapObject[]>();
+    private MapObject?[] _blockLinks = Array.Empty<MapObject?>();
 
     // REJECT
     // For fast sight rejection.
@@ -284,11 +287,11 @@ public class GameController
         {
             if (PlayerInGame[i])
             {
-                if ((Players[i].Command.Buttons & (int)ButtonCode.Special) != 0)
+                if ((Players[i].Command.Buttons & ButtonCode.Special) != 0)
                 {
-                    switch (Players[i].Command.Buttons & (int)ButtonCode.SpecialMask)
+                    switch (Players[i].Command.Buttons & ButtonCode.SpecialMask)
                     {
-                        case (int)ButtonCode.Pause:
+                        case ButtonCode.Pause:
                             Paused = !Paused;
                             if (Paused)
                             {
@@ -301,13 +304,13 @@ public class GameController
 
                             break;
 
-                        case (int)ButtonCode.SaveGame:
+                        case ButtonCode.SaveGame:
                             if (string.IsNullOrWhiteSpace(_saveDescription))
                             {
                                 _saveDescription = "NET GAME";
                             }
 
-                            _saveGameSlot = (Players[i].Command.Buttons & (int)ButtonCode.SaveMask) >> (int)ButtonCode.SaveShift;
+                            _saveGameSlot = (int)(Players[i].Command.Buttons & ButtonCode.SaveMask) >> (int)ButtonCode.SaveShift;
                             GameAction = GameAction.SaveGame;
                             break;
                     }
@@ -353,9 +356,38 @@ public class GameController
         PlayerReborn(player);
     }
 
-    private void PlayerReborn(int player)
+    /// <summary>
+    /// Called after a player dies 
+    /// almost everything is cleared and initialized 
+    /// </summary>
+    private Player PlayerReborn(int player)
     {
+        var frags = Players[player].Frags;
+        var killcount = Players[player].KillCount;
+        var itemcount = Players[player].ItemCount;
+        var secretcount = Players[player].SecretCount;
 
+        var p = new Player();
+        Players[player] = p;
+        p.Frags = frags;
+        p.KillCount = killcount;
+        p.ItemCount = itemcount;
+        p.SecretCount = secretcount;
+
+        p.UseDown = p.AttackDown = true;  // don't do anything immediately 
+        p.PlayerState = PlayerState.Alive;
+        p.Health = Constants.MaxHealth;
+        p.ReadyWeapon = p.PendingWeapon = WeaponType.Pistol;
+        p.WeaponOwned[(int)WeaponType.Fist] = true;
+        p.WeaponOwned[(int)WeaponType.Pistol] = true;
+        p.Ammo[(int)AmmoType.Clip] = 50;
+
+        for (var i = 0; i < (int)AmmoType.NumAmmo; i++)
+        {
+            p.MaxAmmo[i] = MaxAmmo[i];
+        }
+
+        return p;
     }
 
     /// <summary>
@@ -690,7 +722,7 @@ public class GameController
         cmd.ForwardMove = (sbyte)_demoData[_demoDataIdx++];
         cmd.SideMove = (sbyte)_demoData[_demoDataIdx++];
         cmd.AngleTurn = (byte)(_demoData[_demoDataIdx++] << 8);
-        cmd.Buttons = _demoData[_demoDataIdx++];
+        cmd.Buttons = (ButtonCode)_demoData[_demoDataIdx++];
     }
 
     private void WriteDemoTicCommand(TicCommand cmd)
@@ -703,7 +735,7 @@ public class GameController
         _demoData[_demoDataIdx++] = (byte)cmd.ForwardMove;
         _demoData[_demoDataIdx++] = (byte)cmd.SideMove;
         _demoData[_demoDataIdx++] = (byte)(cmd.AngleTurn + 128 >> 8);
-        _demoData[_demoDataIdx++] = cmd.Buttons;
+        _demoData[_demoDataIdx++] = (byte)cmd.Buttons;
 
         _demoDataIdx -= 4;
         if (_demoDataIdx > _demoEnd - 16)
@@ -875,9 +907,7 @@ public class GameController
     /// <param name="thinker"></param>
     public void RemoveThinker(Thinker thinker)
     {
-        thinker.Acv = null;
-        thinker.Acp1 = null;
-        thinker.Acp2 = null;
+        thinker.Action = null;
     }
 
     private void RunThinkers()
@@ -887,7 +917,7 @@ public class GameController
         while (thinkerNode != null)
         {
             var thinker = thinkerNode.Value;
-            if (thinker.Acv == null)
+            if (thinker.Action == null)
             {
                 // Time to remove this thinker
                 var next = thinkerNode.Next;
@@ -896,7 +926,7 @@ public class GameController
             }
             else
             {
-                thinker.Acp1?.Invoke(thinker);
+                thinker.Action(new ActionParams(thinker as MapObject));
                 thinkerNode = thinkerNode.Next;
             }
         }
@@ -933,7 +963,7 @@ public class GameController
         //RespawnSpecials();
 
         // for par times
-        _levelTime++;
+        LevelTime++;
     }
 
     private void P_LoadVertexes(int lump)
@@ -1087,7 +1117,7 @@ public class GameController
 
         if (p.PlayerState == PlayerState.Reborn)
         {
-            PlayerReborn(mthing.Type - 1);
+            p = PlayerReborn(mthing.Type - 1);
         }
 
         x = mthing.X << Constants.FracBits;
@@ -1116,7 +1146,7 @@ public class GameController
         p.ViewHeight = Constants.ViewHeight;
 
         // setup gun psprite
-        // P_SetupPsprites(p);
+        P_SetupPlayerSprites(p);
 
         // give all cards in death match mode
         if (DeathMatch)
@@ -1134,6 +1164,231 @@ public class GameController
             // wake up the heads up text
             // HU_Start();
         }
+    }
+
+    private void P_SetupPlayerSprites(Player player)
+    {
+        // remove all psprites
+        for (var i = 0; i < (int)PlayerSpriteType.NumPlayerSprites; i++)
+        {
+            player.PlayerSprites[i].State = null;
+        }
+
+        // spawn the gun
+        player.PendingWeapon = player.ReadyWeapon;
+        P_BringUpWeapon(player);
+    }
+
+    //
+    // P_MovePsprites
+    // Called every tic by player thinking routine.
+    //
+    private void P_MovePlayerSprites(Player player)
+    {
+        for (var i = 0; i < (int)PlayerSpriteType.NumPlayerSprites; i++)
+        {
+            var psp = player.PlayerSprites[i];
+
+            // a null state means not active
+            var state = psp.State;
+            if (state != null)
+            {
+                // drop tic count and possibly change state
+
+                // a -1 tic count never changes
+                if (psp.Tics != -1)
+                {
+                    psp.Tics--;
+                    if (psp.Tics == 0)
+                    {
+                        P_SetPlayerSprite(player, (PlayerSpriteType)i, state.NextState);
+                    }
+                }
+            }
+        }
+
+        player.PlayerSprites[(int)PlayerSpriteType.Flash].SX = player.PlayerSprites[(int)PlayerSpriteType.Weapon].SX;
+        player.PlayerSprites[(int)PlayerSpriteType.Flash].SY = player.PlayerSprites[(int)PlayerSpriteType.Weapon].SY;
+    }
+
+    public void P_SetPlayerSprite(Player player, PlayerSpriteType position, StateNum stnum)
+    {
+        var psp = player.PlayerSprites[(int)position];
+
+        do
+        {
+            if (stnum == StateNum.S_NULL)
+            {
+                // object removed itself
+                psp.State = null;
+                break;
+            }
+
+            var state = State.GetSpawnState(stnum);
+            psp.State = state;
+            psp.Tics = state.Tics;    // could be 0
+
+            if (state.Misc1 != 0)
+            {
+                // coordinate set
+                psp.SX = state.Misc1 << Constants.FracBits;
+                psp.SY = state.Misc2 << Constants.FracBits;
+            }
+
+            // Call action routine.
+            // Modified handling.
+            if (state.Action != null)
+            {
+                state.Action(new ActionParams(Player: player, PlayerSprite: psp));
+                if (psp.State == null)
+                {
+                    break;
+                }
+            }
+
+            stnum = psp.State.NextState;
+        } while (psp.Tics == 0);
+        // an initial state of 0 could cycle through
+    }
+
+    //
+    // P_CalcSwing
+    //	
+    private Fixed _swingX;
+    private Fixed _swingY;
+
+    private void P_CalcSwing(Player player)
+    {
+        // OPTIMIZE: tablify this.
+        // A LUT would allow for different modes,
+        //  and add flexibility.
+
+        var swing = player.Bob;
+
+        var angle = (RenderEngine.FineAngles / 70 * LevelTime) & RenderEngine.FineMask;
+        _swingX = swing * RenderEngine.FineSine[angle];
+
+        angle = (RenderEngine.FineAngles / 70 * LevelTime + RenderEngine.FineAngles / 2) & RenderEngine.FineMask;
+        _swingY = -(_swingX * RenderEngine.FineSine[angle]);
+    }
+
+    /// <summary>
+    /// Starts bringing the pending weapon up
+    /// from the bottom of the screen.
+    /// Uses player
+    /// </summary>
+    public void P_BringUpWeapon(Player player)
+    {
+        if (player.PendingWeapon == WeaponType.NoChange)
+        {
+            player.PendingWeapon = player.ReadyWeapon;
+        }
+
+        if (player.PendingWeapon == WeaponType.Chainsaw)
+        {
+            //S_StartSound(player->mo, sfx_sawup);
+        }
+
+        var newstate = WeaponInfo.GetByType(player.PendingWeapon).UpState;
+
+        player.PendingWeapon = WeaponType.NoChange;
+        player.PlayerSprites[(int)PlayerSpriteType.Weapon].SY = WeaponInfo.WeaponBottom;
+
+        P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newstate);
+    }
+
+    public bool P_CheckAmmo(Player player)
+    {
+        var ammo = WeaponInfo.GetByType(player.ReadyWeapon).Ammo;
+
+        // Minimal amount for one shot varies.
+        var count = 1;
+        if (player.ReadyWeapon == WeaponType.Bfg)
+        {
+            count = WeaponInfo.BFGCells;
+        }
+        else if (player.ReadyWeapon == WeaponType.SuperShotgun)
+        {
+            count = 2;
+        }
+
+        // Some do not need ammunition anyway.
+        // Return if current ammunition sufficient.
+        if (ammo == AmmoType.NoAmmo || player.Ammo[(int)ammo] >= count)
+        {
+            return true;
+        }
+
+        // Out of ammo, pick a weapon to change to.
+        // Preferences are set here.
+        do
+        {
+            if (player.WeaponOwned[(int)WeaponType.Plasma]
+                && player.Ammo[(int)AmmoType.Cell] != 0
+                && (DoomGame.Instance.GameMode != GameMode.Shareware))
+            {
+                player.PendingWeapon = WeaponType.Plasma;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.SuperShotgun]
+                 && player.Ammo[(int)AmmoType.Shell] > 2
+                 && (DoomGame.Instance.GameMode == GameMode.Commercial))
+            {
+                player.PendingWeapon = WeaponType.SuperShotgun;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.Chaingun]
+                 && player.Ammo[(int)AmmoType.Clip] != 0)
+            {
+                player.PendingWeapon = WeaponType.Chaingun;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.Shotgun]
+                 && player.Ammo[(int)AmmoType.Shell] != 0)
+            {
+                player.PendingWeapon = WeaponType.Shotgun;
+            }
+            else if (player.Ammo[(int)AmmoType.Clip] != 0)
+            {
+                player.PendingWeapon = WeaponType.Pistol;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.Chainsaw])
+            {
+                player.PendingWeapon = WeaponType.Chainsaw;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.Missile]
+                 && player.Ammo[(int)AmmoType.Missile] != 0)
+            {
+                player.PendingWeapon = WeaponType.Missile;
+            }
+            else if (player.WeaponOwned[(int)WeaponType.Bfg]
+                 && player.Ammo[(int)AmmoType.Cell] > 40
+                 && (DoomGame.Instance.GameMode != GameMode.Shareware))
+            {
+                player.PendingWeapon = WeaponType.Bfg;
+            }
+            else
+            {
+                // If everything fails.
+                player.PendingWeapon = WeaponType.Fist;
+            }
+
+        } while (player.PendingWeapon == WeaponType.NoChange);
+
+        // Now set appropriate weapon overlay.
+        P_SetPlayerSprite(player, PlayerSpriteType.Weapon, WeaponInfo.GetByType(player.ReadyWeapon).DownState);
+
+        return false;
+    }
+
+    public void P_FireWeapon(Player player)
+    {
+        if (!P_CheckAmmo(player))
+        {
+            return;
+        }
+
+        P_SetMapObjectState(player.MapObject!, StateNum.S_PLAY_ATK1);
+        var newState = WeaponInfo.GetByType(player.ReadyWeapon).AttackState;
+        P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
+        // TODO P_NoiseAlert(player->mo, player->mo);
     }
 
     private void P_SpawnMapThing(MapThing mthing)
@@ -1186,7 +1441,7 @@ public class GameController
         }
 
         // find which type to spawn
-        var moInfo = MapObjectInfo.Find(mthing.Type);
+        var moInfo = MapObjectInfo.FindByDoomedNum(mthing.Type);
         if (moInfo is null)
         {
             DoomGame.Error($"P_SpawnMapThing: Unknown type {mthing.Type} at ({mthing.X}, {mthing.Y})");
@@ -1244,9 +1499,259 @@ public class GameController
         }
     }
 
+    private void P_UnsetThingPosition(MapObject thing)
+    {
+        if ((thing.Flags & MapObjectFlag.MF_NOSECTOR) == 0)
+        {
+            // inert things don't need to be in blockmap?
+            // unlink from subsector
+            if (thing.SectorNext != null)
+            {
+                thing.SectorNext.SectorPrev = thing.SectorPrev;
+            }
+
+            if (thing.SectorPrev != null)
+            {
+                thing.SectorPrev.SectorNext = thing.SectorNext;
+            }
+            else
+            {
+                thing.SubSector!.Sector!.ThingList = thing.SectorNext;
+            }
+        }
+
+        if ((thing.Flags & MapObjectFlag.MF_NOBLOCKMAP) == 0)
+        {
+            // inert things don't need to be in blockmap
+            // unlink from block map
+            if (thing.BlockNext != null)
+            {
+                thing.BlockNext.BlockPrev = thing.BlockPrev;
+            }
+
+            if (thing.BlockPrev != null)
+            {
+                thing.BlockPrev.BlockNext = thing.BlockNext;
+            }
+            else
+            {
+                var blockx = (thing.X - _blockMapOriginX) >> Constants.MapBlockShift;
+                var blocky = (thing.Y - _blockMapOriginY) >> Constants.MapBlockShift;
+
+                if (blockx >= 0 && blockx < _blockMapWidth && blocky >= 0 && blocky < _blockMapHeight)
+                {
+                    _blockLinks[blocky * _blockMapWidth + blockx] = thing.BlockNext;
+                }
+            }
+        }
+    }
+
+    private void P_SetThingPosition(MapObject thing)
+    {
+        // link into subsector
+        var ss = DoomGame.Instance.Renderer.PointInSubSector(thing.X, thing.Y);
+        thing.SubSector = ss;
+
+        if ((thing.Flags & MapObjectFlag.MF_NOSECTOR) == 0)
+        {
+            // invisible things don't go into the sector links
+            var sec = ss.Sector!;
+
+            thing.SectorPrev = null;
+            thing.SectorNext = sec.ThingList;
+
+            if (sec.ThingList != null)
+            {
+                sec.ThingList.SectorPrev = thing;
+            }
+
+            sec.ThingList = thing;
+        }
+
+        // link into blockmap
+        if ((thing.Flags & MapObjectFlag.MF_NOBLOCKMAP) == 0)
+        {
+            // inert things don't need to be in blockmap		
+            var blockx = (thing.X - _blockMapOriginX) >> Constants.MapBlockShift;
+            var blocky = (thing.Y - _blockMapOriginY) >> Constants.MapBlockShift;
+
+            if (blockx >= 0
+                && blockx < _blockMapWidth
+                && blocky >= 0
+                && blocky < _blockMapHeight)
+            {
+                var link = _blockLinks[blocky * _blockMapWidth + blockx];
+                thing.BlockPrev = null;
+                thing.BlockNext = link;
+
+                if (link != null)
+                {
+                    link.BlockPrev = thing;
+                }
+
+                _blockLinks[blocky * _blockMapWidth + blockx] = thing;
+            }
+            else
+            {
+                // thing is off the map
+                thing.BlockNext = thing.BlockPrev = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the mobj is still present
+    /// </summary>
+    public bool P_SetMapObjectState(MapObject mobj, StateNum state)
+    {
+        do
+        {
+            if (state == StateNum.S_NULL)
+            {
+                mobj.State = null;
+                P_RemoveMapObject(mobj);
+                return false;
+            }
+
+            var st = State.GetSpawnState(state);
+            mobj.State = st;
+            mobj.Tics = st.Tics;
+            mobj.Sprite = st.Sprite;
+            mobj.Frame = st.Frame;
+
+            // Modified handling.
+            // Call action functions when the state is set
+            st.Action?.Invoke(new ActionParams(mobj));
+            
+            state = st.NextState;
+        } while (mobj.Tics == 0);
+
+        return true;
+    }
+
+    private void P_MapObjectThinker(ActionParams actionParams)
+    {
+        var mobj = actionParams.MapObject;
+        if (mobj is null)
+        {
+            return;
+        }
+
+        // momentum movement
+        if (mobj.MomX != 0 || mobj.MomY != 0 || (mobj.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+        {
+            // P_XYMovement(mobj);
+
+            if (mobj.Action == null)
+            {
+                return;     // mobj was removed
+            }
+        }
+
+        if ((mobj.Z != mobj.FloorZ) || mobj.MomZ != 0)
+        {
+            // P_ZMovement(mobj);
+
+            if (mobj.Action == null)
+            {
+                return;     // mobj was removed
+            }
+        }
+
+        // cycle through states,
+        // calling action functions at transitions
+        if (mobj.Tics != -1)
+        {
+            mobj.Tics--;
+
+            // you can cycle through multiple states in a tic
+            if (mobj.Tics == 0)
+            {
+                if (!P_SetMapObjectState(mobj, mobj.State!.NextState))
+                {
+                    return;     // freed itself
+                }
+            }
+        }
+        else
+        {
+            // check for nightmare respawn
+            if ((mobj.Flags & MapObjectFlag.MF_COUNTKILL) == 0)
+            {
+                return;
+            }
+
+            // if (!respawnmonsters)
+                // return;
+
+            mobj.MoveCount++;
+
+            if (mobj.MoveCount < 12 * 35)
+            { 
+                return; 
+            }
+
+            if ((LevelTime & 31) != 0)
+            {
+                return;
+            }
+
+            if (DoomRandom.P_Random() > 4)
+            {
+                return;
+            }
+
+            // P_NightmareRespawn(mobj);
+        }
+    }
+
     private MapObject P_SpawnMapObject(Fixed x, Fixed y, Fixed z, MapObjectType type)
     {
-        return new MapObject();
+        var info = MapObjectInfo.GetByType(type);
+        var mobj = new MapObject(info)
+        {
+            X = x,
+            Y = y
+        };
+
+        if (GameSkill != SkillLevel.Nightmare)
+        {
+            mobj.ReactionTime = info.ReactionTime;
+        }
+
+        mobj.LastLook = DoomRandom.P_Random() % Constants.MaxPlayers;
+        // do not set the state with P_SetMobjState,
+        // because action routines can not be called yet
+        var st = State.GetSpawnState(info.SpawnState);
+        mobj.State = st;
+        mobj.Tics = st.Tics;
+        mobj.Sprite = st.Sprite;
+        mobj.Frame = st.Frame;
+
+        // set subsector and/or block links
+        P_SetThingPosition(mobj);
+
+        mobj.FloorZ = mobj.SubSector!.Sector!.FloorHeight;
+        mobj.CeilingZ = mobj.SubSector.Sector.CeilingHeight;
+
+        if (z == Constants.OnFloorZ)
+        {
+            mobj.Z = mobj.FloorZ;
+        }
+        else if (z == Constants.OnCeilingZ)
+        {
+            mobj.Z = mobj.CeilingZ - mobj.Info.Height;
+        }
+        else
+        {
+            mobj.Z = z;
+        }
+
+        mobj.Action = P_MapObjectThinker;
+
+        AddThinker(mobj);
+
+        return mobj;
     }
 
     private void P_RemoveMapObject(MapObject mobj)
@@ -1265,14 +1770,14 @@ public class GameController
             //    iquetail = (iquetail + 1) & (ITEMQUESIZE - 1);
         }
 
-        //// unlink from sector and block lists
-        //P_UnsetThingPosition(mobj);
+        // unlink from sector and block lists
+        P_UnsetThingPosition(mobj);
 
         //// stop any playing sound
         //S_StopSound(mobj);
 
-        //// free block
-        //P_RemoveThinker((thinker_t*)mobj);
+        // free block
+        RemoveThinker(mobj);
     }
 
     /// <summary>
@@ -1386,11 +1891,11 @@ public class GameController
         //count = _blockMapWidth * _blockMapHeight;
         //_blockLinks = Z_Malloc(count, PurgeTag.Level, 0);
         //memset(_blockLinks, 0, count);
-        _blockLinks = new MapObject[_blockMapWidth][];
-        for (var i = 0; i < _blockMapWidth; i++)
-        {
-            _blockLinks[i] = new MapObject[_blockMapHeight];
-        }
+        _blockLinks = new MapObject?[_blockMapWidth * _blockMapHeight];
+        //for (var i = 0; i < _blockMapWidth; i++)
+        //{
+        //    _blockLinks[i] = new MapObject[_blockMapHeight];
+        //}
     }
 
     private void P_GroupLines()
@@ -1497,7 +2002,7 @@ public class GameController
         var lumpName = DoomGame.Instance.GameMode == GameMode.Commercial ? $"map{map:00}" : $"E{episode}M{map}";
         var lumpNum = DoomGame.Instance.WadData.GetNumForName(lumpName);
 
-        _levelTime = 0;
+        LevelTime = 0;
 
         // note: most of this ordering is important	
         P_LoadBlockMap(lumpNum + MapLumps.BlockMap);

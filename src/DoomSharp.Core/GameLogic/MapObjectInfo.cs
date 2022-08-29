@@ -11,9 +11,14 @@ public struct MapObjectInfo
         AddPredefinedTypes();
     }
 
-    public static MapObjectInfo? Find(int type)
+    public static MapObjectInfo GetByType(MapObjectType type)
     {
-        var query = _predefinedTypes.Where(x => x.DoomedNum == type);
+        return _predefinedTypes[(int)type];
+    }
+
+    public static MapObjectInfo? FindByDoomedNum(int doomedNum)
+    {
+        var query = _predefinedTypes.Where(x => x.DoomedNum == doomedNum);
         if (query.Any())
         {
             return query.Single();
