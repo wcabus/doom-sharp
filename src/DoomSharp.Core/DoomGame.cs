@@ -464,7 +464,7 @@ public class DoomGame : IDisposable
 
         // send a bunch of packets for security
         var netBuffer = _network.DoomCom.Data;
-        netBuffer.Player = _game.ConsolePlayer;
+        netBuffer.Player = (byte)_game.ConsolePlayer;
         netBuffer.NumTics = 0;
         for (var i = 0; i < 4; i++)
         {
@@ -653,7 +653,7 @@ public class DoomGame : IDisposable
         }
 
         var netBuffer = _network.DoomCom.Data;
-        netBuffer.Player = _game.ConsolePlayer;
+        netBuffer.Player = (byte)_game.ConsolePlayer;
 
         // build new ticcmds for console player
         var gameTicDiv = _game.GameTic / TicDup;
@@ -661,7 +661,7 @@ public class DoomGame : IDisposable
         {
             _graphics.StartTic();
             ProcessEvents();
-            if (MakeTic - gameTicDiv >= (Constants.BackupTics / 2 - 1))
+            if (MakeTic - gameTicDiv >= ((Constants.BackupTics / 2) - 1))
             {
                 break;          // can't hold any more
             }
@@ -684,9 +684,9 @@ public class DoomGame : IDisposable
                 continue;
             }
 
-            int realStart;
-            netBuffer.StartTic = realStart = _resendTo[i];
-            netBuffer.NumTics = MakeTic - realStart;
+            var realStart = _resendTo[i];
+            netBuffer.StartTic = (byte)_resendTo[i];
+            netBuffer.NumTics = (byte)(MakeTic - realStart);
             if (netBuffer.NumTics > Constants.BackupTics)
             {
                 Error("NetUpdate: netbuffer->numtics > BACKUPTICS");
@@ -701,7 +701,7 @@ public class DoomGame : IDisposable
 
             if (_remoteResend[i])
             {
-                netBuffer.RetransmitFrom = _netTics[i];
+                netBuffer.RetransmitFrom = (byte)_netTics[i];
                 HSendPacket(i, Constants.NetCommands.Retransmit);
             }
             else
@@ -717,12 +717,31 @@ public class DoomGame : IDisposable
 
     private int NetbufferSize()
     {
-        return Marshal.SizeOf<TicCommand>();
+        return 5 * 4 + Marshal.SizeOf<TicCommand>() * Constants.BackupTics;
     }
 
     private uint NetbufferChecksum()
     {
-        return 0;
+        uint c = 0x1234567;
+        var netbuffer = _network.DoomCom.Data;
+        var checksumOffset = 1;
+
+        c += (uint)(netbuffer.RetransmitFrom * (checksumOffset++));
+        c += (uint)(netbuffer.StartTic * (checksumOffset++));
+        c += (uint)(netbuffer.Player * (checksumOffset++));
+        c += (uint)(netbuffer.NumTics * (checksumOffset++));
+
+        foreach (var cmd in netbuffer.Commands)
+        {
+            c += (uint)(cmd.ForwardMove * (checksumOffset++));
+            c += (uint)(cmd.SideMove * (checksumOffset++));
+            c += (uint)(cmd.AngleTurn * (checksumOffset++));
+            c += (uint)(cmd.Consistency * (checksumOffset++));
+            c += (uint)(cmd.ChatChar * (checksumOffset++));
+            c += (uint)((int)cmd.Buttons * (checksumOffset++));
+        }
+
+        return c & Constants.NetCommands.CheckSum;
     }
 
     private int ExpandTics(int low)
@@ -794,9 +813,9 @@ public class DoomGame : IDisposable
     private bool HGetPacket()
     {
         var netBuffer = _network.DoomCom.Data;
-        if (_reboundPacket)
+        if (_reboundPacket && _reboundStore != null)
         {
-            netBuffer = _reboundStore;
+            _network.DoomCom.Data = _reboundStore;
             _network.DoomCom.RemoteNode = 0;
             _reboundPacket = false;
             return true;
@@ -1075,16 +1094,16 @@ public class DoomGame : IDisposable
                 CheckAbort();
                 for (i = 0; i < _network.DoomCom.NumNodes; i++)
                 {
-                    netBuffer.RetransmitFrom = (int)StartSkill;
+                    netBuffer.RetransmitFrom = (byte)StartSkill;
                     if (_game.DeathMatch)
                     {
-                        netBuffer.RetransmitFrom |= ((_game.DeathMatch ? 1 : 0) << 6);
+                        netBuffer.RetransmitFrom |= (byte)((_game.DeathMatch ? 1 : 0) << 6);
                     }
                     //if (nomonsters)
                     //    netbuffer->retransmitfrom |= 0x20;
                     //if (respawnparm)
                     //    netbuffer->retransmitfrom |= 0x10;
-                    netBuffer.StartTic = StartEpisode * 64 + StartMap;
+                    netBuffer.StartTic = (byte)(StartEpisode * 64 + StartMap);
                     netBuffer.Player = Version;
                     netBuffer.NumTics = 0;
                     HSendPacket(i, Constants.NetCommands.Setup);

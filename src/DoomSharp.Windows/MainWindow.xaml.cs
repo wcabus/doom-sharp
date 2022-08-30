@@ -151,7 +151,7 @@ namespace DoomSharp.Windows
                     return 32;
 
                 case >= Key.A and <= Key.Z:
-                    return 'a' + (e.Key - Key.A);
+                    return 'A' + (e.Key - Key.A);
 
                 default:
                     return (int)e.Key;

@@ -2,7 +2,7 @@
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
-using System.Threading;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -159,6 +159,8 @@ public class GameController
     private Ceiling?[] _activeCeilings = new Ceiling?[Constants.MaxCeilings];
     private Platform?[] _activePlats = new Platform?[Constants.MaxPlats];
 
+    private Line? _ceilingLine;
+
     public GameController()
     {
         for (var i = 0; i < Constants.MaxButtons; i++)
@@ -295,9 +297,8 @@ public class GameController
         {
             if (PlayerInGame[i])
             {
-                var cmd = Players[i].Command;
-                DoomGame.Instance.NetCommands[i][buf] = cmd;
-
+                var cmd = DoomGame.Instance.NetCommands[i][buf];
+                
                 if (DemoPlayback)
                 {
                     ReadDemoTicCommand(cmd);
@@ -307,6 +308,8 @@ public class GameController
                 {
                     WriteDemoTicCommand(cmd);
                 }
+
+                Players[i].Command = cmd;
 
                 // check for turbo cheats
                 if (cmd.ForwardMove > TurboThreshold && (GameTic & 31) == 0 && ((GameTic >> 5) & 3) == i)
@@ -1654,6 +1657,308 @@ public class GameController
         }
     }
 
+    private void P_ExplodeMissile(MapObject mo)
+    {
+        mo.MomX = mo.MomY = mo.MomZ = 0;
+        mo.SetState(MapObjectInfo.GetByType(mo.Type).DeathState);
+
+        mo.Tics -= DoomRandom.P_Random() & 3;
+
+        if (mo.Tics < 1)
+        {
+            mo.Tics = 1;
+        }
+
+        mo.Flags &= ~MapObjectFlag.MF_MISSILE;
+
+        if (mo.Info.DeathSound != SoundType.sfx_None)
+        {
+            // S_StartSound(mo, mo.Info.DeathSound);
+        }
+    }
+
+    /// <summary>
+    /// Attempt to move to a new position,
+    /// crossing special lines unless MF_TELEPORT is set.
+    /// </summary>
+    private bool P_TryMove(MapObject thing, Fixed x, Fixed y)
+    {
+        //if (!P_CheckPosition(thing, x, y))
+        //{
+        //    return false; // solid wall or thing
+        //}
+
+        // TODO https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_map.c
+
+        thing.X = x;
+        thing.Y = y;
+
+        return true;
+    }
+
+    private void P_SlideMove(MapObject thing)
+    {
+
+    }
+
+    private const int StopSpeed = 0x1000;
+    private const int Friction = 0xe8000;
+
+    private void P_XYMovement(MapObject mo)
+    {
+        if (mo.MomX == 0 && mo.MomY == 0)
+        {
+            if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+            {
+                // the skull slammed into something
+                mo.Flags &= ~MapObjectFlag.MF_SKULLFLY;
+                mo.MomX = mo.MomY = mo.MomZ= 0;
+
+                mo.SetState(mo.Info.SpawnState);
+            }
+            return;
+        }
+
+        var player = mo.Player;
+
+        if (mo.MomX > Constants.MaxMove)
+        {
+            mo.MomX = Constants.MaxMove;
+        }
+        else if (mo.MomX < -Constants.MaxMove)
+        {
+            mo.MomX = -Constants.MaxMove;
+        }
+
+        if (mo.MomY > Constants.MaxMove)
+        {
+            mo.MomY = Constants.MaxMove;
+        }
+        else if (mo.MomY < -Constants.MaxMove)
+        {
+            mo.MomY = -Constants.MaxMove;
+        }
+
+        var xmove = mo.MomX;
+        var ymove = mo.MomY;
+        Fixed ptryx, ptryy;
+
+        do
+        {
+            if (xmove > Constants.MaxMove / 2 || ymove > Constants.MaxMove / 2)
+            {
+                ptryx = mo.X + (int)xmove / 2;
+                ptryy = mo.Y + (int)ymove / 2;
+                xmove >>= 1;
+                ymove >>= 1;
+            }
+            else
+            {
+                ptryx = mo.X + xmove;
+                ptryy = mo.Y + ymove;
+                xmove = ymove = 0;
+            }
+
+            if (!P_TryMove(mo, ptryx, ptryy))
+            {
+                // blocked move
+                if (mo.Player != null)
+                {   // try to slide along it
+                    P_SlideMove(mo);
+                }
+                else if ((mo.Flags & MapObjectFlag.MF_MISSILE) != 0)
+                {
+                    // explode a missile
+                    if (_ceilingLine?.BackSector != null &&
+                        _ceilingLine.BackSector.CeilingPic == DoomGame.Instance.Renderer.Sky.FlatNum)
+                    {
+                        // Hack to prevent missiles exploding
+                        // against the sky.
+                        // Does not handle sky floors.
+                        P_RemoveMapObject(mo);
+                        return;
+                    }
+                    P_ExplodeMissile(mo);
+                }
+                else
+                {
+                    mo.MomX = mo.MomY = 0;
+                }
+            }
+        } while (xmove != 0 || ymove != 0);
+
+        // slow down
+        if (player != null && (player.Cheats & Cheat.NoMomentum) != 0)
+        {
+            // debug option for no sliding at all
+            mo.MomX = mo.MomY = 0;
+            return;
+        }
+
+        if ((mo.Flags & (MapObjectFlag.MF_MISSILE | MapObjectFlag.MF_SKULLFLY)) != 0)
+        {
+            return;     // no friction for missiles ever
+        }
+
+        if (mo.Z > mo.FloorZ)
+        {
+            return;		// no friction when airborne
+        }
+
+        if ((mo.Flags & MapObjectFlag.MF_CORPSE) != 0)
+        {
+            // do not stop sliding
+            //  if halfway off a step with some momentum
+            if (mo.MomX > Constants.FracUnit / 4
+                || mo.MomX < -Constants.FracUnit / 4
+                || mo.MomY> Constants.FracUnit / 4
+                || mo.MomY < -Constants.FracUnit / 4)
+            {
+                if (mo.SubSector?.Sector == null || mo.FloorZ != mo.SubSector.Sector.FloorHeight)
+                {
+                    return;
+                }
+            }
+        }
+
+        if (mo.MomX > -StopSpeed
+            && mo.MomX < StopSpeed
+            && mo.MomY > -StopSpeed
+            && mo.MomY < StopSpeed
+            && (player == null || (player.Command.ForwardMove == 0 && player.Command.SideMove == 0)))
+        {
+            // if in a walking frame, stop moving
+            if (player != null && (State.GetStateNum(player.MapObject!.State!) - StateNum.S_PLAY_RUN1) < 4)
+            {
+                player.MapObject.SetState(StateNum.S_PLAY);
+            }
+
+            mo.MomX = 0;
+            mo.MomY = 0;
+        }
+        else
+        {
+            mo.MomX = (mo.MomX * Friction);
+            mo.MomY = (mo.MomY * Friction);
+        }
+    }
+
+    private Fixed P_AproxDistance(Fixed dx, Fixed dy)
+    {
+        dx = Math.Abs(dx);
+        dy = Math.Abs(dy);
+        if (dx < dy)
+        {
+            return dx + dy - (dx >> 1);
+        }
+
+        return dx + dy - (dy >> 1);
+    }
+
+    private void P_ZMovement(MapObject mo)
+    {
+        Fixed dist;
+        Fixed delta;
+
+        // check for smooth step up
+        if (mo.Player != null && mo.Z < mo.FloorZ)
+        {
+            mo.Player.ViewHeight -= mo.FloorZ - mo.Z;
+            mo.Player.DeltaViewHeight = (Constants.ViewHeight - mo.Player.ViewHeight) >> 3;
+        }
+
+        // adjust height
+        mo.Z += mo.MomZ;
+
+        if ((mo.Flags & MapObjectFlag.MF_FLOAT) != 0 && mo.Target != null)
+        {
+            // float down towards target if too close
+            if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) == 0 && (mo.Flags & MapObjectFlag.MF_INFLOAT) == 0)
+            {
+                dist = P_AproxDistance(mo.X - mo.Target.X, mo.Y - mo.Target.Y);
+                delta = (mo.Target.Z + (mo.Height >> 1)) - mo.Z;
+
+                if (delta < 0 && dist < -(delta * 3))
+                {
+                    mo.Z -= Constants.FloatSpeed;
+                }
+                else if (delta > 0 && dist < (delta * 3))
+                {
+                    mo.Z += Constants.FloatSpeed;
+                }
+            }
+        }
+
+        // clip movement
+        if (mo.Z <= mo.FloorZ)
+        {
+            // hit the floor
+
+            // Note (id):
+            //  somebody left this after the setting momz to 0,
+            //  kinda useless there.
+            if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+            {
+                // the skull slammed into something
+                mo.MomZ = -mo.MomZ;
+            }
+
+            if (mo.MomZ < 0)
+            {
+                if (mo.Player != null && mo.MomZ < -Constants.Gravity * 8)
+                {
+                    // Squat down.
+                    // Decrease viewheight for a moment
+                    // after hitting the ground (hard),
+                    // and utter appropriate sound.
+                    mo.Player.DeltaViewHeight = mo.MomZ >> 3;
+                    // S_StartSound(mo, sfx_oof);
+                }
+                mo.MomZ = 0;
+            }
+            mo.Z = mo.FloorZ;
+
+            if ((mo.Flags & MapObjectFlag.MF_MISSILE) != 0 && (mo.Flags & MapObjectFlag.MF_NOCLIP) == 0)
+            {
+                P_ExplodeMissile(mo);
+                return;
+            }
+        }
+        else if ((mo.Flags & MapObjectFlag.MF_NOGRAVITY) == 0)
+        {
+            if (mo.MomZ == 0)
+            {
+                mo.MomZ = -Constants.Gravity * 2;
+            }
+            else
+            {
+                mo.MomZ -= Constants.Gravity;
+            }
+        }
+
+        if (mo.Z + mo.Height > mo.CeilingZ)
+        {
+            // hit the ceiling
+            if (mo.MomZ > 0)
+            {
+                mo.MomZ = 0;
+            }
+            
+            mo.Z = mo.CeilingZ - mo.Height;
+            
+            if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+            {   // the skull slammed into something
+                mo.MomZ = -mo.MomZ;
+            }
+
+            if ((mo.Flags & MapObjectFlag.MF_MISSILE) != 0 && (mo.Flags & MapObjectFlag.MF_NOCLIP) == 0)
+            {
+                P_ExplodeMissile(mo);
+                return;
+            }
+        }
+    }
+
     private void P_MapObjectThinker(ActionParams actionParams)
     {
         var mobj = actionParams.MapObject;
@@ -1665,7 +1970,7 @@ public class GameController
         // momentum movement
         if (mobj.MomX != 0 || mobj.MomY != 0 || (mobj.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
         {
-            // P_XYMovement(mobj);
+            P_XYMovement(mobj);
 
             if (mobj.Action == null)
             {

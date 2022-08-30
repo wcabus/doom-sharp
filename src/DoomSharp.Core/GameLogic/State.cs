@@ -17,6 +17,11 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         return _states[(int)stateNum];
     }
 
+    public static StateNum GetStateNum(State state)
+    {
+        return (StateNum)_states.IndexOf(state);
+    }
+
     private static void ActionLight0(ActionParams actionParams)
     {
         actionParams.Player!.ExtraLight = 0;
