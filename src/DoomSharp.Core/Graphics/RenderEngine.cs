@@ -3421,7 +3421,11 @@ public class RenderEngine
         {
             // Re-map color indices from wall texture column
             //  using a lighting/special effects LUT.
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[_dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127]];
+            var idx = _dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127;
+            if (idx < _dcSource.Length)
+            {
+                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[idx]];
+            }
 
             dest += Constants.ScreenWidth;
             frac += fracStep;
@@ -3461,9 +3465,13 @@ public class RenderEngine
 
         do
         {
-            DoomGame.Instance.Video.Screens[0][dest2] = 
-                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[_dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127]];
-
+            var idx = _dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127;
+            if (idx < _dcSource.Length)
+            {
+                DoomGame.Instance.Video.Screens[0][dest2] =
+                    DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[idx]];
+            }
+            
             dest += Constants.ScreenWidth;
             dest2 += Constants.ScreenWidth;
             frac += fracStep;
