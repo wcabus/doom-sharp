@@ -704,7 +704,7 @@ public class MenuController
         return false;
     }
 
-    private void StartControlPanel()
+    public void StartControlPanel()
     {
         if (IsActive)
         {

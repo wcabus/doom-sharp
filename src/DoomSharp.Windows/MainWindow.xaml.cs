@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -23,7 +24,7 @@ namespace DoomSharp.Windows
             InitializeComponent();
         }
 
-        protected async override void OnInitialized(EventArgs e)
+        protected override void OnInitialized(EventArgs e)
         {
             base.OnInitialized(e);
 
@@ -31,12 +32,9 @@ namespace DoomSharp.Windows
             consoleOutputWindow.Show();
 
             RenderOptions.SetBitmapScalingMode(RenderTarget, BitmapScalingMode.NearestNeighbor);
-            RenderOptions.SetEdgeMode(RenderTarget, EdgeMode.Aliased);
-
-            await Task.Run(async () =>
-            {
-                await DoomGame.Instance.RunAsync();
-            });
+            RenderOptions.SetEdgeMode(RenderTarget, EdgeMode.Aliased); 
+            
+            Task.Run(() => DoomGame.Instance.Run());
         }
 
         private void HandleKeyDown(object sender, KeyEventArgs e)

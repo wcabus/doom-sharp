@@ -2,7 +2,7 @@
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
-using DoomSharp.Core.UI;
+using System.Threading;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -24,6 +24,60 @@ public class GameController
     private WorldMapInfo _wmInfo = new();
 
     private readonly short[][] _consistency = new short[Constants.MaxPlayers][];
+
+    // 
+    // controls (have defaults) 
+    // 
+    private int _keyRight = 'E';
+    private int _keyLeft = 'Q';
+
+    private int _keyUp = 'W';
+    private int _keyDown = 'S';
+    private int _keyStrafeLeft = 'A';
+    private int _keyStrafeRight = 'D';
+    private int _keyFire = ' ';
+    private int _keyUse = (int)Keys.Enter;
+    private int _keyStrafe = (int)Keys.LAlt;
+    private int _keySpeed = (int)Keys.RShift;
+
+    private int _mouseButtonFire = 0;
+    private int _mouseButtonStrafe = 2;
+    private int _mouseButtonForward = 1;
+
+    private int _joyButtonFire = 0;
+    private int _joyButtonStrafe = 1;
+    private int _joyButtonUse = 2;
+    private int _joyButtonSpeed = 3;
+
+    public const int TurboThreshold = 0x32;
+
+    private static readonly Fixed[] ForwardMove = { 0x19, 0x32 };
+    private static readonly Fixed[] SideMove = { 0x18, 0x28 };
+    private static readonly Fixed[] AngleTurn = { 640, 1280, 320 };
+
+    public const int SlowTurnTics = 6;
+    public const int NumKeys = 256;
+
+    private readonly bool[] _gameKeyDown = new bool[NumKeys];
+    private int _turnHeld;
+
+    private readonly bool[] _mouseButtons = new bool[4];
+
+    // mouse values are used once 
+    private int _mouseX;
+    private int _mouseY;
+
+    private int _doubleClickTime;
+    private bool _doubleClickState;
+    private int _doubleClicks;
+    private int _doubleClickTime2;
+    private bool _doubleClickState2;
+    private int _doubleClicks2;
+
+    // joystick values are repeated 
+    private int _joyXMove;
+    private int _joyYMove;
+    private bool[] _joyButtons = new bool[5];
 
     public int LevelTime { get; private set; }
     private LinkedList<Thinker> _thinkers = new();
@@ -164,9 +218,6 @@ public class GameController
     /// </summary>
     public bool PreCache { get; set; } = true;
 
-    public const int NumKeys = 256;
-    public bool[] GameKeyDown { get; } = new bool[256];
-
     public LinkedList<Thinker> Thinkers => _thinkers;
 
     public int NumSectors => _numSectors;
@@ -188,7 +239,6 @@ public class GameController
     public void Ticker()
     {
         var buf = 0;
-        TicCommand cmd;
 
         // do player reborns if needed
         for (var i = 0; i < Constants.MaxPlayers; i++)
@@ -245,9 +295,9 @@ public class GameController
         {
             if (PlayerInGame[i])
             {
-                cmd = Players[i].Command;
+                var cmd = Players[i].Command;
+                DoomGame.Instance.NetCommands[i][buf] = cmd;
 
-                //    memcpy(cmd, &netcmds[i][buf], sizeof(ticcmd_t));
                 if (DemoPlayback)
                 {
                     ReadDemoTicCommand(cmd);
@@ -258,29 +308,32 @@ public class GameController
                     WriteDemoTicCommand(cmd);
                 }
 
-                //    // check for turbo cheats
-                //    if (cmd->forwardmove > TURBOTHRESHOLD
-                //    && !(gametic & 31) && ((gametic >> 5) & 3) == i)
-                //    {
-                //        static char turbomessage[80];
-                //        extern char* player_names[4];
-                //        sprintf(turbomessage, "%s is turbo!", player_names[i]);
-                //        players[ConsolePlayer].message = turbomessage;
-                //    }
+                // check for turbo cheats
+                if (cmd.ForwardMove > TurboThreshold && (GameTic & 31) == 0 && ((GameTic >> 5) & 3) == i)
+                {
+                    //static char turbomessage[80];
+                    //extern char* player_names[4];
+                    //sprintf(turbomessage, "%s is turbo!", player_names[i]);
+                    Players[ConsolePlayer].Message = "Player is turbo!";
+                }
 
-                //    if (netgame && !netdemo && !(gametic % ticdup))
-                //    {
-                //        if (gametic > BACKUPTICS
-                //            && consistancy[i][buf] != cmd->consistancy)
-                //        {
-                //            I_Error("consistency failure (%i should be %i)",
-                //                 cmd->consistancy, consistancy[i][buf]);
-                //        }
-                //        if (players[i].mo)
-                //            consistancy[i][buf] = players[i].mo->x;
-                //        else
-                //            consistancy[i][buf] = rndindex;
-                //    }
+                if (NetGame && !NetDemo && (GameTic % DoomGame.Instance.TicDup) == 0)
+                {
+                    if (GameTic > Constants.BackupTics && _consistency[i][buf] != cmd.Consistency)
+                    {
+                        DoomGame.Error($"consistency failure ({cmd.Consistency} should be {_consistency[i][buf]})");
+                        return;
+                    }
+
+                    if (Players[i].MapObject != null)
+                    {
+                        _consistency[i][buf] = (short)Players[i].MapObject!.X;
+                    }
+                    else
+                    {
+                        _consistency[i][buf] = (short)DoomRandom.RandomIndex;
+                    }
+                }
             }
         }
 
@@ -723,13 +776,13 @@ public class GameController
 
         cmd.ForwardMove = (sbyte)_demoData[_demoDataIdx++];
         cmd.SideMove = (sbyte)_demoData[_demoDataIdx++];
-        cmd.AngleTurn = (byte)(_demoData[_demoDataIdx++] << 8);
+        cmd.AngleTurn = (short)(_demoData[_demoDataIdx++] << 8);
         cmd.Buttons = (ButtonCode)_demoData[_demoDataIdx++];
     }
 
     private void WriteDemoTicCommand(TicCommand cmd)
     {
-        if (GameKeyDown['q']) // press q to end demo recording 
+        if (_gameKeyDown['q']) // press q to end demo recording 
         {
             CheckDemoStatus();
         }
@@ -1185,7 +1238,7 @@ public class GameController
     // P_MovePsprites
     // Called every tic by player thinking routine.
     //
-    private void P_MovePlayerSprites(Player player)
+    public void P_MovePlayerSprites(Player player)
     {
         for (var i = 0; i < (int)PlayerSpriteType.NumPlayerSprites; i++)
         {
@@ -1387,7 +1440,7 @@ public class GameController
             return;
         }
 
-        P_SetMapObjectState(player.MapObject!, StateNum.S_PLAY_ATK1);
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK1);
         var newState = WeaponInfo.GetByType(player.ReadyWeapon).AttackState;
         P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
         // TODO P_NoiseAlert(player->mo, player->mo);
@@ -1601,36 +1654,6 @@ public class GameController
         }
     }
 
-    /// <summary>
-    /// Returns true if the mobj is still present
-    /// </summary>
-    public bool P_SetMapObjectState(MapObject mobj, StateNum state)
-    {
-        do
-        {
-            if (state == StateNum.S_NULL)
-            {
-                mobj.State = null;
-                P_RemoveMapObject(mobj);
-                return false;
-            }
-
-            var st = State.GetSpawnState(state);
-            mobj.State = st;
-            mobj.Tics = st.Tics;
-            mobj.Sprite = st.Sprite;
-            mobj.Frame = st.Frame;
-
-            // Modified handling.
-            // Call action functions when the state is set
-            st.Action?.Invoke(new ActionParams(mobj));
-            
-            state = st.NextState;
-        } while (mobj.Tics == 0);
-
-        return true;
-    }
-
     private void P_MapObjectThinker(ActionParams actionParams)
     {
         var mobj = actionParams.MapObject;
@@ -1669,7 +1692,7 @@ public class GameController
             // you can cycle through multiple states in a tic
             if (mobj.Tics == 0)
             {
-                if (!P_SetMapObjectState(mobj, mobj.State!.NextState))
+                if (!mobj.SetState(mobj.State!.NextState))
                 {
                     return;     // freed itself
                 }
@@ -1707,7 +1730,7 @@ public class GameController
         }
     }
 
-    private MapObject P_SpawnMapObject(Fixed x, Fixed y, Fixed z, MapObjectType type)
+    public MapObject P_SpawnMapObject(Fixed x, Fixed y, Fixed z, MapObjectType type)
     {
         var info = MapObjectInfo.GetByType(type);
         var mobj = new MapObject(info)
@@ -1756,7 +1779,7 @@ public class GameController
         return mobj;
     }
 
-    private void P_RemoveMapObject(MapObject mobj)
+    public void P_RemoveMapObject(MapObject mobj)
     {
         if ((mobj.Flags & MapObjectFlag.MF_SPECIAL) != 0
             && (mobj.Flags & MapObjectFlag.MF_DROPPED) == 0
@@ -2348,5 +2371,389 @@ public class GameController
 
         // UNUSED: no horizonal sliders.
         //	P_InitSlidingDoorFrames();
+    }
+
+    /// <summary>
+    /// Get info needed to make ticcmd_ts for the players
+    /// </summary>
+    public bool HandleEvent(InputEvent currentEvent)
+    {
+        // allow spy mode changes even during the demo
+        if (GameState == GameState.Level && 
+            currentEvent.Type == EventType.KeyDown &&
+            currentEvent.Data1 == (int)Keys.F12 && 
+            (SingleDemo || !DeathMatch))
+        {
+            // spy mode 
+            do
+            {
+                DisplayPlayer++;
+                if (DisplayPlayer == Constants.MaxPlayers)
+                {
+                    DisplayPlayer = 0;
+                }
+            } while (!PlayerInGame[DisplayPlayer] && DisplayPlayer != ConsolePlayer);
+            
+            return true;
+        }
+
+        // any other key pops up menu if in demos
+        if (GameAction == GameAction.Nothing && 
+            !SingleDemo &&
+            (DemoPlayback || GameState == GameState.DemoScreen)
+        )
+        {
+            if (currentEvent.Type == EventType.KeyDown ||
+                (currentEvent.Type == EventType.Mouse && currentEvent.Data1 != 0) ||
+                (currentEvent.Type == EventType.Joystick && currentEvent.Data1 != 0))
+            {
+                DoomGame.Instance.Menu.StartControlPanel();
+                return true;
+            }
+            return false;
+        }
+
+        if (GameState == GameState.Level)
+        {
+            //if (HU_Responder(ev))
+            //    return true;    // chat ate the event 
+            //if (ST_Responder(ev))
+            //    return true;    // status window ate it 
+            //if (AM_Responder(ev))
+            //    return true;    // automap ate it 
+        }
+
+        if (GameState == GameState.Finale)
+        {
+            //if (F_Responder(ev))
+            //    return true;    // finale ate the event 
+        }
+
+        switch (currentEvent.Type)
+        {
+            case EventType.KeyDown:
+                if (currentEvent.Data1 == (int)Keys.Pause)
+                {
+                    SendPause = true;
+                    return true;
+                }
+
+                if (currentEvent.Data1 < NumKeys)
+                {
+                    _gameKeyDown[currentEvent.Data1] = true;
+                }
+                
+                return true;    // eat key down events 
+
+            case EventType.KeyUp:
+                if (currentEvent.Data1 < NumKeys)
+                {
+                    _gameKeyDown[currentEvent.Data1] = false;
+                }
+
+                return false;   // always let key up events filter down 
+
+            case EventType.Mouse:
+                _mouseButtons[0] = (currentEvent.Data1 & 1) != 0;
+                _mouseButtons[1] = (currentEvent.Data1 & 2) != 0;
+                _mouseButtons[2] = (currentEvent.Data1 & 4) != 0;
+                _mouseX = currentEvent.Data2 * (DoomGame.Instance.Menu.MouseSensitivity + 5) / 10;
+                _mouseY = currentEvent.Data3 * (DoomGame.Instance.Menu.MouseSensitivity + 5) / 10;
+                return true;    // eat events 
+
+            case EventType.Joystick:
+                _joyButtons[0] = (currentEvent.Data1 & 1) != 0;
+                _joyButtons[1] = (currentEvent.Data1 & 2) != 0;
+                _joyButtons[2] = (currentEvent.Data1 & 4) != 0;
+                _joyButtons[3] = (currentEvent.Data1 & 8) != 0;
+                _joyXMove = currentEvent.Data2;
+                _joyYMove = currentEvent.Data3;
+                return true;    // eat events 
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Builds a ticcmd from all of the available inputs
+    /// or reads it from the demo buffer. 
+    /// If recording a demo, write it out 
+    /// </summary>
+    public TicCommand BuildTicCommand()
+    {
+        var cmd = new TicCommand(); // empty, or external driver
+
+        cmd.Consistency = _consistency[ConsolePlayer][DoomGame.Instance.MakeTic % Constants.BackupTics];
+
+        var strafe = _gameKeyDown[_keyStrafe] || _mouseButtons[_mouseButtonStrafe] || _joyButtons[_joyButtonStrafe];
+        var speed = (_gameKeyDown[_keySpeed] || _joyButtons[_joyButtonSpeed]) ? 1 : 0;
+
+        var turnSpeed = 0;
+        var forward = 0;
+        var side = 0;
+
+        // use two stage accelerative turning
+        // on the keyboard and joystick
+        if (_joyXMove < 0 || _joyXMove > 0
+                          || _gameKeyDown[_keyRight]
+                          || _gameKeyDown[_keyLeft])
+        {
+            _turnHeld += DoomGame.Instance.TicDup;
+        }
+        else
+        {
+            _turnHeld = 0;
+        }
+
+        if (_turnHeld < SlowTurnTics)
+        {
+            turnSpeed = 2;             // slow turn 
+        }
+        else
+        {
+            turnSpeed = speed;
+        }
+
+        // let movement keys cancel each other out
+        if (strafe)
+        {
+            if (_gameKeyDown[_keyRight])
+            {
+                // fprintf(stderr, "strafe right\n");
+                side += SideMove[speed];
+            }
+
+            if (_gameKeyDown[_keyLeft])
+            {
+                //	fprintf(stderr, "strafe left\n");
+                side -= SideMove[speed];
+            }
+
+            if (_joyXMove > 0)
+            {
+                side += SideMove[speed];
+            }
+
+            if (_joyXMove < 0)
+            {
+                side -= SideMove[speed];
+            }
+
+        }
+        else
+        {
+            if (_gameKeyDown[_keyRight])
+            {
+                cmd.AngleTurn -= (short)AngleTurn[turnSpeed];
+            }
+
+            if (_gameKeyDown[_keyLeft])
+            {
+                cmd.AngleTurn += (short)AngleTurn[turnSpeed];
+            }
+
+            if (_joyXMove > 0)
+            {
+                cmd.AngleTurn -= (short)AngleTurn[turnSpeed];
+            }
+
+            if (_joyXMove < 0)
+            {
+                cmd.AngleTurn += (short)AngleTurn[turnSpeed];
+            }
+        }
+
+        if (_gameKeyDown[_keyUp])
+        {
+            // fprintf(stderr, "up\n");
+            forward += ForwardMove[speed];
+        }
+        
+        if (_gameKeyDown[_keyDown])
+        {
+            // fprintf(stderr, "down\n");
+            forward -= ForwardMove[speed];
+        }
+
+        if (_joyYMove < 0)
+        {
+            forward += ForwardMove[speed];
+        }
+
+        if (_joyYMove > 0)
+        {
+            forward -= ForwardMove[speed];
+        }
+
+        if (_gameKeyDown[_keyStrafeRight])
+        {
+            side += SideMove[speed];
+        }
+
+        if (_gameKeyDown[_keyStrafeLeft])
+        {
+            side -= SideMove[speed];
+        }
+
+        // buttons
+        cmd.ChatChar = (char)0; // TODO HU_dequeueChatChar();
+
+        if (_gameKeyDown[_keyFire] || _mouseButtons[_mouseButtonFire]
+                                   || _joyButtons[_joyButtonFire])
+        {
+            cmd.Buttons |= ButtonCode.Attack;
+        }
+
+        if (_gameKeyDown[_keyUse] || _joyButtons[_joyButtonUse])
+        {
+            cmd.Buttons |= ButtonCode.Use;
+            // clear double clicks if hit use button 
+            _doubleClicks = 0;
+        }
+
+        // chainsaw overrides 
+        for (var i = 0; i < (int)WeaponType.NumberOfWeapons - 1; i++)
+        {
+            if (!_gameKeyDown['1' + i])
+            {
+                continue;
+            }
+
+            cmd.Buttons |= ButtonCode.Change;
+            cmd.Buttons |= (ButtonCode)(i << (int)ButtonCode.WeaponShift);
+            break;
+        }
+
+        // mouse
+        if (_mouseButtons[_mouseButtonForward])
+        {
+            forward += ForwardMove[speed];
+        }
+
+        // forward double click
+        if (_mouseButtons[_mouseButtonForward] != _doubleClickState && _doubleClickTime > 1)
+        {
+            _doubleClickState = _mouseButtons[_mouseButtonForward];
+            if (_doubleClickState)
+            {
+                _doubleClicks++;
+            }
+
+            if (_doubleClicks == 2)
+            {
+                cmd.Buttons |= ButtonCode.Use;
+                _doubleClicks = 0;
+            }
+            else
+            {
+                _doubleClickTime = 0;
+            }
+        }
+        else
+        {
+            _doubleClickTime += DoomGame.Instance.TicDup;
+            if (_doubleClickTime > 20)
+            {
+                _doubleClicks = 0;
+                _doubleClickState = false;
+            }
+        }
+
+        // strafe double click
+        var bstrafe = _mouseButtons[_mouseButtonStrafe] || _joyButtons[_joyButtonStrafe];
+        if (bstrafe != _doubleClickState2 && _doubleClickTime2 > 1)
+        {
+            _doubleClickState2 = bstrafe;
+            if (_doubleClickState2)
+            {
+                _doubleClicks2++;
+            }
+
+            if (_doubleClicks2 == 2)
+            {
+                cmd.Buttons |= ButtonCode.Use;
+                _doubleClicks2 = 0;
+            }
+            else
+            {
+                _doubleClickTime2 = 0;
+            }
+        }
+        else
+        {
+            _doubleClickTime2 += DoomGame.Instance.TicDup;
+            if (_doubleClickTime2 > 20)
+            {
+                _doubleClicks2 = 0;
+                _doubleClickState2 = false;
+            }
+        }
+
+        forward += _mouseY;
+        if (strafe)
+        {
+            side += _mouseX * 2;
+        }
+        else
+        {
+            cmd.AngleTurn -= (short)(_mouseX * 0x8);
+        }
+
+        _mouseX = _mouseY = 0;
+
+        if (forward > ForwardMove[1]) // MAXPLMOVE = forwardmove[1]
+        {
+            forward = ForwardMove[1];
+        }
+        else if (forward < -ForwardMove[1])
+        {
+            forward = -ForwardMove[1];
+        }
+
+        if (side > ForwardMove[1])
+        {
+            side = ForwardMove[1];
+        }
+        else if (side < -ForwardMove[1])
+        {
+            side = -ForwardMove[1];
+        }
+
+        cmd.ForwardMove += (sbyte)forward;
+        cmd.SideMove += (sbyte)side;
+
+        // special buttons
+        if (SendPause)
+        {
+            SendPause = false;
+            cmd.Buttons = ButtonCode.Special | ButtonCode.Pause;
+        }
+
+        if (SendSave)
+        {
+            SendSave = false;
+            cmd.Buttons = ButtonCode.Special | ButtonCode.SaveGame | (ButtonCode)(_saveGameSlot << (int)ButtonCode.SaveShift);
+        }
+
+        return cmd;
+    }
+
+    public void ExitLevel()
+    {
+        // _secretExit = false;
+        GameAction = GameAction.Completed;
+    }
+
+    public int GetPlayerIndex(Player player)
+    {
+        for (var i = 0; i < Players.Length; i++)
+        {
+            if (Players[i] == player)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }

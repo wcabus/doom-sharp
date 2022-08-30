@@ -1,5 +1,6 @@
 ﻿namespace DoomSharp.Core.GameLogic;
 
+[Flags]
 public enum Cheat
 {
     /// <summary>

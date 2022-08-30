@@ -156,4 +156,35 @@ public class MapObject : Thinker
 
     // Thing being chased/attacked for tracers.
     public MapObject? Tracer { get; set; }
+
+    /// <summary>
+    /// Returns true if the mobj is still present
+    /// </summary>
+    public bool SetState(StateNum state)
+    {
+        do
+        {
+            if (state == StateNum.S_NULL)
+            {
+                State = null;
+                // TODO Try to move this method to this class
+                DoomGame.Instance.Game.P_RemoveMapObject(this);
+                return false;
+            }
+
+            var st = State.GetSpawnState(state);
+            State = st;
+            Tics = st.Tics;
+            Sprite = st.Sprite;
+            Frame = st.Frame;
+
+            // Modified handling.
+            // Call action functions when the state is set
+            st.Action?.Invoke(new ActionParams(this));
+
+            state = st.NextState;
+        } while (Tics == 0);
+
+        return true;
+    }
 }

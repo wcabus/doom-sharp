@@ -1,9 +1,6 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
-using System;
 using DoomSharp.Core.Graphics;
-using DoomSharp.Core.Input;
-using System.Runtime.CompilerServices;
 
 namespace DoomSharp.Core.UI;
 
@@ -176,7 +173,7 @@ public class StatusBar
     private bool _firstTime;
     private int _veryFirstTime = 1;
 
-    private string _palette = "PLAYPAL";
+    private const string Palette = "PLAYPAL";
     private int _paletteIdx = 0;
     private uint _clock;
     private int _messageCounter;
@@ -334,7 +331,7 @@ public class StatusBar
             return;
         }
 
-        DoomGame.Instance.Video.SetPalette(_palette, _paletteIdx);
+        DoomGame.Instance.Video.SetPalette(Palette, _paletteIdx);
         _stopped = true;
     }
 
@@ -347,7 +344,6 @@ public class StatusBar
 
     private void LoadData()
     {
-        _palette = "PLAYPAL";
         _paletteIdx = 0;
         LoadGraphics();
     }
@@ -440,7 +436,6 @@ public class StatusBar
         //_cursorOn = false;
 
         _faceIndex = 0;
-        _palette = "";
         _paletteIdx = 0;
 
         _oldHealth = -1;
@@ -508,7 +503,7 @@ public class StatusBar
         if (palette != _paletteIdx)
         {
             _paletteIdx = palette;
-            DoomGame.Instance.Video.SetPalette(_palette, _paletteIdx);
+            DoomGame.Instance.Video.SetPalette(Palette, _paletteIdx);
         }
     }
 
@@ -906,7 +901,7 @@ public class StatusBar
         if (_ufwPriority < 5)
         {
             // invulnerability
-            if ((_player!.Cheats & CheatType.GodMode) != 0 || _player.Powers[(int)PowerUpType.Invulnerability] != 0)
+            if ((_player!.Cheats & Cheat.GodMode) != 0 || _player.Powers[(int)PowerUpType.Invulnerability] != 0)
             {
                 _ufwPriority = 4;
 

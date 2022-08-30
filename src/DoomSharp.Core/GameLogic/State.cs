@@ -1,7 +1,5 @@
 ﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
-using System;
-using System.Numerics;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -46,7 +44,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         if (player.MapObject!.State == _states[(int)StateNum.S_PLAY_ATK1] || player.MapObject.State == _states[(int)StateNum.S_PLAY_ATK2])
         {
-            game.P_SetMapObjectState(player.MapObject, StateNum.S_PLAY);
+            player.MapObject.SetState(StateNum.S_PLAY);
         }
 
         if (player.ReadyWeapon == WeaponType.Chainsaw && psp.State == _states[(int)StateNum.S_SAW])

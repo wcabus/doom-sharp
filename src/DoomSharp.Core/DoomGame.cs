@@ -79,7 +79,7 @@ public class DoomGame : IDisposable
         }
     }
 
-    public async Task RunAsync()
+    public void Run()
     {
         try
         {
@@ -194,6 +194,8 @@ public class DoomGame : IDisposable
     public int StartEpisode { get; set; } = 1;
     public int StartMap { get; set; } = 1;
     public bool AutoStart { get; set; } = false;
+
+    public TicCommand[][] NetCommands => _netCommands;
 
     public int TicDup { get; private set; } = 1; // tic duplication // 1 = no duplication, 2-5 = dup for slow nets
 
@@ -416,7 +418,7 @@ public class DoomGame : IDisposable
             {
                 _graphics.StartTic();
                 ProcessEvents();
-                //G_BuildTiccmd(&netcmds[consoleplayer][MakeTic % BACKUPTICS]);
+                _netCommands[Game.ConsolePlayer][MakeTic % Constants.BackupTics] = Game.BuildTicCommand();
                 if (_advancedemo)
                 {
                     DoAdvanceDemo();
@@ -664,8 +666,8 @@ public class DoomGame : IDisposable
                 break;          // can't hold any more
             }
 
-            // TODO _game.BuildTicCommand(_localCommands[MakeTic & Constants.BackupTics]);
-            
+            _localCommands[MakeTic % Constants.BackupTics] = Game.BuildTicCommand();
+
             MakeTic++;
         }
 
@@ -1129,7 +1131,7 @@ public class DoomGame : IDisposable
                 continue;
             }
 
-            // _game.HandleEvent(currentEvent);
+            Game.HandleEvent(currentEvent);
         }
     }
 
