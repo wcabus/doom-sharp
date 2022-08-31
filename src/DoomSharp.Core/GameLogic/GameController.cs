@@ -159,7 +159,31 @@ public class GameController
     private Ceiling?[] _activeCeilings = new Ceiling?[Constants.MaxCeilings];
     private Platform?[] _activePlats = new Platform?[Constants.MaxPlats];
 
+    // Map tracking
+
+    private Fixed[] _tmBoundingBox = { 0, 0, 0, 0 };
+    private MapObject? _tmThing;
+    private MapObjectFlag _tmFlags;
+    private Fixed _tmX;
+    private Fixed _tmY;
+
+    // If "floatok" is true, move would be ok if within "tmfloorz - tmceilingz"
+    private bool _floatOk;
+
+    private Fixed _tmFloorZ;
+    private Fixed _tmCeilingZ;
+    private Fixed _tmDropOffZ;
+
+    // keep track of the line that lowers the ceiling,
+    // so missiles don't explode against sky hack walls
     private Line? _ceilingLine;
+
+    // keep track of special lines as they are hit,
+    // but don't process them until the move is proven valid
+    private const int MaxSpecialCross = 8;
+
+    private Line[] _specHit = new Line[MaxSpecialCross];
+    private int _numSpecHit;
 
     public GameController()
     {
@@ -465,7 +489,7 @@ public class GameController
             // first spawn of level, before corpses
             for (var i = 0; i < playernum; i++)
             {
-                if (Players[i].MapObject.X == (mthing.X << Constants.FracBits) && Players[i].MapObject.Y == (mthing.Y << Constants.FracBits))
+                if (Players[i].MapObject!.X == (mthing.X << Constants.FracBits) && Players[i].MapObject!.Y == (mthing.Y << Constants.FracBits))
                 {
                     return false;
                 } 
@@ -476,10 +500,10 @@ public class GameController
         x = mthing.X << Constants.FracBits;
         y = mthing.Y << Constants.FracBits;
 
-        //if (!P_CheckPosition(Players[playernum].MapObject, x, y))
-        //{
-        //    return false;
-        //}
+        if (!P_CheckPosition(Players[playernum].MapObject!, x, y))
+        {
+            return false;
+        }
 
         // flush an old corpse if needed 
         if (_bodyQueueSlot >= BodyQueueSize)
@@ -551,25 +575,25 @@ public class GameController
                 return;
             }
 
-            //if (G_CheckSpot(playernum, &playerstarts[playernum]))
-            //{
-            //    P_SpawnPlayer(&playerstarts[playernum]);
-            //    return;
-            //}
+            if (CheckSpot(player, _playerStarts[player]))
+            {
+                P_SpawnPlayer(_playerStarts[player]);
+                return;
+            }
 
             // try to spawn at one of the other players spots 
             for (var i = 0; i < Constants.MaxPlayers; i++)
             {
-                //if (G_CheckSpot(playernum, &playerstarts[i]))
-                //{
-                //    playerstarts[i].type = playernum + 1;   // fake as other player 
-                //    P_SpawnPlayer(&playerstarts[i]);
-                //    playerstarts[i].type = i + 1;       // restore 
-                //    return;
-                //}
+                if (CheckSpot(player, _playerStarts[i]))
+                {
+                    _playerStarts[i].Type = (short)(player + 1);   // fake as other player 
+                    P_SpawnPlayer(_playerStarts[i]);
+                    _playerStarts[i].Type = (short)(i + 1);       // restore 
+                    return;
+                }
                 // he's going to be inside something.  Too bad.
             }
-            // P_SpawnPlayer(&playerstarts[playernum]);
+            P_SpawnPlayer(_playerStarts[player]);
         }
     }
 
@@ -724,7 +748,7 @@ public class GameController
         UserGame = true;                // will be set false if a demo 
         Paused = false;
         DemoPlayback = false;
-        // AutomapActive = false;
+        DoomGame.Instance.AutoMapActive = false;
         ViewActive = true;
         GameEpisode = episode;
         GameMap = map;
@@ -893,13 +917,25 @@ public class GameController
         GameAction = GameAction.Nothing;
         //Z_CheckHeap();
 
-        //// clear cmd building stuff
-        //memset(gamekeydown, 0, sizeof(gamekeydown));
-        //joyxmove = joyymove = 0; 
-        //mousex = mousey = 0; 
-        //sendpause = sendsave = paused = false; 
-        //memset(mousebuttons, 0, sizeof(mousebuttons));
-        //memset(joybuttons, 0, sizeof(joybuttons));
+        // clear cmd building stuff
+        for (var i = 0; i < _gameKeyDown.Length; i++)
+        {
+            _gameKeyDown[i] = false;
+        }
+
+        _joyXMove = _joyYMove = 0;
+        _mouseX = _mouseY = 0;
+        SendPause = SendSave = Paused = false;
+
+        for (var i = 0; i < _mouseButtons.Length; i++)
+        {
+            _mouseButtons[i] = false;
+        }
+
+        for (var i = 0; i < _joyButtons.Length; i++)
+        {
+            _joyButtons[i] = false;
+        }
     }
 
     public bool CheckDemoStatus()
@@ -1677,28 +1713,1004 @@ public class GameController
         }
     }
 
+    //
+    // P_LineOpening
+    // Sets opentop and openbottom to the window
+    // through a two sided line.
+    // OPTIMIZE: keep this precalculated
+    //
+    private Fixed _openTop;
+    private Fixed _openBottom;
+    private Fixed _openRange;
+    private Fixed _lowFloor;
+
+    private void P_LineOpening(Line lineDef)
+    {
+        if (lineDef.SideNum[1] == -1)
+        {
+            // single sided line
+            _openRange = 0;
+            return;
+        }
+
+        var front = lineDef.FrontSector!;
+        var back = lineDef.BackSector!;
+
+        if (front.CeilingHeight < back.CeilingHeight)
+        {
+            _openTop = front.CeilingHeight;
+        }
+        else
+        {
+            _openTop = back.CeilingHeight;
+        }
+
+        if (front.FloorHeight > back.FloorHeight)
+        {
+            _openBottom = front.FloorHeight;
+            _lowFloor = back.FloorHeight;
+        }
+        else
+        {
+            _openBottom = back.FloorHeight;
+            _lowFloor = front.FloorHeight;
+        }
+
+        _openRange = _openTop - _openBottom;
+    }
+
+    //
+    // MOVEMENT ITERATOR FUNCTIONS
+    //
+
+    /// <summary>
+    /// Adjusts tmfloorz and tmceilingz as lines are contacted
+    /// </summary>
+    private bool PIT_CheckLine(Line line)
+    {
+        if (_tmBoundingBox[BoundingBox.BoxRight] <= line.BoundingBox[BoundingBox.BoxLeft]
+            || _tmBoundingBox[BoundingBox.BoxLeft] >= line.BoundingBox[BoundingBox.BoxRight]
+            || _tmBoundingBox[BoundingBox.BoxTop] <= line.BoundingBox[BoundingBox.BoxBottom]
+            || _tmBoundingBox[BoundingBox.BoxBottom] >= line.BoundingBox[BoundingBox.BoxTop])
+        {
+            return true;
+        }
+
+        if (P_BoxOnLineSide(_tmBoundingBox, line) != -1)
+        {
+            return true;
+        }
+
+        // A line has been hit
+
+        // The moving thing's destination position will cross
+        // the given line.
+        // If this should not be allowed, return false.
+        // If the line is special, keep track of it
+        // to process later if the move is proven ok.
+        // NOTE: specials are NOT sorted by order,
+        // so two special lines that are only 8 pixels apart
+        // could be crossed in either order.
+
+        if (line.BackSector == null)
+        {
+            return false; // one sided line
+        }
+
+        if ((_tmThing!.Flags & MapObjectFlag.MF_MISSILE) == 0)
+        {
+            if ((line.Flags & Constants.Line.Blocking) != 0)
+            {
+                return false; // Explicitly blocking everything
+            }
+
+            if (_tmThing.Player != null && (line.Flags & Constants.Line.BlockMonsters) != 0)
+            {
+                return false; // block monsters only
+            }
+        }
+
+        // set openrange, opentop, openbottom
+        P_LineOpening(line);
+
+        // adjust floor / ceiling heights
+        if (_openTop < _tmCeilingZ)
+        {
+            _tmCeilingZ = _openTop;
+            _ceilingLine = line;
+        }
+
+        if (_openBottom > _tmFloorZ)
+        {
+            _tmFloorZ = _openBottom;
+        }
+
+        if (_lowFloor < _tmDropOffZ)
+        {
+            _tmDropOffZ = _lowFloor;
+        }
+
+        // if contacted a special line, add it to the list
+        if (line.Special != 0)
+        {
+            _specHit[_numSpecHit++] = line;
+        }
+
+        return true;
+    }
+
+    private bool PIT_CheckThing(MapObject thing)
+    {
+        if ((thing.Flags & (MapObjectFlag.MF_SOLID | MapObjectFlag.MF_SPECIAL | MapObjectFlag.MF_SHOOTABLE)) == 0)
+        {
+            return true;
+        }
+
+        var blockDist = thing.Radius + _tmThing!.Radius;
+
+        if (Math.Abs(thing.X - _tmX) >= blockDist ||
+            Math.Abs(thing.Y - _tmY) >= blockDist)
+        {
+            // didn't hit it
+            return true;
+        }
+
+        // don't clip against self
+        if (thing == _tmThing)
+        {
+            return true;
+        }
+
+        // check for skulls slamming into things
+        if ((_tmThing.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+        {
+            var damage = ((DoomRandom.P_Random() % 8) + 1) * _tmThing.Info.Damage;
+            MapObject.DamageMapObject(thing, _tmThing, _tmThing, damage);
+
+            _tmThing.Flags &= ~MapObjectFlag.MF_SKULLFLY;
+            _tmThing.MomX = _tmThing.MomY = _tmThing.MomZ = 0;
+
+            _tmThing.SetState(_tmThing.Info.SpawnState);
+            
+            return false; // stop moving
+        }
+
+        // missiles can hit other things
+        if ((_tmThing.Flags & MapObjectFlag.MF_MISSILE) != 0)
+        {
+            // see if it went over / under
+            if (_tmThing.Z > thing.Z + thing.Height)
+            {
+                return true; // overhead
+            }
+
+            if (_tmThing.Z + _tmThing.Height < thing.Z)
+            {
+                return true; // underneath
+            }
+
+            if (_tmThing.Target != null && (
+                    _tmThing.Target.Type == thing.Type || (
+                        _tmThing.Target.Type == MapObjectType.MT_KNIGHT && thing.Type == MapObjectType.MT_BRUISER) || (
+                        _tmThing.Target.Type == MapObjectType.MT_BRUISER && thing.Type == MapObjectType.MT_KNIGHT)))
+            {
+                // Don't hit same species as originator.
+                if (thing == _tmThing.Target)
+                {
+                    return true;
+                }
+
+                if (thing.Type != MapObjectType.MT_PLAYER)
+                {
+                    // Explode, but do no damage.
+                    // Let players missile other players.
+                    return false;
+                }
+            }
+
+            if ((thing.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+            {
+                // didn't do any damage
+                return (thing.Flags & MapObjectFlag.MF_SOLID) == 0;
+            }
+
+            // damage / explode
+            var damage = ((DoomRandom.P_Random() % 8) + 1) * _tmThing.Info.Damage;
+            MapObject.DamageMapObject(thing, _tmThing, _tmThing.Target, damage);
+
+            // don't traverse any more
+            return false;
+        }
+
+        // check for special pickup
+        if ((thing.Flags & MapObjectFlag.MF_SPECIAL) != 0)
+        {
+            var solid = (thing.Flags & MapObjectFlag.MF_SOLID) != 0;
+            if ((_tmFlags & MapObjectFlag.MF_PICKUP) != 0)
+            {
+                // can remove thing
+                P_TouchSpecialThing(thing, _tmThing);
+            }
+            return !solid;
+        }
+
+        return (thing.Flags & MapObjectFlag.MF_SOLID) == 0;
+    }
+
+    /// <summary>
+    /// The validcount flags are used to avoid checking lines
+    /// that are marked in multiple mapblocks,
+    /// so increment validcount before the first call
+    /// to P_BlockLinesIterator, then make one or more calls
+    /// to it.
+    /// </summary>
+    private bool P_BlockLinesIterator(int x, int y, Func<Line, bool> lineFunction)
+    {
+        if (x < 0
+            || y < 0
+            || x >= _blockMapWidth
+            || y >= _blockMapHeight)
+        {
+            return true;
+        }
+
+        var offset = y * _blockMapWidth + x;
+        offset = _blockMap[offset];
+
+        for (var i = offset; _blockMapLump[i] != -1; i++)
+        {
+            var line = _lines[_blockMapLump[i]];
+
+            if (line.ValidCount == DoomGame.Instance.Renderer.ValidCount)
+            {
+                continue; // line has already been checked;
+            }
+
+            line.ValidCount = DoomGame.Instance.Renderer.ValidCount;
+            if (!lineFunction(line))
+            {
+                return false;
+            }
+        }
+
+        return true; // everything was checked
+    }
+
+    private bool P_BlockThingsIterator(int x, int y, Func<MapObject, bool> thingFunction)
+    {
+        if (x < 0
+            || y < 0
+            || x >= _blockMapWidth
+            || y >= _blockMapHeight)
+        {
+            return true;
+        }
+
+        var thing = _blockLinks[y * _blockMapWidth + x];
+        for (; thing != null; thing = thing.BlockNext)
+        {
+            if (!thingFunction(thing))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// P_CheckPosition
+    /// This is purely informative, nothing is modified
+    /// (except things picked up).
+    /// 
+    /// in:
+    ///  a mobj_t (can be valid or invalid)
+    ///  a position to be checked
+    ///   (doesn't need to be related to the mobj_t->x,y)
+    ///
+    /// during:
+    ///  special things are touched if MF_PICKUP
+    ///  early out on solid lines?
+    ///
+    /// out:
+    ///  newsubsec
+    ///  floorz
+    ///  ceilingz
+    ///  tmdropoffz
+    ///   the lowest point contacted
+    ///   (monsters won't move to a dropoff)
+    ///  speciallines[]
+    ///  numspeciallines
+    /// </summary>
+    private bool P_CheckPosition(MapObject thing, Fixed x, Fixed y)
+    {
+        _tmThing = thing;
+        _tmFlags = thing.Flags;
+
+        _tmX = x;
+        _tmY = y;
+
+        _tmBoundingBox[BoundingBox.BoxTop] = y + _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxBottom] = y - _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxLeft] = x + _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxRight] = x - _tmThing.Radius;
+
+        var newSubSector = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+        _ceilingLine = null;
+
+        // The base floor / ceiling is from the subsector
+        // that contains the point.
+        // Any contacted lines the step closer together
+        // will adjust them.
+        _tmFloorZ = _tmDropOffZ = newSubSector.Sector!.FloorHeight;
+        _tmCeilingZ = newSubSector.Sector.CeilingHeight;
+
+        DoomGame.Instance.Renderer.ValidCount++;
+        _numSpecHit = 0;
+
+        if ((_tmFlags & MapObjectFlag.MF_NOCLIP) != 0)
+        {
+            return true;
+        }
+
+        // Check things first, possibly picking things up.
+        // The bounding box is extended by MAXRADIUS
+        // because mobj_ts are grouped into mapblocks
+        // based on their origin point, and can overlap
+        // into adjacent blocks by up to MAXRADIUS units.
+        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
+        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
+        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
+        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
+
+        for (var bx = xl; bx <= xh; bx++)
+        {
+            for (var by = yl; by <= yh; by++)
+            {
+                if (!P_BlockThingsIterator(bx, by, PIT_CheckThing))
+                {
+                    return false;
+                }
+            }
+        }
+
+        // check lines
+        xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX) >> Constants.MapBlockShift;
+        xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX) >> Constants.MapBlockShift;
+        yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY) >> Constants.MapBlockShift;
+        yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY) >> Constants.MapBlockShift;
+
+        for (var bx = xl; bx <= xh; bx++)
+        {
+            for (var by = yl; by <= yh; by++)
+            {
+                if (!P_BlockLinesIterator(bx, by, PIT_CheckLine))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Attempt to move to a new position,
     /// crossing special lines unless MF_TELEPORT is set.
     /// </summary>
     private bool P_TryMove(MapObject thing, Fixed x, Fixed y)
     {
-        //if (!P_CheckPosition(thing, x, y))
-        //{
-        //    return false; // solid wall or thing
-        //}
+        _floatOk = false;
+        if (!P_CheckPosition(thing, x, y))
+        {
+            return false; // solid wall or thing
+        }
 
-        // TODO https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_map.c
+        if ((thing.Flags & MapObjectFlag.MF_NOCLIP) == 0)
+        {
+            if (_tmCeilingZ - _tmFloorZ < thing.Height)
+            {
+                return false; // doesn't fit
+            }
 
+            _floatOk = true;
+
+            if ((thing.Flags & MapObjectFlag.MF_TELEPORT) == 0 && _tmCeilingZ - thing.Z < thing.Height)
+            {
+                return false; // mapobject must lower itself to fit
+            }
+
+            if ((thing.Flags & MapObjectFlag.MF_TELEPORT) == 0 && _tmFloorZ - thing.Z > 24 * Constants.FracUnit)
+            {
+                return false; // too big a step up
+            }
+
+            if ((thing.Flags & (MapObjectFlag.MF_DROPOFF | MapObjectFlag.MF_FLOAT)) == 0 && 
+                _tmFloorZ - _tmDropOffZ > 24 * Constants.FracUnit)
+            {
+                return false; // don't stand over a dropoff
+            }
+        }
+
+        // the move is ok,
+        // so link the thing into its new position
+        P_UnsetThingPosition(thing);
+
+        var oldX = thing.X;
+        var oldY = thing.Y;
+        thing.FloorZ = _tmFloorZ;
+        thing.CeilingZ = _tmCeilingZ;
         thing.X = x;
         thing.Y = y;
+
+        P_SetThingPosition(thing);
+
+        // if any special lines were hit, do the effect
+        if ((thing.Flags & (MapObjectFlag.MF_TELEPORT | MapObjectFlag.MF_NOCLIP)) == 0)
+        {
+            while (_numSpecHit-- != 0)
+            {
+                // see if the line was crossed
+                var line = _specHit[_numSpecHit];
+                var side = P_PointOnLineSide(thing.X, thing.Y, line);
+                var oldSide = P_PointOnLineSide(oldX, oldY, line);
+                if (side != oldSide)
+                {
+                    if (line.Special != 0)
+                    {
+                        P_CrossSpecialLine(line, oldSide, thing);
+                    }
+                }
+            }
+        }
 
         return true;
     }
 
-    private void P_SlideMove(MapObject thing)
-    {
+    //
+    // INTERCEPT ROUTINES
+    //
 
+    private const int MaxIntercepts = 128;
+    private Intercept?[] _intercepts = new Intercept?[MaxIntercepts];
+    private int _lastInterceptIdx = 0;
+
+    private const int PT_AddLines = 1;
+    private const int PT_AddThings = 2;
+    private const int PT_EarlyOut = 4;
+
+    private DividerLine _trace = new();
+    private bool _earlyOut;
+    private int _pathTraversalFlags;
+
+    /// <summary>
+    /// Looks for lines in the given block
+    /// that intercept the given trace
+    /// to add to the intercepts list.
+    ///
+    /// A line is crossed if its endpoints
+    /// are on opposite sides of the trace.
+    /// Returns true if earlyout and a solid line hit.
+    /// </summary>
+    private bool PIT_AddLineIntercepts(Line line)
+    {
+        int s1;
+        int s2;
+        var dl = new DividerLine();
+
+        // avoid precision problems with two routines
+        if (_trace.Dx > Constants.FracUnit * 16
+            || _trace.Dy > Constants.FracUnit * 16
+            || _trace.Dx < -Constants.FracUnit * 16
+            || _trace.Dy < -Constants.FracUnit * 16)
+        {
+            s1 = P_PointOnDivlineSide(line.V1.X, line.V1.Y, _trace);
+            s2 = P_PointOnDivlineSide(line.V2.X, line.V2.Y, _trace);
+        }
+        else
+        {
+            s1 = P_PointOnLineSide(_trace.X, _trace.Y, line);
+            s2 = P_PointOnLineSide(_trace.X + _trace.Dx, _trace.Y + _trace.Dy, line);
+        }
+
+        if (s1 == s2)
+        {
+            return true;    // line isn't crossed
+        }
+
+        // hit the line
+        P_MakeDivline(line, dl);
+        var frac = P_InterceptVector(_trace, dl);
+
+        if (frac < 0)
+        {
+            return true;    // behind source
+        }
+
+        // try to early out the check
+        if (_earlyOut && frac < Constants.FracUnit && line.BackSector == null)
+        {
+            return false;   // stop checking
+        }
+
+        _intercepts[_lastInterceptIdx++] = new Intercept
+        {
+            Frac = frac,
+            IsLine = true,
+            Line = line
+        };
+
+        return true;	// continue
+    }
+
+    private bool PIT_AddThingIntercepts(MapObject thing)
+    {
+        Fixed x1;
+        Fixed y1;
+        Fixed x2;
+        Fixed y2;
+
+        var tracePositive = (_trace.Dx ^ _trace.Dy) > 0;
+
+        // check a corner to corner crossection for hit
+        if (tracePositive)
+        {
+            x1 = thing.X - thing.Radius;
+            y1 = thing.Y + thing.Radius;
+
+            x2 = thing.X + thing.Radius;
+            y2 = thing.Y - thing.Radius;
+        }
+        else
+        {
+            x1 = thing.X - thing.Radius;
+            y1 = thing.Y - thing.Radius;
+
+            x2 = thing.X + thing.Radius;
+            y2 = thing.Y + thing.Radius;
+        }
+
+        var s1 = P_PointOnDivlineSide(x1, y1, _trace);
+        var s2 = P_PointOnDivlineSide(x2, y2, _trace);
+
+        if (s1 == s2)
+        {
+            return true;        // line isn't crossed
+        }
+
+        var dl = new DividerLine
+        {
+            X = x1,
+            Y = y1,
+            Dx = x2 - x1,
+            Dy = y2 - y1
+        };
+
+        var frac = P_InterceptVector(_trace, dl);
+        if (frac < 0)
+        {
+            return true;        // behind source
+        }
+
+        _intercepts[_lastInterceptIdx++] = new Intercept
+        {
+            Frac = frac,
+            IsLine = false,
+            Thing = thing
+        };
+
+        return true;		// keep going
+    }
+
+    /// <summary>
+    /// Returns true if the traverser function returns true
+    /// for all lines.
+    /// </summary>
+    private bool P_TraverseIntercepts(Func<Intercept, bool> traverserFunction, Fixed maxFrac)
+    {
+        Intercept? intercept = null;
+
+        var count = _lastInterceptIdx;
+        while (count-- != 0)
+        {
+            Fixed dist = int.MaxValue;
+            for (var i = 0; i < _lastInterceptIdx; i++)
+            {
+                var scan = _intercepts[i];
+                if (scan != null && scan.Frac < dist)
+                {
+                    dist = scan.Frac;
+                    intercept = scan;
+                }
+            }
+
+            if (dist > maxFrac)
+            {
+                return true;    // checked everything in range		
+            }
+            
+            if (!traverserFunction(intercept!))
+            {
+                return false;   // don't bother going farther
+            }
+
+            intercept!.Frac = int.MaxValue;
+        }
+
+        return true;		// everything was traversed
+    }
+
+    /// <summary>
+    /// Traces a line from x1,y1 to x2,y2,
+    /// calling the traverser function for each.
+    /// Returns true if the traverser function returns true
+    /// for all lines.
+    /// </summary>
+    private bool P_PathTraverse(Fixed x1, Fixed y1, Fixed x2, Fixed y2, int flags, Func<Intercept, bool> traverserFunction)
+    {
+        Fixed xStep;
+        Fixed yStep;
+
+        Fixed partial;
+
+        int mapXStep;
+        int mapYStep;
+
+        int count;
+
+        _earlyOut = (flags & PT_EarlyOut) != 0;
+
+        DoomGame.Instance.Renderer.ValidCount++;
+        _lastInterceptIdx = 0;
+
+        if (((x1 - _blockMapOriginX) & (Constants.MapBlockSize - 1)) == 0)
+        {
+            x1 += Constants.FracUnit; // don't side exactly on a line
+        }
+
+        if (((y1 - _blockMapOriginY) & (Constants.MapBlockSize - 1)) == 0)
+        {
+            y1 += Constants.FracUnit; // don't side exactly on a line
+        }
+
+        _trace.X = x1;
+        _trace.Y = y1;
+        _trace.Dx = x2 - x1;
+        _trace.Dy = y2 - y1;
+
+        x1 -= _blockMapOriginX;
+        y1 -= _blockMapOriginY;
+        Fixed xt1 = x1 >> Constants.MapBlockShift;
+        Fixed yt1 = y1 >> Constants.MapBlockShift;
+
+        x2 -= _blockMapOriginX;
+        y2 -= _blockMapOriginY;
+        Fixed xt2 = x2 >> Constants.MapBlockShift;
+        Fixed yt2 = y2 >> Constants.MapBlockShift;
+
+        if (xt2 > xt1)
+        {
+            mapXStep = 1;
+            partial = Constants.FracUnit - ((x1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
+            yStep = (y2 - y1) / Math.Abs(x2 - x1);
+        }
+        else if (xt2 < xt1)
+        {
+            mapXStep = -1;
+            partial = (x1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1);
+            yStep = (y2 - y1) / Math.Abs(x2 - x1);
+        }
+        else
+        {
+            mapXStep = 0;
+            partial = Constants.FracUnit;
+            yStep = 256 * Constants.FracUnit;
+        }
+
+        var yIntercept = (y1 >> Constants.MapBlockToFrac) + (partial * yStep);
+
+
+        if (yt2 > yt1)
+        {
+            mapYStep = 1;
+            partial = Constants.FracUnit - ((y1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
+            xStep = (x2 - x1) / Math.Abs(y2 - y1);
+        }
+        else if (yt2 < yt1)
+        {
+            mapYStep = -1;
+            partial = (y1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1);
+            xStep = (x2 - x1) / Math.Abs(y2 - y1);
+        }
+        else
+        {
+            mapYStep = 0;
+            partial = Constants.FracUnit;
+            xStep = 256 * Constants.FracUnit;
+        }
+        var xIntercept = (x1 >> Constants.MapBlockToFrac) + (partial * xStep);
+
+        // Step through map blocks.
+        // Count is present to prevent a round off error
+        // from skipping the break.
+        int mapX = xt1;
+        int mapY = yt1;
+
+        for (count = 0; count < 64; count++)
+        {
+            if ((flags & PT_AddLines) != 0)
+            {
+                if (!P_BlockLinesIterator(mapX, mapY, PIT_AddLineIntercepts))
+                {
+                    return false;   // early out
+                }
+            }
+
+            if ((flags & PT_AddThings) != 0)
+            {
+                if (!P_BlockThingsIterator(mapX, mapY, PIT_AddThingIntercepts))
+                {
+                    return false;   // early out
+                }
+            }
+
+            if (mapX == xt2 && mapY == yt2)
+            {
+                break;
+            }
+
+            if ((yIntercept >> Constants.FracBits) == mapY)
+            {
+                yIntercept += yStep;
+                mapX += mapXStep;
+            }
+            else if ((xIntercept >> Constants.FracBits) == mapX)
+            {
+                xIntercept += xStep;
+                mapY += mapYStep;
+            }
+        }
+
+        // go through the sorted list
+        return P_TraverseIntercepts(traverserFunction, Constants.FracUnit);
+    }
+
+    //
+    // SLIDE MOVE
+    // Allows the player to slide along any angled walls.
+    //
+    private Fixed _bestSlideFrac;
+    private Fixed _secondSlideFrac;
+
+    private Line? _bestSlideLine;
+    private Line? _secondSlideLine;
+
+    private MapObject? _slideMapObject;
+
+    private Fixed _tmXMove;
+    private Fixed _tmYMove;
+
+    /// <summary>
+    /// Adjusts the xmove / ymove
+    /// so that the next move will slide along the wall.
+    /// </summary>
+    private void P_HitSlideLine(Line line)
+    {
+        if (line.SlopeType == SlopeType.Horizontal)
+        {
+            _tmYMove = 0;
+            return;
+        }
+
+        if (line.SlopeType == SlopeType.Vertical)
+        {
+            _tmXMove = 0;
+            return;
+        }
+
+        var side = P_PointOnLineSide(_slideMapObject!.X, _slideMapObject.Y, line);
+        var lineAngle = DoomGame.Instance.Renderer.PointToAngle2(0, 0, line.Dx, line.Dy);
+
+        if (side == 1)
+        {
+            lineAngle += RenderEngine.Angle180;
+        }
+
+        var moveAngle = DoomGame.Instance.Renderer.PointToAngle2(0, 0, _tmXMove, _tmYMove);
+        var deltaAngle = moveAngle - lineAngle;
+
+        if (deltaAngle > RenderEngine.Angle180)
+        {
+            deltaAngle += RenderEngine.Angle180;
+        }
+        //	I_Error ("SlideLine: ang>ANG180");
+
+        lineAngle >>= RenderEngine.AngleToFineShift;
+        deltaAngle >>= RenderEngine.AngleToFineShift;
+
+        var moveLen = P_AproxDistance(_tmXMove, _tmYMove);
+        var newLen = (moveLen * RenderEngine.FineCosine[deltaAngle]);
+
+        _tmXMove = (newLen * RenderEngine.FineCosine[lineAngle]);
+        _tmYMove = (newLen * RenderEngine.FineSine[lineAngle]);
+    }
+
+    private bool PTR_SlideTraverse(Intercept intercept)
+    {
+        if (!intercept.IsLine)
+        {
+            DoomGame.Error("PTR_SlideTraverse: not a line?");
+            return false;
+        }
+
+        var line = intercept.Line!;
+        if ((line.Flags & Constants.Line.TwoSided) == 0)
+        {
+            if (P_PointOnLineSide(_slideMapObject!.X, _slideMapObject.Y, line) != 0)
+            {
+                // don't hit the back side
+                return true;
+            }
+
+            IsBlocking();
+            return false;
+        }
+
+        // set openrange, opentop, openbottom
+        P_LineOpening(line);
+
+        if (_openRange < _slideMapObject!.Height)
+        {
+            IsBlocking();        // doesn't fit
+            return false;
+        }
+
+        if (_openTop - _slideMapObject.Z < _slideMapObject.Height)
+        {
+            IsBlocking();        // mobj is too high
+            return false;
+        }
+        
+        if (_openBottom - _slideMapObject.Z > 24 * Constants.FracUnit)
+        {
+            IsBlocking();        // too big a step up
+            return false;
+        }
+
+        // this line doesn't block movement
+        return true;
+
+        // the line does block movement,
+        // see if it is closer than best so far
+        void IsBlocking()
+        {
+            if (intercept.Frac < _bestSlideFrac)
+            {
+                _secondSlideFrac = _bestSlideFrac;
+                _secondSlideLine = _bestSlideLine;
+                _bestSlideFrac = intercept.Frac;
+                _bestSlideLine = line;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The momx / momy move is bad, so try to slide
+    /// along a wall.
+    /// Find the first line hit, move flush to it,
+    /// and slide along it
+    ///
+    /// This is a kludgy mess. 
+    /// </summary>
+    private void P_SlideMove(MapObject mo)
+    {
+        Fixed leadx;
+        Fixed leady;
+        Fixed trailx;
+        Fixed traily;
+        Fixed newx;
+        Fixed newy;
+        var hitcount = 0;
+
+        _slideMapObject = mo;
+
+        Retry();
+
+        // trace along the three leading corners
+        if (mo.MomX > 0)
+        {
+            leadx = mo.X + mo.Radius;
+            trailx = mo.X - mo.Radius;
+        }
+        else
+        {
+            leadx = mo.X - mo.Radius;
+            trailx = mo.X + mo.Radius;
+        }
+
+        if (mo.MomY > 0)
+        {
+            leady = mo.Y + mo.Radius;
+            traily = mo.Y - mo.Radius;
+        }
+        else
+        {
+            leady = mo.Y - mo.Radius;
+            traily = mo.Y + mo.Radius;
+        }
+
+        _bestSlideFrac = Constants.FracUnit + 1;
+
+        P_PathTraverse(leadx, leady, leadx + mo.MomX, leady + mo.MomY,
+            PT_AddLines, PTR_SlideTraverse);
+        P_PathTraverse(trailx, leady, trailx + mo.MomX, leady + mo.MomY,
+            PT_AddLines, PTR_SlideTraverse);
+        P_PathTraverse(leadx, traily, leadx + mo.MomX, traily + mo.MomY,
+            PT_AddLines, PTR_SlideTraverse);
+
+        // move up to the wall
+        if (_bestSlideFrac == Constants.FracUnit + 1)
+        {
+            // the move most have hit the middle, so stairstep
+            StairStep();
+            return;
+        }
+
+        // fudge a bit to make sure it doesn't hit
+        _bestSlideFrac -= 0x800;
+        if (_bestSlideFrac > 0)
+        {
+            newx = (mo.MomX * _bestSlideFrac);
+            newy = (mo.MomY * _bestSlideFrac);
+
+            if (!P_TryMove(mo, mo.X + newx, mo.Y + newy))
+            {
+                StairStep();
+            }
+        }
+
+        // Now continue along the wall.
+        // First calculate remainder.
+        _bestSlideFrac = Constants.FracUnit - (_bestSlideFrac + 0x800);
+
+        if (_bestSlideFrac > Constants.FracUnit)
+        {
+            _bestSlideFrac = Constants.FracUnit;
+        }
+
+        if (_bestSlideFrac <= 0)
+        {
+            return;
+        }
+
+        _tmXMove = (mo.MomX * _bestSlideFrac);
+        _tmYMove = (mo.MomY * _bestSlideFrac);
+
+        P_HitSlideLine(_bestSlideLine!);  // clip the moves
+
+        mo.MomX = _tmXMove;
+        mo.MomY = _tmYMove;
+
+        if (!P_TryMove(mo, mo.X + _tmXMove, mo.Y + _tmYMove))
+        {
+            Retry();
+        }
+
+        void Retry()
+        {
+            if (++hitcount == 3)
+            {
+                StairStep(); // don't loop forever
+            }
+        }
+
+        void StairStep()
+        {
+            if (!P_TryMove(mo, mo.X, mo.Y + mo.MomY))
+            {
+                P_TryMove(mo, mo.X + mo.MomX, mo.Y);
+            }
+        }
     }
 
     private const int StopSpeed = 0x1000;
@@ -1855,11 +2867,165 @@ public class GameController
         return dx + dy - (dy >> 1);
     }
 
+    private int P_PointOnLineSide(Fixed x, Fixed y, Line line)
+    {
+        if (line.Dx == 0)
+        {
+            if (x <= line.V1.X)
+            {
+                return line.Dy > 0 ? 1 : 0;
+            }
+
+            return line.Dy < 0 ? 1 : 0;
+        }
+
+        if (line.Dy == 0)
+        {
+            if (y <= line.V1.Y)
+            {
+                return line.Dx < 0 ? 1 : 0;
+            }
+
+            return line.Dx > 0 ? 1 : 0;
+        }
+
+        var dx = (x - line.V1.X);
+        var dy = (y - line.V1.Y);
+
+        var left = (line.Dy >> Constants.FracBits * dx);
+        var right = (dy * line.Dx >> Constants.FracBits);
+
+        if (right < left)
+        {
+            return 0;       // front side
+
+        }
+
+        return 1;			// back side
+    }
+
+    /// <summary>
+    /// Considers the line to be infinite
+    /// Returns side 0 or 1, -1 if box crosses the line.
+    /// </summary>
+    private int P_BoxOnLineSide(Fixed[] boundingBox, Line line)
+    {
+        int p1 = -1, p2 = -1;
+
+        switch (line.SlopeType)
+        {
+            case SlopeType.Horizontal:
+                p1 = boundingBox[BoundingBox.BoxTop] > line.V1.Y ? 1 : 0;
+                p2 = boundingBox[BoundingBox.BoxBottom] > line.V1.Y ? 1 : 0;
+                if (line.Dx < 0)
+                {
+                    p1 ^= 1;
+                    p2 ^= 1;
+                }
+                break;
+
+            case SlopeType.Vertical:
+                p1 = boundingBox[BoundingBox.BoxRight] < line.V1.X ? 1 : 0;
+                p2 = boundingBox[BoundingBox.BoxLeft] < line.V1.X ? 1 : 0;
+                if (line.Dy < 0)
+                {
+                    p1 ^= 1;
+                    p2 ^= 1;
+                }
+                break;
+
+            case SlopeType.Positive:
+                p1 = P_PointOnLineSide(boundingBox[BoundingBox.BoxLeft], boundingBox[BoundingBox.BoxTop], line);
+                p2 = P_PointOnLineSide(boundingBox[BoundingBox.BoxRight], boundingBox[BoundingBox.BoxBottom], line);
+                break;
+
+            case SlopeType.Negative:
+                p1 = P_PointOnLineSide(boundingBox[BoundingBox.BoxRight], boundingBox[BoundingBox.BoxTop], line);
+                p2 = P_PointOnLineSide(boundingBox[BoundingBox.BoxLeft], boundingBox[BoundingBox.BoxBottom], line);
+                break;
+        }
+
+        return p1 == p2 ? p1 : -1;
+    }
+
+    private int P_PointOnDivlineSide(Fixed x, Fixed y, DividerLine line)
+    {
+        if (line.Dx == 0)
+        {
+            if (x <= line.X)
+            {
+                return line.Dy > 0 ? 1 : 0;
+            }
+
+            return line.Dy < 0 ? 1 : 0;
+        }
+        
+        if (line.Dy == 0)
+        {
+            if (y <= line.Y)
+            {
+                return line.Dx < 0 ? 1 : 0;
+            }
+
+            return line.Dx > 0 ? 1 : 0;
+        }
+
+        var dx = (x - line.X);
+        var dy = (y - line.Y);
+
+        // try to quickly decide by looking at sign bits
+        if (((line.Dy ^ line.Dx ^ dx ^ dy) & 0x80000000) != 0)
+        {
+            if (((line.Dy ^ dx) & 0x80000000) != 0)
+            {
+                return 1;       // (left is negative)
+            }
+            
+            return 0;
+        }
+
+        var left = (Fixed)(line.Dy >> 8) * (dx >> 8);
+        var right = (Fixed)(dy >> 8) * (line.Dx >> 8);
+
+        if (right < left)
+        {
+            return 0;       // front side
+        }
+
+        return 1;			// back side
+    }
+
+    private void P_MakeDivline(Line li, DividerLine dl)
+    {
+        dl.X = li.V1.X;
+        dl.Y = li.V1.Y;
+        dl.Dx = li.Dx;
+        dl.Dy = li.Dy;
+    }
+
+    /// <summary>
+    /// Returns the fractional intercept point
+    /// along the first divline.
+    /// This is only called by the addthings
+    /// and addlines traversers.
+    /// </summary>
+    private Fixed P_InterceptVector(DividerLine v2, DividerLine v1)
+    {
+        Fixed den = (v1.Dy >> 8 * v2.Dx) - (v1.Dx >> 8 * v2.Dy);
+
+        if (den == 0)
+        {
+            return 0;
+        }
+
+        //	I_Error ("P_InterceptVector: parallel");
+
+        Fixed num = ((v1.X - v2.X) >> 8 * v1.Dy) + ((v2.Y - v1.Y) >> 8 * v1.Dx);
+        return num / den;
+    }
+
     private void P_ZMovement(MapObject mo)
     {
-        Fixed dist;
-        Fixed delta;
-
         // check for smooth step up
         if (mo.Player != null && mo.Z < mo.FloorZ)
         {
@@ -1875,8 +3041,8 @@ public class GameController
             // float down towards target if too close
             if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) == 0 && (mo.Flags & MapObjectFlag.MF_INFLOAT) == 0)
             {
-                dist = P_AproxDistance(mo.X - mo.Target.X, mo.Y - mo.Target.Y);
-                delta = (mo.Target.Z + (mo.Height >> 1)) - mo.Z;
+                var dist = P_AproxDistance(mo.X - mo.Target.X, mo.Y - mo.Target.Y);
+                var delta = (mo.Target.Z + (mo.Height >> 1)) - mo.Z;
 
                 if (delta < 0 && dist < -(delta * 3))
                 {
@@ -1980,7 +3146,7 @@ public class GameController
 
         if ((mobj.Z != mobj.FloorZ) || mobj.MomZ != 0)
         {
-            // P_ZMovement(mobj);
+            P_ZMovement(mobj);
 
             if (mobj.Action == null)
             {
@@ -2676,6 +3842,60 @@ public class GameController
 
         // UNUSED: no horizonal sliders.
         //	P_InitSlidingDoorFrames();
+    }
+
+    private void P_TouchSpecialThing(MapObject special, MapObject toucher)
+    {
+        // TODO https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_inter.c#L339
+    }
+
+    /// <summary>
+    /// Called every time a thing origin is about
+    ///  to cross a line with a non 0 special.
+    /// </summary>
+    private void P_CrossSpecialLine(Line line, int side, MapObject thing)
+    {
+        var ok = false;
+
+        // Triggers that other things can activate
+        if (thing.Player == null)
+        {
+            // Things that should NOT trigger specials...
+            switch (thing.Type)
+            {
+                case MapObjectType.MT_ROCKET:
+                case MapObjectType.MT_PLASMA:
+                case MapObjectType.MT_BFG:
+                case MapObjectType.MT_TROOPSHOT:
+                case MapObjectType.MT_HEADSHOT:
+                case MapObjectType.MT_BRUISERSHOT:
+                    return;
+            }
+
+            switch (line.Special)
+            {
+                case 39:    // TELEPORT TRIGGER
+                case 97:    // TELEPORT RETRIGGER
+                case 125:   // TELEPORT MONSTERONLY TRIGGER
+                case 126:   // TELEPORT MONSTERONLY RETRIGGER
+                case 4: // RAISE DOOR
+                case 10:    // PLAT DOWN-WAIT-UP-STAY TRIGGER
+                case 88:    // PLAT DOWN-WAIT-UP-STAY RETRIGGER
+                    ok = true;
+                    break;
+            }
+
+            if (!ok)
+            {
+                return;
+            }
+        }
+
+        // Note: could use some const's here.
+        switch (line.Special)
+        {
+            // TODO Triggers  https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_spec.c#L541
+        }
     }
 
     /// <summary>

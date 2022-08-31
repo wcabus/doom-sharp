@@ -2114,7 +2114,7 @@ public class RenderEngine
     private int _viewAngleOffset;
 
     // increment every time a check is made
-    private int _validCount = 1;
+    public int ValidCount { get; set; } = 1;
 
     private int? _fixedColorMapIdx;
 
@@ -4003,7 +4003,7 @@ public class RenderEngine
         }
 
         _frameCount++;
-        _validCount++;
+        ValidCount++;
     }
 
     public void RenderPlayerView(Player player)
@@ -6135,13 +6135,13 @@ public class RenderEngine
         // A sector might have been split into several
         //  subsectors during BSP building.
         // Thus we check whether its already added.
-        if (sec.ValidCount == _validCount)
+        if (sec.ValidCount == ValidCount)
         {
             return;
         }
 
         // Well, now it will be done.
-        sec.ValidCount = _validCount;
+        sec.ValidCount = ValidCount;
 
         var lightNum = (sec.LightLevel >> LightSegShift) + _extraLight;
 

@@ -492,7 +492,7 @@ public class Player
                 {
                     if ((DoomGame.Instance.Game.LevelTime & 0x1f) == 0)
                     {
-                        DamageMapObject(MapObject, null, null, 10);
+                        MapObject.DamageMapObject(MapObject, null, null, 10);
                     }
                 }
                 break;
@@ -503,7 +503,7 @@ public class Player
                 {
                     if ((DoomGame.Instance.Game.LevelTime & 0x1f) == 0)
                     {
-                        DamageMapObject(MapObject, null, null, 5);
+                        MapObject.DamageMapObject(MapObject, null, null, 5);
                     }
                 }
                 break;
@@ -516,7 +516,7 @@ public class Player
                 {
                     if ((DoomGame.Instance.Game.LevelTime & 0x1f) == 0)
                     {
-                        DamageMapObject(MapObject, null, null, 20);
+                        MapObject.DamageMapObject(MapObject, null, null, 20);
                     }
                 }
                 break;
@@ -533,7 +533,7 @@ public class Player
 
                 if ((DoomGame.Instance.Game.LevelTime & 0x1f) == 0)
                 {
-                    DamageMapObject(MapObject, null, null, 20);
+                    MapObject.DamageMapObject(MapObject, null, null, 20);
                 }
 
                 if (Health <= 10)
@@ -546,274 +546,5 @@ public class Player
                 DoomGame.Error("P_PlayerInSpecialSector: unknown special {sector.Special");
                 break;
         }
-    }
-
-    /// <summary>
-    /// Damages both enemies and players
-    /// "inflictor" is the thing that caused the damage
-    ///  creature or missile, can be NULL (slime, etc)
-    /// "source" is the thing to target after taking damage
-    ///  creature or NULL
-    /// Source and inflictor are the same for melee attacks.
-    /// Source can be NULL for slime, barrel explosions
-    /// and other environmental stuff.
-    /// </summary>
-    public void DamageMapObject(MapObject target, MapObject? inflictor, MapObject? source, int damage)
-    {
-        if ((target.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
-        {
-            return; // shouldn't happen...
-        }
-
-        if (target.Health <= 0)
-        {
-            return;
-        }
-
-        if ((target.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
-        {
-            target.MomX = target.MomY = target.MomZ = 0;
-        }
-
-        var player = target.Player;
-        if (player != null && DoomGame.Instance.Game.GameSkill == SkillLevel.Baby)
-        {
-            damage >>= 1;   // take half damage in trainer mode
-        }
-        
-        // Some close combat weapons should not
-        // inflict thrust and push the victim out of reach,
-        // thus kick away unless using the chainsaw.
-        if (inflictor != null && 
-            (target.Flags & MapObjectFlag.MF_NOCLIP) == 0 && 
-            (source?.Player == null || source.Player.ReadyWeapon != WeaponType.Chainsaw))
-        {
-            var ang = DoomGame.Instance.Renderer.PointToAngle2(inflictor.X, inflictor.Y, target.X, target.Y);
-            var thrust = new Fixed(damage * (Constants.FracUnit >> 3) * 100 / target.Info.Mass);
-
-            // make fall forwards sometimes
-            if (damage < 40 && 
-                damage > target.Health && 
-                target.Z - inflictor.Z > 64 * Constants.FracUnit && 
-                (DoomRandom.P_Random() & 1) != 0)
-            {
-                ang += RenderEngine.Angle180;
-                thrust = (int)thrust * 4;
-            }
-
-            ang >>= RenderEngine.AngleToFineShift;
-            target.MomX += (thrust * RenderEngine.FineCosine[ang]);
-            target.MomY += (thrust * RenderEngine.FineSine[ang]);
-        }
-
-        // player specific
-        if (player != null)
-        {
-            // end of game hell hack
-            if (target.SubSector?.Sector != null && target.SubSector.Sector.Special == 11 && damage >= target.Health)
-            {
-                damage = target.Health - 1;
-            }
-            
-            // Below certain threshold,
-            // ignore damage in GOD mode, or with INVUL power.
-            if (damage < 1000 && 
-                ((player.Cheats & Cheat.GodMode) != 0 || 
-                 player.Powers[(int)PowerUpType.Invulnerability] != 0))
-            {
-                return;
-            }
-
-            var saved = 0;
-            if (player.ArmorType != 0)
-            {
-                if (player.ArmorType == 1)
-                {
-                    saved = damage / 3;
-                }
-                else
-                {
-                    saved = damage / 2;
-                }
-
-                if (player.ArmorPoints <= saved)
-                {
-                    // armor is used up
-                    saved = player.ArmorPoints;
-                    player.ArmorType = 0;
-                }
-                player.ArmorPoints -= saved;
-                damage -= saved;
-            }
-
-            player.Health -= damage;   // mirror mobj health here for Dave
-            if (player.Health < 0)
-            {
-                player.Health = 0;
-            }
-
-            player.Attacker = source;
-            player.DamageCount += damage;  // add damage after armor / invuln
-
-            if (player.DamageCount > 100)
-            {
-                player.DamageCount = 100;  // teleport stomp does 10k points...
-            }
-
-            var temp = damage < 100 ? damage : 100;
-
-            //if (player == DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer])
-            //{
-            //    I_Tactile(40, 10, 40 + temp * 2); // unused
-            //}
-        }
-
-        // do the damage	
-        target.Health -= damage;
-        if (target.Health <= 0)
-        {
-            KillMapObject(source, target);
-            return;
-        }
-
-        if (DoomRandom.P_Random() < target.Info.PainChance && 
-            (target.Flags & MapObjectFlag.MF_SKULLFLY) == 0)
-        {
-            target.Flags |= MapObjectFlag.MF_JUSTHIT;    // fight back!
-            target.SetState(target.Info.PainState);
-        }
-
-        target.ReactionTime = 0;       // we're awake now...	
-
-        if ((target.Threshold == 0 || target.Type == MapObjectType.MT_VILE) &&
-            source != null &&
-            source != target &&
-            source.Type != MapObjectType.MT_VILE)
-        {
-            // if not intent on another player,
-            // chase after this one
-            target.Target = source;
-            target.Threshold = Constants.BaseThreshold;
-            if (target.State == State.GetSpawnState(target.Info.SpawnState) &&
-                target.Info.SeeState != StateNum.S_NULL)
-            {
-                target.SetState(target.Info.SeeState);
-            }
-        }
-    }
-
-    private void KillMapObject(MapObject? source, MapObject target)
-    {
-        target.Flags &= ~(MapObjectFlag.MF_SHOOTABLE | MapObjectFlag.MF_FLOAT | MapObjectFlag.MF_SKULLFLY);
-
-        if (target.Type != MapObjectType.MT_SKULL)
-        {
-            target.Flags &= ~MapObjectFlag.MF_NOGRAVITY;
-        }
-
-        target.Flags |= MapObjectFlag.MF_CORPSE | MapObjectFlag.MF_DROPOFF;
-        target.Height >>= 2;
-
-        if (source?.Player != null)
-        {
-            // count for intermission
-            if ((target.Flags & MapObjectFlag.MF_COUNTKILL) != 0)
-            {
-                source.Player.KillCount++;
-            }
-
-            if (target.Player != null)
-            {
-                var playerIndex = DoomGame.Instance.Game.GetPlayerIndex(target.Player);
-                if (playerIndex != -1)
-                {
-                    source.Player.Frags[playerIndex]++;
-                }
-            }
-        }
-        else if (!DoomGame.Instance.Game.NetGame && 
-                 (target.Flags & MapObjectFlag.MF_COUNTKILL) != 0)
-        {
-            // count all monster deaths,
-            // even those caused by other monsters
-            DoomGame.Instance.Game.Players[0].KillCount++;
-        }
-
-        if (target.Player != null)
-        {
-            // count environment kills against you
-            if (source != null)
-            {
-                var playerIndex = DoomGame.Instance.Game.GetPlayerIndex(target.Player);
-                if (playerIndex != -1)
-                {
-                    target.Player.Frags[playerIndex]++;
-                }
-            }
-
-            target.Flags &= ~MapObjectFlag.MF_SOLID;
-            target.Player.PlayerState = PlayerState.Dead;
-            DropWeapon(target.Player);
-
-            if (target.Player == DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer] && 
-                DoomGame.Instance.AutoMapActive)
-            {
-                // don't die in auto map,
-                // switch view prior to dying
-                // TODO AM_Stop();
-            }
-        }
-
-        if (target.Health < -target.Info.SpawnHealth && target.Info.XDeathState != StateNum.S_NULL)
-        {
-            target.SetState(target.Info.XDeathState);
-        }
-        else
-        {
-            target.SetState(target.Info.DeathState);
-        }
-        
-        target.Tics -= DoomRandom.P_Random() & 3;
-
-        if (target.Tics < 1)
-        {
-            target.Tics = 1;
-        }
-
-        //	I_StartSound (&actor->r, actor->info->deathsound);
-
-        // Drop stuff.
-        // This determines the kind of object spawned
-        // during the death frame of a thing.
-        MapObjectType item;
-        switch (target.Type)
-        {
-            case MapObjectType.MT_WOLFSS:
-            case MapObjectType.MT_POSSESSED:
-                item = MapObjectType.MT_CLIP;
-                break;
-
-            case MapObjectType.MT_SHOTGUY:
-                item = MapObjectType.MT_SHOTGUN;
-                break;
-
-            case MapObjectType.MT_CHAINGUY:
-                item = MapObjectType.MT_CHAINGUN;
-                break;
-
-            default:
-                return;
-        }
-
-        var mo = DoomGame.Instance.Game.P_SpawnMapObject(target.X, target.Y, Constants.OnFloorZ, item);
-        mo.Flags |= MapObjectFlag.MF_DROPPED; // special versions of items
-    }
-
-    private void DropWeapon(Player player)
-    {
-        DoomGame.Instance.Game.P_SetPlayerSprite(
-            player,
-            PlayerSpriteType.Weapon, 
-            WeaponInfo.GetByType(player.ReadyWeapon).DownState);
     }
 }
