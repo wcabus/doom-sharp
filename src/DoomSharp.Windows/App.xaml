@@ -5,6 +5,6 @@
              xmlns:vm="clr-namespace:DoomSharp.Windows.ViewModels"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         <vm:ViewModelLocator x:Key="ViewModelLocator" />
+        <vm:ViewModelLocator x:Key="ViewModelLocator" />
     </Application.Resources>
 </Application>

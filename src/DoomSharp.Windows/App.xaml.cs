@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using DoomSharp.Core;
+using DoomSharp.Core.Data;
+using DoomSharp.Windows.Data;
 using DoomSharp.Windows.ViewModels;
 
 namespace DoomSharp.Windows
@@ -13,6 +15,7 @@ namespace DoomSharp.Windows
         {
             DoomGame.SetConsole(ConsoleViewModel.Instance);
             DoomGame.SetOutputRenderer(MainViewModel.Instance);
+            WadFileCollection.Init(new WadStreamProvider());
         }
     }
 }

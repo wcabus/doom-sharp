@@ -79,11 +79,28 @@ public class DoomGame : IDisposable
         }
     }
 
+    /// <summary>
+    /// To be used for platforms where the filesystem is not widely available, like mobile platforms
+    /// </summary>
+    /// <param name="gameMode"></param>
+    /// <param name="fileName"></param>
+    /// <returns></returns>
+    public Task RunAsync(GameMode gameMode, string fileName)
+    {
+        GameMode = gameMode;
+        _wadFileNames.Add(fileName);
+
+        return RunAsync();
+    }
+
     public async Task RunAsync()
     {
         try
         {
-            IdentifyVersion();
+            if (GameMode == GameMode.Indetermined)
+            {
+                IdentifyVersion();
+            }
 
             ModifiedGame = false;
 
@@ -109,7 +126,7 @@ public class DoomGame : IDisposable
             _zone.Initialize();
 
             _console.WriteLine("W_Init: Init WADfiles.");
-            _wadFiles = WadFileCollection.InitializeMultipleFiles(_wadFileNames);
+            _wadFiles = await WadFileCollection.InitializeMultipleFiles(_wadFileNames);
 
             switch (GameMode)
             {
@@ -1272,7 +1289,7 @@ public class DoomGame : IDisposable
     private void IdentifyVersion()
     {
         var doomWadDir = Environment.GetEnvironmentVariable("DOOMWADDIR") ?? ".";
-
+        
         // Commercial
         var wadFile = Path.Combine(doomWadDir, "doom2.wad");
         if (File.Exists(wadFile))

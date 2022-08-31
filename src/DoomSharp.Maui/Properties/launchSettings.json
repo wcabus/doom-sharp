@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Windows Machine": {
+      "commandName": "MsixPackage",
+      "nativeDebugging": false,
+      "environmentVariables": {
+        "DOOMWADDIR": "C:\\Projects\\Doom\\wad"
+      }
+    }
+  }
+}

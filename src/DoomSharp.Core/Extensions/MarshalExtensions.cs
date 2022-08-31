@@ -3,7 +3,7 @@
 // ReSharper disable once CheckNamespace
 namespace System.IO;
 
-internal static class MarshalExtensions
+public static class MarshalExtensions
 {
     public static T ReadStruct<T>(this BinaryReader reader) where T : struct
     {
