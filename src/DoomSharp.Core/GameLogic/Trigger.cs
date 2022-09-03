@@ -543,7 +543,7 @@ public static class Trigger
         }
     }
 
-    private static int DoorEvent(Line line, DoorType type)
+    public static int DoorEvent(Line line, DoorType type)
     {
         var secnum = -1;
         var game = DoomGame.Instance.Game;
@@ -814,7 +814,7 @@ public static class Trigger
         }
     }
 
-    private static int FloorEvent(Line line, FloorType type)
+    public static int FloorEvent(Line line, FloorType type)
     {
         var secnum = -1;
         var rtn = 0;
@@ -1423,7 +1423,7 @@ public static class Trigger
         }
     }
 
-    private static int PlatformEvent(Line line, PlatformType type, int amount)
+    public static int PlatformEvent(Line line, PlatformType type, int amount)
     {
         var secnum = -1;
         var rtn = 0;

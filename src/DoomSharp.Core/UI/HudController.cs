@@ -308,4 +308,9 @@ public class HudController
         //    }
         //}
     }
+
+    public bool HandleEvent(InputEvent currentEvent)
+    {
+        return false;
+    }
 }

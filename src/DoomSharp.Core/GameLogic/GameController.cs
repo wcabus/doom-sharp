@@ -190,6 +190,19 @@ public class GameController
     private Line[] _specHit = new Line[MaxSpecialCross];
     private int _numSpecHit;
 
+    private MapObject? _lineTarget;
+    private MapObject? _shootThing;
+
+    // Height if not aiming up or down
+    private Fixed _shootZ;
+
+    private int _laDamage;
+    private Fixed _attackRange;
+    
+    private Fixed _aimSlope;
+    private Fixed _topSlope;
+    private Fixed _bottomSlope;
+
     public GameController()
     {
         for (var i = 0; i < Constants.MaxButtons; i++)
@@ -266,6 +279,9 @@ public class GameController
     public int NumSegments => _numSegments;
     public Segment[] Segments => _segments;
     public bool AutomapActive { get; set; }
+
+    public MapObject? LineTarget => _lineTarget;
+    public Fixed BulletSlope => _bulletSlope;
 
     public void Ticker()
     {
@@ -4870,6 +4886,50 @@ public class GameController
     }
 
     /// <summary>
+    /// Called when a thing shoots a special line.
+    /// </summary>
+    private void P_ShootSpecialLine(MapObject thing, Line line)
+    {
+        var ok = false;
+
+        // Impacts that other things can activate.
+        if (thing.Player == null)
+        {
+            if (line.Special == 46)
+            {
+                // open door impact
+                ok = true;
+            }
+
+            if (!ok)
+            {
+                return;
+            }
+        }
+
+        switch (line.Special)
+        {
+            case 24:
+                // RAISE FLOOR
+                Trigger.FloorEvent(line, FloorType.RaiseFloor);
+                P_ChangeSwitchTexture(line, false);
+                break;
+
+            case 46:
+                // OPEN DOOR
+                Trigger.DoorEvent(line, DoorType.Open);
+                P_ChangeSwitchTexture(line, true);
+                break;
+
+            case 47:
+                // RAISE FLOOR NEAR AND CHANGE
+                Trigger.PlatformEvent(line, PlatformType.RaiseToNearestAndChange, 0);
+                P_ChangeSwitchTexture(line, false);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Get info needed to make ticcmd_ts for the players
     /// </summary>
     public bool HandleEvent(InputEvent currentEvent)
@@ -4911,17 +4971,21 @@ public class GameController
 
         if (GameState == GameState.Level)
         {
-            //if (HU_Responder(ev))
-            //    return true;    // chat ate the event 
-            //if (ST_Responder(ev))
-            //    return true;    // status window ate it 
-            //if (AM_Responder(ev))
+            if (DoomGame.Instance.Hud.HandleEvent(currentEvent))
+            {
+                return true;    // chat ate it 
+            }
+            if (DoomGame.Instance.StatusBar.HandleEvent(currentEvent))
+            {
+                return true;    // status window ate it 
+            }
+            //if (AM_Responder(currentEvent))
             //    return true;    // automap ate it 
         }
 
         if (GameState == GameState.Finale)
         {
-            //if (F_Responder(ev))
+            //if (F_Responder(currentEvent))
             //    return true;    // finale ate the event 
         }
 
@@ -5267,5 +5331,430 @@ public class GameController
         }
 
         return -1;
+    }
+
+    //
+    // P_BulletSlope
+    // Sets a slope so a near miss is at aproximately
+    // the height of the intended target
+    //
+    private Fixed _bulletSlope;
+    
+    public void P_BulletSlope(MapObject mo)
+    {
+        // see which target is to be aimed at
+        var an = mo.Angle;
+        _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+
+        if (_lineTarget == null)
+        {
+            an += 1 << 26;
+            _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+            if (_lineTarget == null)
+            {
+                an -= 2 << 26;
+                _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+            }
+        }
+    }
+
+
+    //
+    // P_GunShot
+    //
+    public void P_GunShot(MapObject mo, bool accurate)
+    {
+        var damage = 5 * (DoomRandom.P_Random() % 3 + 1);
+        var angle = mo.Angle;
+
+        if (!accurate)
+        {
+            angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+        }
+
+        P_LineAttack(mo, angle, Constants.MissileRange, _bulletSlope, damage);
+    }
+
+
+    /// <summary>
+    /// Sets line target and aim slope when a target is aimed at.
+    /// </summary>
+    private bool PTR_AimTraverse(Intercept intercept)
+    {
+        Fixed dist;
+
+        if (intercept.IsLine)
+        {
+            var li = intercept.Line!;
+            if ((li.Flags & Constants.Line.TwoSided) == 0)
+            {
+                return false; // stop
+            }
+
+            // Crosses a two sided line.
+            // A two sided line will restrict
+            // the possible target ranges.
+            P_LineOpening(li);
+
+            if (_openBottom >= _openTop)
+            {
+                return false; // stop
+            }
+
+            dist = _attackRange * intercept.Frac;
+
+            if (li.FrontSector!.FloorHeight != li.BackSector!.FloorHeight)
+            {
+                var slope = (_openBottom - _shootZ) / dist;
+                if (slope > _bottomSlope)
+                {
+                    _bottomSlope = slope;
+                }
+            }
+
+            if (li.FrontSector!.CeilingHeight != li.BackSector!.CeilingHeight)
+            {
+                var slope = (_openTop - _shootZ) / dist;
+                if (slope < _topSlope)
+                {
+                    _topSlope = slope;
+                }
+            }
+
+            if (_topSlope <= _bottomSlope)
+            {
+                return false; // stop
+            }
+
+            return true; // shot continues
+        }
+
+        // shoot a thing
+        var th = intercept.Thing!;
+        if (th == _shootThing)
+        {
+            return true; // can't shoot self
+        }
+
+        if ((th.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            return true; // corpse or something
+        }
+
+        // check angles to see if the thing can be aimed at
+        dist = _attackRange * intercept.Frac;
+        var thingTopSlope = (th.Z + th.Height - _shootZ) / dist;
+
+        if (thingTopSlope < _bottomSlope)
+        {
+            return true;			// shot over the thing
+        }
+
+        var thingBottomSlope = (th.Z - _shootZ) / dist;
+
+        if (thingBottomSlope > _topSlope)
+        {
+            return true;			// shot under the thing
+        }
+
+        // this thing can be hit
+        if (thingTopSlope > _topSlope)
+        {
+            thingTopSlope = _topSlope;
+        }
+
+        if (thingBottomSlope < _bottomSlope)
+        {
+            thingBottomSlope = _bottomSlope;
+        }
+
+        _aimSlope = (int)(thingTopSlope + thingBottomSlope) / 2;
+        _lineTarget = th;
+
+        return false;
+    }
+
+    private bool PTR_ShootTraverse(Intercept intercept)
+    {
+        Fixed dist;
+
+        if (intercept.IsLine)
+        {
+            var li = intercept.Line!;
+            if (li.Special != 0)
+            {
+                P_ShootSpecialLine(_shootThing, li);
+            }
+
+            if ((li.Flags & Constants.Line.TwoSided) == 0)
+            {
+                return HitLine(li);
+            }
+
+            // crosses a two sided line
+            P_LineOpening(li);
+
+            dist = _attackRange * intercept.Frac;
+
+            if (li.FrontSector!.FloorHeight != li.BackSector!.FloorHeight)
+            {
+                var slope = (_openBottom - _shootZ) / dist;
+                if (slope > _aimSlope)
+                {
+                    return HitLine(li);
+                }
+            }
+
+            if (li.FrontSector!.CeilingHeight != li.BackSector!.CeilingHeight)
+            {
+                var slope = (_openTop - _shootZ) / dist;
+                if (slope < _aimSlope)
+                {
+                    return HitLine(li);
+                }
+            }
+
+            // shot continues
+            return true;
+        }
+
+        // shoot a thing
+        var th = intercept.Thing!;
+        if (th == _shootThing)
+        {
+            return true; // can't shoot self
+        }
+
+        if ((th.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            return true; // corpse or something
+        }
+
+        // check angles to see if the thing can be aimed at
+        dist = _attackRange * intercept.Frac;
+        var thingTopSlope = (th.Z + th.Height - _shootZ) / dist;
+
+        if (thingTopSlope < _aimSlope)
+        {
+            return true; // shot over the thing
+        }
+
+        var thingBottomSlope = (th.Z - _shootZ) / dist;
+
+        if (thingBottomSlope > _aimSlope)
+        {
+            return true; // shot under the thing
+        }
+
+        // hit thing
+        // position a bit closer
+        var frac = intercept.Frac - ((10 * Constants.FracUnit) / _attackRange);
+
+        var x = _trace.X + (_trace.Dx * frac);
+        var y = _trace.Y + (_trace.Dy * frac);
+        var z = _shootZ + (_aimSlope * (frac * _attackRange));
+
+        // Spawn bullet puffs or blod spots,
+        // depending on target type.
+        if ((th.Flags & MapObjectFlag.MF_NOBLOOD) != 0)
+        {
+            P_SpawnPuff(x, y, z);
+        }
+        else
+        {
+            P_SpawnBlood(x, y, z, _laDamage);
+        }
+
+        if (_laDamage != 0)
+        {
+            MapObject.DamageMapObject(th, _shootThing, _shootThing, _laDamage);
+        }
+
+        // don't go any farther
+        return false;
+
+        bool HitLine(Line li)
+        {
+            // position a bit closer
+            var frac = intercept.Frac - ((Constants.FracUnit * 4) / _attackRange);
+            var x = _trace.X + (_trace.Dx * frac);
+            var y = _trace.Y + (_trace.Dy * frac);
+            var z = _shootZ + (_aimSlope * (frac * _attackRange));
+
+            if (li.FrontSector!.CeilingPic == DoomGame.Instance.Renderer.Sky.FlatNum)
+            {
+                // don't shoot the sky!
+                if (z > li.FrontSector.CeilingHeight)
+                {
+                    return false;
+                }
+
+                // it's a sky hack wall
+                if (li.BackSector != null && li.BackSector.CeilingPic == DoomGame.Instance.Renderer.Sky.FlatNum)
+                {
+                    return false;
+                }
+            }
+
+            // Spawn bullet puffs.
+            P_SpawnPuff(x, y, z);
+
+            // don't go any farther.
+            return false;
+        }
+    }
+
+    public Fixed P_AimLineAttack(MapObject thing, uint angle, Fixed distance)
+    {
+        angle >>= RenderEngine.AngleToFineShift;
+        _shootThing = thing;
+
+        var x2 = thing.X + (distance >> Constants.FracBits) * (int)RenderEngine.FineCosine[angle];
+        var y2 = thing.Y + (distance >> Constants.FracBits) * (int)RenderEngine.FineSine[angle];
+        _shootZ = thing.Z + (thing.Height >> 1) + 8 * Constants.FracUnit;
+
+        // Can't shoot outside view angles
+        _topSlope = 100 * Constants.FracUnit / 160;
+        _bottomSlope = -100 * Constants.FracUnit / 160;
+
+        _attackRange = distance;
+        _lineTarget = null;
+
+        P_PathTraverse(thing.X, thing.Y, x2, y2, PT_AddLines | PT_AddThings, PTR_AimTraverse);
+
+        if (LineTarget != null)
+        {
+            return _aimSlope;
+        }
+
+        return Fixed.Zero;
+    }
+
+    public void P_LineAttack(MapObject thing, uint angle, Fixed distance, Fixed slope, int damage)
+    {
+        angle >>= RenderEngine.AngleToFineShift;
+        _shootThing = thing;
+        _laDamage = damage;
+
+        var x2 = thing.X + (distance >> Constants.FracBits) * (int)RenderEngine.FineCosine[angle];
+        var y2 = thing.Y + (distance >> Constants.FracBits) * (int)RenderEngine.FineSine[angle];
+        _shootZ = thing.Z + (thing.Height >> 1) + 8 * Constants.FracUnit;
+        _attackRange = distance;
+        _aimSlope = slope;
+
+        P_PathTraverse(thing.X, thing.Y, x2, y2, PT_AddLines | PT_AddThings, PTR_ShootTraverse);
+    }
+
+    private void P_SpawnPuff(Fixed x, Fixed y, Fixed z)
+    {
+        z += ((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
+
+        var th = P_SpawnMapObject(x, y, z, MapObjectType.MT_PUFF);
+        th.MomZ = Constants.FracUnit;
+        th.Tics -= DoomRandom.P_Random() & 3;
+
+        if (th.Tics < 1)
+        {
+            th.Tics = 1;
+        }
+
+        // don't make punches spark on the wall
+        if (_attackRange == Constants.MeleeRange)
+        {
+            th.SetState(StateNum.S_PUFF3);
+        }
+    }
+
+    private void P_SpawnBlood(Fixed x, Fixed y, Fixed z, int damage)
+    {
+        z += ((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
+
+        var th = P_SpawnMapObject(x, y, z, MapObjectType.MT_BLOOD);
+        th.MomZ = Constants.FracUnit * 2;
+        th.Tics -= DoomRandom.P_Random() & 3;
+
+        if (th.Tics < 1)
+        {
+            th.Tics = 1;
+        }
+
+        if (damage is <= 12 and >= 9)
+        {
+            th.SetState(StateNum.S_BLOOD2);
+        }
+        else if (damage < 9)
+        {
+            th.SetState(StateNum.S_BLOOD3);
+        }
+    }
+
+    /// <summary>
+    /// Moves the missile forward a bit
+    ///  and possibly explodes it right there.
+    /// </summary>
+    private void P_CheckMissileSpawn(MapObject th)
+    {
+        th.Tics -= DoomRandom.P_Random() & 3;
+        if (th.Tics < 1)
+        {
+            th.Tics = 1;
+        }
+
+        // move a little forward so an angle can
+        // be computed if it immediately explodes
+        th.X += (th.MomX >> 1);
+        th.Y += (th.MomY >> 1);
+        th.Z += (th.MomZ >> 1);
+
+        if (!P_TryMove(th, th.X, th.Y))
+        {
+            P_ExplodeMissile(th);
+        }
+    }
+
+    /// <summary>
+    /// Tries to aim at a nearby monster
+    /// </summary>
+    public void P_SpawnPlayerMissile(MapObject source, MapObjectType type)
+    {
+        // see which target is to be aimed at
+        var an = source.Angle;
+        var slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+
+        if (_lineTarget == null)
+        {
+            an += 1 << 26;
+            slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+
+            if (_lineTarget == null)
+            {
+                an -= 2 << 26;
+                slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+            }
+
+            if (_lineTarget == null)
+            {
+                an = source.Angle;
+                slope = 0;
+            }
+        }
+
+        var x = source.X;
+        var y = source.Y;
+        var z = source.Z + 4 * 8 * Constants.FracUnit;
+
+        var th = P_SpawnMapObject(x, y, z, type);
+        if (th.Info.SeeSound != SoundType.sfx_None)
+        {
+            // S_StartSound (th, th->info->seesound);
+        }
+
+        th.Target = source;
+        th.Angle = an;
+        th.MomX = th.Info.Speed * RenderEngine.FineCosine[an >> RenderEngine.AngleToFineShift];
+        th.MomY = th.Info.Speed * RenderEngine.FineSine[an >> RenderEngine.AngleToFineShift];
+        th.MomZ = th.Info.Speed * slope;
+
+        P_CheckMissileSpawn(th);
     }
 }
