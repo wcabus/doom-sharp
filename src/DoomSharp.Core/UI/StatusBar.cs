@@ -1,6 +1,7 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
 using DoomSharp.Core.Graphics;
+using DoomSharp.Core.Input;
 
 namespace DoomSharp.Core.UI;
 
@@ -379,7 +380,7 @@ public class StatusBar
         // arms ownership widgets
         for (var i = 0; i < 6; i++)
         {
-            name = $"STGNUM{i}";
+            name = $"STGNUM{i + 2}";
 
             // gray #
             _arms[i][0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
@@ -576,11 +577,12 @@ public class StatusBar
         // weapons owned
         for (var i = 0; i < 6; i++)
         {
+            var weaponIdx = i;
             _armsWidgets[i] = new MultiIconWidget(
                 ST_ARMSX + (i % 3) * ST_ARMSXSPACE,
                 ST_ARMSY + (i / 3) * ST_ARMSYSPACE,
                 _arms[i]!,
-                () => _player.WeaponOwned[i + 1] ? 1 : 0,
+                () => _player.WeaponOwned[weaponIdx + 1] ? 1 : 0,
                 () => _armsOn);
         }
 
@@ -1236,5 +1238,38 @@ public class StatusBar
 
             OldValue = ValueFunc();
         }
+    }
+
+    public bool HandleEvent(InputEvent currentEvent)
+    {
+        //// Filter automap on/off.
+        //if (ev->type == ev_keyup
+        //    && ((ev->data1 & 0xffff0000) == AM_MSGHEADER))
+        //{
+        //    switch (ev->data1)
+        //    {
+        //        case AM_MSGENTERED:
+        //            st_gamestate = AutomapState;
+        //            st_firsttime = true;
+        //            break;
+
+        //        case AM_MSGEXITED:
+        //            //	fprintf(stderr, "AM exited\n");
+        //            st_gamestate = FirstPersonState;
+        //            break;
+        //    }
+        //}
+
+        //// if a user keypress...
+        // else if 
+        if (currentEvent.Type == EventType.KeyDown)
+        {
+            if (!DoomGame.Instance.Game.NetGame)
+            {
+                // cheats go here
+            }
+        }
+
+        return false;
     }
 }
