@@ -2,6 +2,7 @@
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
+using System.Numerics;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -546,5 +547,255 @@ public class Player
                 DoomGame.Error("P_PlayerInSpecialSector: unknown special {sector.Special");
                 break;
         }
+    }
+
+    /// <summary>
+    /// Num is the number of clip loads,
+    /// not the individual count (0= 1/2 clip).
+    /// Returns false if the ammo can't be picked up at all
+    /// </summary>
+    public bool GiveAmmo(AmmoType ammo, int num)
+    {
+        if (ammo is AmmoType.NoAmmo or AmmoType.NumAmmo)
+        {
+            return false;
+        }
+
+        if (Ammo[(int)ammo] == MaxAmmo[(int)ammo])
+        {
+            return false;
+        }
+
+        if (num != 0)
+        {
+            num *= GameController.ClipAmmo[(int)ammo];
+        }
+        else
+        {
+            num = GameController.ClipAmmo[(int)ammo] / 2;
+        }
+
+        if (DoomGame.Instance.Game.GameSkill is SkillLevel.Baby or SkillLevel.Nightmare)
+        {
+            // give double ammo in trainer mode,
+            // you'll need in nightmare
+            num <<= 1;
+        }
+
+        var oldAmmo = Ammo[(int)ammo];
+        Ammo[(int)ammo] += num;
+
+        if (Ammo[(int)ammo] > MaxAmmo[(int)ammo])
+        {
+            Ammo[(int)ammo] = MaxAmmo[(int)ammo];
+        }
+
+        // If non zero ammo, 
+        // don't change up weapons,
+        // player was lower on purpose.
+        if (oldAmmo != 0)
+        {
+            return true;
+        }
+
+        // We were down to zero,
+        // so select a new weapon.
+        // Preferences are not user selectable.
+        switch (ammo)
+        {
+            case AmmoType.Clip:
+                if (ReadyWeapon == WeaponType.Fist)
+                {
+                    if (WeaponOwned[(int)WeaponType.Chaingun])
+                    {
+                        PendingWeapon = WeaponType.Chaingun;
+                    }
+                    else
+                    {
+                        PendingWeapon = WeaponType.Pistol;
+                    }
+                }
+
+                break;
+
+            case AmmoType.Shell:
+                if (ReadyWeapon is WeaponType.Fist or WeaponType.Pistol)
+                {
+                    if (WeaponOwned[(int)WeaponType.Shotgun])
+                    {
+                        PendingWeapon = WeaponType.Shotgun;
+                    }
+                }
+
+                break;
+
+            case AmmoType.Cell:
+                if (ReadyWeapon is WeaponType.Fist or WeaponType.Pistol)
+                {
+                    if (WeaponOwned[(int)WeaponType.Plasma])
+                    {
+                        PendingWeapon = WeaponType.Plasma;
+                    }
+                }
+
+                break;
+
+            case AmmoType.Missile:
+                if (ReadyWeapon is WeaponType.Fist)
+                {
+                    if (WeaponOwned[(int)WeaponType.Missile])
+                    {
+                        PendingWeapon = WeaponType.Missile;
+                    }
+                }
+
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The weapon name may have a MF_DROPPED flag ored in.
+    /// </summary>
+    public bool GiveWeapon(WeaponType weapon, bool dropped)
+    {
+        var game = DoomGame.Instance.Game;
+        if (game.NetGame && game.DeathMatch && !dropped)
+        {
+            // leave placed weapons forever on net games
+            if (WeaponOwned[(int)weapon])
+            {
+                return false;
+            }
+
+            BonusCount += GameController.BonusAdd;
+            WeaponOwned[(int)weapon] = true;
+
+            if (game.DeathMatch)
+            {
+                GiveAmmo(WeaponInfo.GetByType(weapon).Ammo, 5);
+            }
+            else
+            {
+                GiveAmmo(WeaponInfo.GetByType(weapon).Ammo, 2);
+            }
+
+            PendingWeapon = weapon;
+            //if (player == &players[consoleplayer])
+            //    S_StartSound(NULL, sfx_wpnup);
+
+            return false;
+        }
+
+        var gaveAmmo = false;
+        var ammo = WeaponInfo.GetByType(weapon).Ammo;
+        if (ammo != AmmoType.NoAmmo)
+        {
+            // give one clip with a dropped weapon,
+            // two clips with a found weapon
+            gaveAmmo = GiveAmmo(ammo, dropped ? 1 : 2);
+        }
+
+        var gaveWeapon = false;
+        if (!WeaponOwned[(int)weapon])
+        {
+            gaveWeapon = true;
+            WeaponOwned[(int)weapon] = true;
+            PendingWeapon = weapon;
+        }
+
+        return gaveWeapon || gaveAmmo;
+    }
+
+    /// <summary>
+    /// Returns false if the body isn't needed at all
+    /// </summary>
+    public bool GiveBody(int num)
+    {
+        if (Health >= Constants.MaxHealth)
+        {
+            return false;
+        }
+
+        Health += num;
+        if (Health > Constants.MaxHealth)
+        {
+            Health = Constants.MaxHealth;
+        }
+
+        MapObject!.Health = Health;
+        return true;
+    }
+
+    /// <summary>
+    /// Returns false if the armor is worse
+    /// than the current armor.
+    /// </summary>
+    public bool GiveArmor(int armorType)
+    {
+        var hits = armorType * 100;
+        if (ArmorPoints >= hits)
+        {
+            return false; // don't pick up
+        }
+
+        ArmorType = armorType;
+        ArmorPoints = hits;
+        return true;
+    }
+
+    public void GiveCard(KeyCardType card)
+    {
+        if (Cards[(int)card])
+        {
+            return;
+        }
+
+        BonusCount = GameController.BonusAdd;
+        Cards[(int)card] = true;
+    }
+
+    public bool GivePower(PowerUpType power)
+    {
+        if (power == PowerUpType.Invulnerability)
+        {
+            Powers[(int)power] = 30 * Constants.TicRate;
+            return true;
+        }
+
+        if (power == PowerUpType.Invisibility)
+        {
+            Powers[(int)power] = 60 * Constants.TicRate;
+            MapObject!.Flags |= MapObjectFlag.MF_SHADOW;
+            return true;
+        }
+
+        if (power == PowerUpType.InfraRed)
+        {
+            Powers[(int)power] = 120 * Constants.TicRate;
+            return true;
+        }
+
+        if (power == PowerUpType.IronFeet)
+        {
+            Powers[(int)power] = 60 * Constants.TicRate;
+            return true;
+        }
+
+        if (power == PowerUpType.Strength)
+        {
+            GiveBody(100);
+            Powers[(int)power] = 1;
+            return true;
+        }
+
+        if (Powers[(int)power] != 0)
+        {
+            return false;   // already got it
+        }
+
+        Powers[(int)power] = 1;
+        return true;
     }
 }

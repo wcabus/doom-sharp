@@ -55,6 +55,11 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
     public int LineCount { get; set; }
     
     public Line[] Lines { get; set; } = Array.Empty<Line>();
+    
+    public short FloorPic { get; set; } = FloorPic;
+    public Fixed FloorHeight { get; set; } = FloorHeight;
+    public Fixed CeilingHeight { get; set; } = CeilingHeight;
+    public short LightLevel { get; set; } = LightLevel;
 
     public static Sector ReadFromWadData(BinaryReader reader)
     {
@@ -85,7 +90,7 @@ public record SideDef(Fixed TextureOffset, Fixed RowOffset, Sector Sector)
     public int BottomTexture { get; set; }
     public int MidTexture { get; set; }
 
-    public static SideDef ReadFromWadData(BinaryReader reader, Sector[] sectors)
+    public static SideDef ReadFromWadData(BinaryReader reader, List<Sector> sectors)
     {
         var textureOffset = reader.ReadInt16();
         var rowOffset = reader.ReadInt16();
@@ -180,6 +185,19 @@ public class Line
                 [1] = reader.ReadInt16()
             }
         };
+    }
+
+    /// <summary>
+    /// Returns the sector next to the current one, or <c>null</c> if not two-sided line.
+    /// </summary>
+    public Sector? GetNextSector(Sector sector)
+    {
+        if ((Flags & Constants.Line.TwoSided) == 0)
+        {
+            return null;
+        }
+
+        return FrontSector == sector ? BackSector : FrontSector;
     }
 }
 

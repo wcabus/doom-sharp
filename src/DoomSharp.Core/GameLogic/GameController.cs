@@ -3,6 +3,7 @@ using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
+using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -10,6 +11,10 @@ public class GameController
 {
     public static readonly int[] MaxAmmo = { 200, 50, 300, 50 };
     public static readonly int[] ClipAmmo = { 10, 4, 20, 1 };
+
+    public const int BonusAdd = 6;
+
+    private bool _secretExit;
 
     private int _saveGameSlot = 0;
     private string _saveDescription = "";
@@ -97,7 +102,7 @@ public class GameController
     private Segment[] _segments = Array.Empty<Segment>();
 
     private int _numSectors;
-    private Sector[] _sectors = Array.Empty<Sector>();
+    private List<Sector> _sectors = new();
 
     private int _numSubSectors;
     private SubSector[] _subSectors = Array.Empty<SubSector>();
@@ -156,8 +161,8 @@ public class GameController
     private int _numLineSpecials;
     private Line[] _lineSpecialList = new Line[Constants.MaxLineAnimations];
 
-    private Ceiling?[] _activeCeilings = new Ceiling?[Constants.MaxCeilings];
-    private Platform?[] _activePlats = new Platform?[Constants.MaxPlats];
+    private readonly Ceiling?[] _activeCeilings = new Ceiling?[Ceiling.MaxCeilings];
+    private readonly Platform?[] _activePlats = new Platform?[Platform.MaxPlats];
 
     // Map tracking
 
@@ -247,7 +252,7 @@ public class GameController
     public LinkedList<Thinker> Thinkers => _thinkers;
 
     public int NumSectors => _numSectors;
-    public Sector[] Sectors => _sectors;
+    public List<Sector> Sectors => _sectors;
 
     public int NumSides => _numSides;
     public SideDef[] Sides => _sides;
@@ -1120,7 +1125,7 @@ public class GameController
     {
         const int sizeOfMapSector = 2 + 2 + 8 + 8 + 2 + 2 + 2;
         _numSectors = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapSector;
-        _sectors = new Sector[_numSectors];
+        _sectors = new List<Sector>(_numSectors);
         
         var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
         using var stream = new MemoryStream(data, false);
@@ -1128,7 +1133,7 @@ public class GameController
 
         for (var i = 0; i < _numSectors; i++)
         {
-            _sectors[i] = Sector.ReadFromWadData(reader);
+            _sectors.Add(Sector.ReadFromWadData(reader));
         }
     }
 
@@ -2167,6 +2172,129 @@ public class GameController
         return true;
     }
 
+    /// <summary>
+    /// Takes a valid thing and adjusts the thing->floorz,
+    /// thing->ceilingz, and possibly thing->z.
+    /// This is called for all nearby monsters
+    /// whenever a sector changes height.
+    /// If the thing doesn't fit,
+    /// the z will be set to the lowest value
+    /// and false will be returned.
+    /// </summary>
+    private bool P_ThingHeightClip(MapObject thing)
+    {
+        var onFloor = thing.Z == thing.FloorZ;
+
+        P_CheckPosition(thing, thing.X, thing.Y);
+        // what about stranding monster partially off an edge?
+
+        thing.FloorZ = _tmFloorZ;
+        thing.CeilingZ = _tmCeilingZ;
+
+        if (onFloor)
+        {
+            // walking monsters rise and fall with the floor
+            thing.Z = thing.FloorZ;
+        }
+        else
+        {
+            // don't adjust a floating monster unless forced to
+            if (thing.Z + thing.Height > thing.CeilingZ)
+            {
+                thing.Z = thing.CeilingZ - thing.Height;
+            }
+        }
+
+        return thing.CeilingZ - thing.FloorZ >= thing.Height;
+    }
+
+    //
+    // SECTOR HEIGHT CHANGING
+    // After modifying a sectors floor or ceiling height,
+    // call this routine to adjust the positions
+    // of all things that touch the sector.
+    //
+    // If anything doesn't fit anymore, true will be returned.
+    // If crunch is true, they will take damage
+    //  as they are being crushed.
+    // If Crunch is false, you should set the sector height back
+    //  the way it was and call P_ChangeSector again
+    //  to undo the changes.
+    //
+
+    private bool _noFit;
+    private bool _crushChange;
+
+    private bool PIT_ChangeSector(MapObject thing)
+    {
+        if (P_ThingHeightClip(thing))
+        {
+            // keep checking
+            return true;
+        }
+
+        // crunch bodies to giblets
+        if (thing.Health <= 0)
+        {
+            thing.SetState(StateNum.S_GIBS);
+
+            thing.Flags &= ~MapObjectFlag.MF_SOLID;
+            thing.Height = 0;
+            thing.Radius = 0;
+
+            // keep checking
+            return true;
+        }
+
+        // crunch dropped items
+        if ((thing.Flags & MapObjectFlag.MF_DROPPED) != 0)
+        {
+            P_RemoveMapObject(thing);
+
+            // keep checking
+            return true;
+        }
+
+        if ((thing.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            // assume it is bloody gibs or something
+            return true;
+        }
+
+        _noFit = true;
+
+        if (_crushChange && (LevelTime & 3) == 0)
+        {
+            MapObject.DamageMapObject(thing, null, null, 10);
+
+            // spray blood in a random direction
+            var mo = P_SpawnMapObject(thing.X, thing.Y, thing.Z + thing.Height / 2, MapObjectType.MT_BLOOD);
+
+            mo.MomX = (DoomRandom.P_Random() - DoomRandom.P_Random()) << 12;
+            mo.MomY = (DoomRandom.P_Random() - DoomRandom.P_Random()) << 12;
+        }
+
+        // keep checking (crush other things)	
+        return true;
+    }
+
+    public bool P_ChangeSector(Sector sector, bool crunch)
+    {
+        _noFit = false;
+        _crushChange = crunch;
+
+        // re-check heights for all things near the moving sector
+        for (var x = sector.BlockBox[BoundingBox.BoxLeft]; x <= sector.BlockBox[BoundingBox.BoxRight]; x++)
+        {
+            for (var y = sector.BlockBox[BoundingBox.BoxBottom]; y <= sector.BlockBox[BoundingBox.BoxTop]; y++)
+            {
+                P_BlockThingsIterator(x, y, PIT_ChangeSector);
+            }
+        }
+
+        return _noFit;
+    }
+
     //
     // INTERCEPT ROUTINES
     //
@@ -2898,7 +3026,6 @@ public class GameController
         if (right < left)
         {
             return 0;       // front side
-
         }
 
         return 1;			// back side
@@ -3011,7 +3138,7 @@ public class GameController
     /// </summary>
     private Fixed P_InterceptVector(DividerLine v2, DividerLine v1)
     {
-        Fixed den = (v1.Dy >> 8 * v2.Dx) - (v1.Dx >> 8 * v2.Dy);
+        var den = ((v1.Dy >> 8) * v2.Dx) - ((v1.Dx >> 8) * v2.Dy);
 
         if (den == 0)
         {
@@ -3020,7 +3147,7 @@ public class GameController
 
         //	I_Error ("P_InterceptVector: parallel");
 
-        Fixed num = ((v1.X - v2.X) >> 8 * v1.Dy) + ((v2.Y - v1.Y) >> 8 * v1.Dx);
+        var num = (((v1.X - v2.X) >> 8) * v1.Dy) + (((v2.Y - v1.Y) >> 8) * v1.Dx);
         return num / den;
     }
 
@@ -3125,7 +3252,98 @@ public class GameController
         }
     }
 
-    private void P_MapObjectThinker(ActionParams actionParams)
+    private bool PIT_StompThing(MapObject thing)
+    {
+        if ((thing.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            return true;
+        }
+
+        var blockDist = thing.Radius + _tmThing!.Radius;
+
+        if (Math.Abs(thing.X - _tmX) >= blockDist ||
+            Math.Abs(thing.Y - _tmY) >= blockDist)
+        {
+            // didn't hit it
+            return true;
+        }
+
+        // don't clip against self
+        if (thing == _tmThing)
+        {
+            return true;
+        }
+
+        // monsters don't stomp things except on boss level
+        if (_tmThing.Player == null && GameMap != 30)
+        {
+            return false;
+        }
+
+        MapObject.DamageMapObject(thing, _tmThing, _tmThing, 10000);
+
+        return true;
+    }
+
+    public bool P_TeleportMove(MapObject thing, Fixed x, Fixed y)
+    {
+        // kill anything occupying the position
+        _tmThing = thing;
+        _tmFlags = thing.Flags;
+
+        _tmX = x;
+        _tmY = y;
+
+        _tmBoundingBox[BoundingBox.BoxTop] = y + _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxBottom] = y - _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxRight] = x + _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxLeft] = x - _tmThing.Radius;
+
+        var newSubSec = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+        _ceilingLine = null;
+
+        // The base floor/ceiling is from the subsector
+        // that contains the point.
+        // Any contacted lines the step closer together
+        // will adjust them.
+        _tmFloorZ = _tmDropOffZ = newSubSec.Sector!.FloorHeight;
+        _tmCeilingZ = newSubSec.Sector.CeilingHeight;
+
+        DoomGame.Instance.Renderer.ValidCount++;
+        _numSpecHit = 0;
+
+        // stomp on any things contacted
+        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
+        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
+        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
+        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
+
+        for (var bx = xl; bx <= xh; bx++)
+        {
+            for (var by = yl; by <= yh; by++)
+            {
+                if (!P_BlockThingsIterator(bx, by, PIT_StompThing))
+                {
+                    return false;
+                }
+            }
+        }
+
+        // the move is ok,
+        // so link the thing into its new position
+        P_UnsetThingPosition(thing);
+
+        thing.FloorZ = _tmFloorZ;
+        thing.CeilingZ = _tmCeilingZ;
+        thing.X = x;
+        thing.Y = y;
+
+        P_SetThingPosition(thing);
+
+        return true;
+    }
+
+    public void P_MapObjectThinker(ActionParams actionParams)
     {
         var mobj = actionParams.MapObject;
         if (mobj is null)
@@ -3598,12 +3816,12 @@ public class GameController
         var texMid = _sides[line.SideNum[0]].MidTexture;
         var texBot = _sides[line.SideNum[0]].BottomTexture;
 
-        var sound = 0; // TODO sfx_swtchon
+        var sound = SoundType.sfx_swtchn;
 
         // EXIT SWITCH?
         if (line.Special == 11)
         {
-            // sound = sfx_swtchx;
+            sound = SoundType.sfx_swtchx;
         }
 
         for (var i = 0; i < _numSwitches * 2; i++)
@@ -3825,12 +4043,12 @@ public class GameController
         }
 
         //	Init other misc stuff
-        for (var i = 0; i < Constants.MaxCeilings; i++)
+        for (var i = 0; i < Ceiling.MaxCeilings; i++)
         {
             _activeCeilings[i] = null;
         }
 
-        for (var i = 0; i < Constants.MaxPlats; i++)
+        for (var i = 0; i < Platform.MaxPlats; i++)
         {
             _activePlats[i] = null;
         }
@@ -3844,9 +4062,766 @@ public class GameController
         //	P_InitSlidingDoorFrames();
     }
 
+    public void P_AddActiveCeiling(Ceiling ceiling)
+    {
+        for (var i = 0; i < Ceiling.MaxCeilings; i++)
+        {
+            if (_activeCeilings[i] == null)
+            {
+                _activeCeilings[i] = ceiling;
+                return;
+            }
+        }
+    }
+
+    public void P_RemoveActiveCeiling(Ceiling ceiling)
+    {
+        for (var i = 0; i < Ceiling.MaxCeilings; i++)
+        {
+            if (_activeCeilings[i] != ceiling)
+            {
+                continue;
+            }
+
+            ceiling.Sector!.SpecialData = null;
+            RemoveThinker(ceiling);
+            _activeCeilings[i] = null;
+            return;
+        }
+    }
+
+    /// <summary>
+    /// Restart a ceiling that's in-stasis
+    /// </summary>
+    public void P_ActivateInStasisCeiling(Line line)
+    {
+        for (var i = 0; i < Ceiling.MaxCeilings; i++)
+        {
+            var ceiling = _activeCeilings[i];
+            if (ceiling == null ||
+                ceiling.Tag != line.Tag ||
+                ceiling.Direction != 0)
+            {
+                continue;
+            }
+
+            ceiling.Direction = ceiling.OldDirection;
+            ceiling.Action = Trigger.MoveCeiling;
+            return;
+        }
+    }
+
+    public int CeilingCrushStopEvent(Line line)
+    {
+        var rtn = 0;
+        for (var i = 0; i < Ceiling.MaxCeilings; i++)
+        {
+            var ceiling = _activeCeilings[i];
+            if (ceiling != null &&
+                ceiling.Tag == line.Tag &&
+                ceiling.Direction != 0)
+            {
+                ceiling.OldDirection = ceiling.Direction;
+                ceiling.Action = null;
+                ceiling.Direction = 0; // in stasis
+                rtn = 1;
+            }
+        }
+
+        return rtn;
+    }
+
+    public void StopPlatformEvent(Line line)
+    {
+        foreach (var platform in _activePlats.Where(x => x != null && x.Status != PlatformState.InStatis && x.Tag == line.Tag))
+        {
+            platform!.OldStatus = platform.Status;
+            platform.Status = PlatformState.InStatis;
+            platform.Action = null;
+        }
+    }
+
+    public void P_AddActivePlatform(Platform platform)
+    {
+        for (var i = 0; i < Platform.MaxPlats; i++)
+        {
+            if (_activePlats[i] == null)
+            {
+                _activePlats[i] = platform;
+                return;
+            }
+        }
+
+        DoomGame.Error("P_AddActivePlat: no more plats!");
+    }
+
+    public void P_RemoveActivePlatform(Platform platform)
+    {
+        for (var i = 0; i < Platform.MaxPlats; i++)
+        { 
+            if (_activePlats[i] != platform)
+            {
+                continue;
+            }
+
+            platform.Sector!.SpecialData = null;
+            RemoveThinker(platform);
+            _activePlats[i] = null;
+            return;
+        }
+
+        DoomGame.Error("P_RemoveActivePlat: can't find plat!");
+    }
+
+    public void P_ActivateInStasis(int tag)
+    {
+        for (var i = 0; i < Platform.MaxPlats; i++)
+        {
+            var platform = _activePlats[i];
+            if (platform == null ||
+                platform.Tag != tag ||
+                platform.Status != PlatformState.InStatis)
+            {
+                continue;
+            }
+
+            platform.Status = platform.OldStatus;
+            platform.Action = Trigger.PlatformRaise;
+            return;
+        }
+    }
+
     private void P_TouchSpecialThing(MapObject special, MapObject toucher)
     {
-        // TODO https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_inter.c#L339
+        var delta = special.Z - toucher.Z;
+
+        if (delta > toucher.Height || delta < -8 * Constants.FracUnit)
+        {
+            // out of reach
+            return;
+        }
+
+        var sound = SoundType.sfx_itemup;
+        var player = toucher.Player!;
+
+        // Dead thing touching.
+        // Can happen with a sliding player corpse.
+        if (toucher.Health <= 0)
+        {
+            return;
+        }
+
+        // Identify the sprite.
+        switch (special.Sprite)
+        {
+            // armor
+            case SpriteNum.SPR_ARM1:
+                if (!player.GiveArmor(1))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotArmor;
+                break;
+
+            case SpriteNum.SPR_ARM2:
+                if (!player.GiveArmor(2))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotMega;
+                break;
+
+            case SpriteNum.SPR_BON1:
+                player.Health++; // can go over 100%
+                if (player.Health > 200)
+                {
+                    player.Health = 200;
+                }
+
+                player.MapObject!.Health = player.Health;
+                player.Message = Messages.GotHealthBonus;
+
+                break;
+
+            case SpriteNum.SPR_BON2:
+                player.ArmorPoints++; // can go over 100%
+                if (player.ArmorPoints > 200)
+                {
+                    player.ArmorPoints = 200;
+                }
+
+                if (player.ArmorType == 0)
+                {
+                    player.ArmorType = 1;
+                }
+
+                player.Message = Messages.GotArmorBonus;
+
+                break;
+
+            case SpriteNum.SPR_SOUL:
+                player.Health += 100;
+                if (player.Health > 200)
+                {
+                    player.Health = 200;
+                }
+
+                player.MapObject!.Health = player.Health;
+                player.Message = Messages.GotSuper;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_MEGA:
+                if (DoomGame.Instance.GameMode != GameMode.Commercial)
+                {
+                    return;
+                }
+
+                player.Health = 200;
+                player.MapObject!.Health = player.Health;
+                player.GiveArmor(2);
+                player.Message = Messages.GotMegaSphere;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            // cards
+            // leave cards for everyone
+            case SpriteNum.SPR_BKEY:
+                if (!player.Cards[(int)KeyCardType.BlueCard])
+                {
+                    player.Message = Messages.GotBlueCard;
+                }
+                player.GiveCard(KeyCardType.BlueCard);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            case SpriteNum.SPR_YKEY:
+                if (!player.Cards[(int)KeyCardType.YellowCard])
+                {
+                    player.Message = Messages.GotYellowCard;
+                }
+                player.GiveCard(KeyCardType.YellowCard);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            case SpriteNum.SPR_RKEY:
+                if (!player.Cards[(int)KeyCardType.RedCard])
+                {
+                    player.Message = Messages.GotRedCard;
+                }
+                player.GiveCard(KeyCardType.RedCard);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            case SpriteNum.SPR_BSKU:
+                if (!player.Cards[(int)KeyCardType.BlueSkull])
+                {
+                    player.Message = Messages.GotBlueSkull;
+                }
+                player.GiveCard(KeyCardType.BlueSkull);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            case SpriteNum.SPR_YSKU:
+                if (!player.Cards[(int)KeyCardType.YellowSkull])
+                {
+                    player.Message = Messages.GotYellowSkull;
+                }
+                player.GiveCard(KeyCardType.YellowSkull);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            case SpriteNum.SPR_RSKU:
+                if (!player.Cards[(int)KeyCardType.RedSkull])
+                {
+                    player.Message = Messages.GotRedSkull;
+                }
+                player.GiveCard(KeyCardType.RedSkull);
+                if (!NetGame)
+                {
+                    break;
+                }
+
+                return;
+
+            // medikits, heals
+            case SpriteNum.SPR_STIM:
+                if (!player.GiveBody(10))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotStim;
+                break;
+
+            case SpriteNum.SPR_MEDI:
+                if (!player.GiveBody(25))
+                {
+                    return;
+                }
+
+                if (player.Health < 25)
+                {
+                    player.Message = Messages.GotMedikitAndItWasNeeded;
+                }
+                else
+                {
+                    player.Message = Messages.GotMedikit;
+                }
+
+                break;
+
+            case SpriteNum.SPR_PINV:
+                if (!player.GivePower(PowerUpType.Invulnerability))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotInvulnerability;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_PSTR:
+                if (!player.GivePower(PowerUpType.Strength))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotBerserk;
+                if (player.ReadyWeapon != WeaponType.Fist)
+                {
+                    player.PendingWeapon = WeaponType.Fist;
+                }
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_PINS:
+                if (!player.GivePower(PowerUpType.Invisibility))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotInvisibility;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_SUIT:
+                if (!player.GivePower(PowerUpType.IronFeet))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotSuit;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_PMAP:
+                if (!player.GivePower(PowerUpType.AllMap))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotMap;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            case SpriteNum.SPR_PVIS:
+                if (!player.GivePower(PowerUpType.InfraRed))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotVisor;
+                sound = SoundType.sfx_getpow;
+
+                break;
+
+            // ammo
+            case SpriteNum.SPR_CLIP:
+                if ((special.Flags & MapObjectFlag.MF_DROPPED) != 0)
+                {
+                    if (!player.GiveAmmo(AmmoType.Clip, 0))
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    if (!player.GiveAmmo(AmmoType.Clip, 1))
+                    {
+                        return;
+                    }
+                }
+
+                player.Message = Messages.GotClip;
+                break;
+
+            case SpriteNum.SPR_AMMO:
+                if (!player.GiveAmmo(AmmoType.Clip, 5))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotClipBox;
+                break;
+
+            case SpriteNum.SPR_ROCK:
+                if (!player.GiveAmmo(AmmoType.Missile, 1))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotRocket;
+                break;
+
+            case SpriteNum.SPR_BROK:
+                if (!player.GiveAmmo(AmmoType.Missile, 5))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotRocketBox;
+                break;
+
+            case SpriteNum.SPR_CELL:
+                if (!player.GiveAmmo(AmmoType.Cell, 1))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotCell;
+                break;
+
+            case SpriteNum.SPR_CELP:
+                if (!player.GiveAmmo(AmmoType.Cell, 5))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotCellBox;
+                break;
+
+            case SpriteNum.SPR_SHEL:
+                if (!player.GiveAmmo(AmmoType.Shell, 1))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotShells;
+                break;
+
+            case SpriteNum.SPR_SBOX:
+                if (!player.GiveAmmo(AmmoType.Shell, 5))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotShellBox;
+                break;
+
+            case SpriteNum.SPR_BPAK:
+                if (!player.Backpack)
+                {
+                    for (var i = 0; i < (int)AmmoType.NumAmmo; i++)
+                    {
+                        player.MaxAmmo[i] *= 2;
+                    }
+
+                    player.Backpack = true;
+                }
+
+                for (var i = 0; i < (int)AmmoType.NumAmmo; i++)
+                {
+                    player.GiveAmmo((AmmoType)i, 1);
+                }
+
+                player.Message = Messages.GotBackpack;
+                break;
+
+            // weapons
+            case SpriteNum.SPR_BFUG:
+                if (!player.GiveWeapon(WeaponType.Bfg, false))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotBfg9000;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_MGUN:
+                if (!player.GiveWeapon(WeaponType.Chaingun, (special.Flags & MapObjectFlag.MF_DROPPED) != 0))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotChaingun;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_CSAW:
+                if (!player.GiveWeapon(WeaponType.Chainsaw, false))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotChainsaw;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_LAUN:
+                if (!player.GiveWeapon(WeaponType.Missile, false))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotRocketLauncher;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_PLAS:
+                if (!player.GiveWeapon(WeaponType.Plasma, false))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotPlasmaRifle;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_SHOT:
+                if (!player.GiveWeapon(WeaponType.Shotgun, (special.Flags & MapObjectFlag.MF_DROPPED) != 0))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotShotgun;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            case SpriteNum.SPR_SGN2:
+                if (!player.GiveWeapon(WeaponType.SuperShotgun, (special.Flags & MapObjectFlag.MF_DROPPED) != 0))
+                {
+                    return;
+                }
+
+                player.Message = Messages.GotShotgun2;
+                sound = SoundType.sfx_wpnup;
+                break;
+
+            default:
+                DoomGame.Error("P_SpecialThing: Unknown gettable thing");
+                return;
+        }
+
+        if ((special.Flags & MapObjectFlag.MF_COUNTITEM) != 0)
+        {
+            player.ItemCount++;
+        }
+
+        P_RemoveMapObject(special);
+        player.BonusCount += BonusAdd;
+        if (player == Players[ConsolePlayer])
+        {
+            // S_StartSound(NULL, sound);
+        }
+    }
+
+    public Fixed P_FindLowestFloorSurrounding(Sector sec)
+    {
+        var floor = sec.FloorHeight;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            var other = check.GetNextSector(sec);
+
+            if (other == null)
+            {
+                continue;
+            }
+
+            if (other.FloorHeight < floor)
+            {
+                floor = other.FloorHeight;
+            }
+        }
+
+        return floor;
+    }
+
+    public Fixed P_FindHighestFloorSurrounding(Sector sec)
+    {
+        Fixed floor = -500 * Constants.FracUnit;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            var other = check.GetNextSector(sec);
+
+            if (other == null)
+            {
+                continue;
+            }
+
+            if (other.FloorHeight > floor)
+            {
+                floor = other.FloorHeight;
+            }
+        }
+
+        return floor;
+    }
+
+    private const int MaxAdjoiningSectors = 20;
+
+    public Fixed P_FindNextHighestFloor(Sector sec, int currentHeight)
+    {
+        var heightList = new List<Fixed>();
+        var h = 0;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            var other = check.GetNextSector(sec);
+
+            if (other == null)
+            {
+                continue;
+            }
+
+            if (other.FloorHeight > currentHeight)
+            {
+                heightList.Add(other.FloorHeight);
+                h++;
+            }
+
+            // Check for overflow. Exit.
+            if (h >= MaxAdjoiningSectors)
+            {
+                DoomGame.Console.WriteLine("Sector with more than 20 adjoining sectors");
+                break;
+            }
+        }
+
+        // Find lowest height in list
+        if (h == 0)
+        {
+            return currentHeight;
+        }
+
+        return heightList.Min();
+    }
+
+    public Fixed P_FindLowestCeilingSurrounding(Sector sec)
+    {
+        var height = Fixed.MaxValue;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            var other = check.GetNextSector(sec);
+
+            if (other == null)
+            {
+                continue;
+            }
+
+            if (other.CeilingHeight < height)
+            {
+                height = other.CeilingHeight;
+            }
+        }
+
+        return height;
+    }
+
+    public Fixed P_FindHighestCeilingSurrounding(Sector sec)
+    {
+        var height = Fixed.Zero;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            var other = check.GetNextSector(sec);
+
+            if (other == null)
+            {
+                continue;
+            }
+
+            if (other.CeilingHeight > height)
+            {
+                height = other.CeilingHeight;
+            }
+        }
+
+        return height;
+    }
+
+    public int P_FindSectorFromLineTag(Line line, int start)
+    {
+        for (var i = start + 1; i < NumSectors; i++)
+        {
+            if (Sectors[i].Tag == line.Tag)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public int P_FindMinSurroundingLight(Sector sector, int max)
+    {
+        var min = max;
+
+        for (var i = 0; i < sector.LineCount; i++)
+        {
+            var line = sector.Lines[i];
+            var check = line.GetNextSector(sector);
+
+            if (check == null)
+            {
+                continue;
+            }
+
+            if (check.LightLevel < min)
+            {
+                min = check.LightLevel;
+            }
+        }
+
+        return min;
     }
 
     /// <summary>
@@ -3891,11 +4866,7 @@ public class GameController
             }
         }
 
-        // Note: could use some const's here.
-        switch (line.Special)
-        {
-            // TODO Triggers  https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/p_spec.c#L541
-        }
+        Trigger.Handle(line, side, thing);
     }
 
     /// <summary>
@@ -4013,15 +4984,15 @@ public class GameController
         var strafe = _gameKeyDown[_keyStrafe] || _mouseButtons[_mouseButtonStrafe] || _joyButtons[_joyButtonStrafe];
         var speed = (_gameKeyDown[_keySpeed] || _joyButtons[_joyButtonSpeed]) ? 1 : 0;
 
-        var turnSpeed = 0;
+        int turnSpeed;
         var forward = 0;
         var side = 0;
 
         // use two stage accelerative turning
         // on the keyboard and joystick
-        if (_joyXMove < 0 || _joyXMove > 0
-                          || _gameKeyDown[_keyRight]
-                          || _gameKeyDown[_keyLeft])
+        if (_joyXMove is < 0 or > 0 
+            || _gameKeyDown[_keyRight] 
+            || _gameKeyDown[_keyLeft])
         {
             _turnHeld += DoomGame.Instance.TicDup;
         }
@@ -4265,7 +5236,23 @@ public class GameController
 
     public void ExitLevel()
     {
-        // _secretExit = false;
+        _secretExit = false;
+        GameAction = GameAction.Completed;
+    }
+
+    public void SecretExitLevel()
+    {
+        // IF NO WOLF3D LEVELS, NO SECRET EXIT!
+        if (DoomGame.Instance.GameMode == GameMode.Commercial &&
+            DoomGame.Instance.WadData.CheckNumForName("map31") < 0)
+        {
+            _secretExit = false;
+        }
+        else
+        {
+            _secretExit = true;
+        }
+
         GameAction = GameAction.Completed;
     }
 

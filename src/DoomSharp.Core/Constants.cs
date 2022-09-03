@@ -159,19 +159,6 @@ public static class Constants
     public const int MaxAnimations = 32;
     public const int MaxLineAnimations = 64;
 
-    public const int PlatWait = 3;
-    public const int PlatSpeed = FracUnit;
-    public const int MaxPlats = 30;
-
-    public const int VDoorSpeed = FracUnit * 2;
-    public const int VDoorWait = 150;
-
-    public const int CeilingSpeed = FracUnit;
-    public const int CeilingWait = 150;
-    public const int MaxCeilings = 30;
-
-    public const int FloorSpeed = FracUnit;
-
     public const int NodeLeafSubSector = 0x8000;
 
     public const int OnFloorZ = int.MinValue;

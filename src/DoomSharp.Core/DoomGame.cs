@@ -316,7 +316,7 @@ public class DoomGame : IDisposable
 
         if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
-            DoomGame.Instance.Hud.Drawer();
+            Hud.Drawer();
         }
 
         // clean up border stuff
@@ -1333,7 +1333,7 @@ public class DoomGame : IDisposable
     public static void Error(string message)
     {
         _console.WriteLine("Error: " + message);
-        throw new DoomErrorException();
+        DoomGame.Instance.Quit();
     }
 
     public void Dispose()

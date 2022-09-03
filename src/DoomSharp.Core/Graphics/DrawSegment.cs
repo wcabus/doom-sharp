@@ -2,9 +2,9 @@
 
 public class DrawSegment
 {
-    private int[]? _spriteTopClip;
-    private int[]? _spriteBottomClip;
-    private int[]? _maskedTextureCol;
+    private short[]? _spriteTopClip;
+    private short[]? _spriteBottomClip;
+    private short[]? _maskedTextureCol;
 
     public Segment? CurrentLine { get; set; }
     public int X1 { get; set; }
@@ -25,7 +25,7 @@ public class DrawSegment
 
     // Pointers to lists for sprite clipping,
     //  all three adjusted so [x1] is first value.
-    public int[]? SpriteTopClip
+    public short[]? SpriteTopClip
     {
         get => _spriteTopClip;
         set
@@ -41,7 +41,7 @@ public class DrawSegment
     }
     public int? SpriteTopClipIdx { get; set; }
     
-    public int[]? SpriteBottomClip
+    public short[]? SpriteBottomClip
     {
         get => _spriteBottomClip;
         set
@@ -57,7 +57,7 @@ public class DrawSegment
     }
     public int? SpriteBottomClipIdx { get; set; }
 
-    public int[]? MaskedTextureCol
+    public short[]? MaskedTextureCol
     {
         get => _maskedTextureCol;
         set

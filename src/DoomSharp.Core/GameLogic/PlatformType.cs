@@ -2,7 +2,7 @@
 
 public enum PlatformType
 {
-    PepertualRaise,
+    PerpetualRaise,
     DownWaitUpStay,
     RaiseAndChange,
     RaiseToNearestAndChange,

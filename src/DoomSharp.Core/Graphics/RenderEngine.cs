@@ -1,5 +1,4 @@
-﻿using System;
-using System.Text;
+﻿using System.Text;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Extensions;
 using DoomSharp.Core.GameLogic;
@@ -34,7 +33,7 @@ public class RenderEngine
     /// <summary>
     /// Tangens lookup table
     /// </summary>
-    public static readonly int[] FineTangent =
+    public static readonly Fixed[] FineTangent = new Fixed[FineAngles / 2]
     {
         -170910304, -56965752, -34178904, -24413316, -18988036, -15535599, -13145455, -11392683,
         -10052327, -8994149, -8137527, -7429880, -6835455, -6329090, -5892567, -5512368,
@@ -553,7 +552,7 @@ public class RenderEngine
     /// <summary>
     /// Sine (and cosine) lookup table
     /// </summary>
-    public static readonly int[] FineSine =
+    public static readonly Fixed[] FineSine = new Fixed[5 * FineAngles / 4]
     {
         25, 75, 125, 175, 226, 276, 326, 376,
         427, 477, 527, 578, 628, 678, 728, 779,
@@ -1837,12 +1836,12 @@ public class RenderEngine
         65534, 65535, 65535, 65535, 65535, 65535, 65535, 65535
     };
 
-    public static readonly int[] FineCosine = new int[FineSine.Length];
+    public static readonly Fixed[] FineCosine = new Fixed[FineSine.Length];
 
     /// <summary>
     /// ArcTan lookup table
     /// </summary>
-    public static readonly uint[] TanToAngle =
+    public static readonly uint[] TanToAngle = new uint[SlopeRange + 1]
     {
         0, 333772, 667544, 1001315, 1335086, 1668857, 2002626, 2336395,
         2670163, 3003929, 3337694, 3671457, 4005219, 4338979, 4672736, 5006492,
@@ -2211,8 +2210,8 @@ public class RenderEngine
 
     // constant arrays
     //  used for psprite clipping and initializing clipping
-    private readonly int[] _negoneArray = new int[Constants.ScreenWidth];
-    private readonly int[] _screenHeightArray = new int[Constants.ScreenWidth];
+    private readonly short[] _negoneArray = new short[Constants.ScreenWidth];
+    private readonly short[] _screenHeightArray = new short[Constants.ScreenWidth];
 
     public const int MaxVisSprites = 128;
     private readonly VisSprite?[] _visSprites = new VisSprite?[MaxVisSprites];
@@ -2246,7 +2245,7 @@ public class RenderEngine
     private int[] _textureWidthMask = Array.Empty<int>();
 
     // needed for texture pegging
-    private Fixed[] _textureHeight = Array.Empty<Fixed>();
+    public Fixed[] TextureHeight { get; private set; } = Array.Empty<Fixed>();
     private int[] _textureCompositeSize = Array.Empty<int>();
     private short[][] _textureColumnLump = Array.Empty<short[]>();
     private ushort[][] _textureColumnOfs = Array.Empty<ushort[]>();
@@ -2274,7 +2273,7 @@ public class RenderEngine
     private VisPlane? _ceilingPlane;
 
     public const int MaxOpenings = Constants.ScreenWidth * 64;
-    private int[] _openings = new int[MaxOpenings];
+    private short[] _openings = new short[MaxOpenings];
     private int _lastOpeningIdx = -1;
 
     //
@@ -2282,8 +2281,8 @@ public class RenderEngine
     //  floorclip starts out SCREENHEIGHT
     //  ceilingclip starts out -1
     //
-    private int[] _floorClip = new int[Constants.ScreenWidth];
-    private int[] _ceilingClip = new int[Constants.ScreenWidth];
+    private short[] _floorClip = new short[Constants.ScreenWidth];
+    private short[] _ceilingClip = new short[Constants.ScreenWidth];
 
     //
     // spanstart holds the start of a plane span
@@ -2345,7 +2344,6 @@ public class RenderEngine
 
     // first pixel in a column (possibly virtual) 
     private byte[]? _dcSource;
-    private int? _dcSourceIdx;
 
     // just for profiling 
     private int _dcCount;
@@ -2371,9 +2369,9 @@ public class RenderEngine
     // Used for sprites and masked mid textures.
     // Masked means: partly transparent, i.e. stored
     //  in posts/runs of opaque pixels.
-    private int[]? _mFloorClip;
+    private short[]? _mFloorClip;
     private int? _mFloorClipIdx;
-    private int[]? _mCeilingClip;
+    private short[]? _mCeilingClip;
     private int? _mCeilingClipIdx;
 
     private Fixed _sprYScale;
@@ -2453,7 +2451,57 @@ public class RenderEngine
 
         var colData = new byte[_textureComposite[tex]!.Length - ofs];
         Array.Copy(_textureComposite[tex]!, ofs, colData, 0, _textureComposite[tex]!.Length - ofs);
-        return new Column(0xff, 0, colData);
+        return new Column(0, 0, colData);
+    }
+
+    private byte[] GetColumnBytes(int tex, int col)
+    {
+        col &= _textureWidthMask[tex];
+        var lump = _textureColumnLump[tex][col];
+        var ofs = _textureColumnOfs[tex][col];
+
+        if (lump > 0)
+        {
+            var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!;
+            var patch = Patch.FromBytes(data);
+            var column = patch.GetColumnByOffset(ofs);
+
+            if (column is null)
+            {
+                return Array.Empty<byte>();
+            }
+
+            var pixels = new List<byte>(column.Length);
+            do
+            {
+                pixels.AddRange(column.Pixels);
+                column = column.Next;
+            } while (column != null);
+
+            // add the next column just in case
+            column = patch.GetColumnByOffset(ofs, 1);
+            while (column != null)
+            {
+                pixels.AddRange(column.Pixels);
+                column = column.Next;
+            }
+
+            return pixels.ToArray();
+        }
+
+        if (_textureComposite[tex] == null)
+        {
+            GenerateComposite(tex);
+        }
+
+        var colData = new byte[_textureComposite[tex]!.Length];
+        Array.Copy(_textureComposite[tex]!, ofs, colData, 0, _textureComposite[tex]!.Length - ofs);
+        if (ofs != 0)
+        {
+            // hack to wrap around sprite data to not go out of bounds in DrawColumn
+            Array.Copy(_textureComposite[tex]!, 0, colData, _textureComposite[tex]!.Length - ofs, ofs);
+        }
+        return colData;
     }
 
     // Initializes the texture list
@@ -2499,7 +2547,7 @@ public class RenderEngine
         _textureComposite = new byte[_numTextures][];
         _textureCompositeSize = new int[_numTextures];
         _textureWidthMask = new int[_numTextures];
-        _textureHeight = new Fixed[_numTextures];
+        TextureHeight = new Fixed[_numTextures];
 
         var totalWidth = 0;
 
@@ -2570,7 +2618,7 @@ public class RenderEngine
             }
 
             _textureWidthMask[i] = k - 1;
-            _textureHeight[i] = new Fixed(texture.Height << Constants.FracBits);
+            TextureHeight[i] = new Fixed(texture.Height << Constants.FracBits);
             totalWidth += texture.Width;
         }
 
@@ -2631,15 +2679,15 @@ public class RenderEngine
     ///  the composite texture is created from the patches,
     ///  and each column is cached.
     /// </summary>
-    private void GenerateComposite(int texnum)
+    private void GenerateComposite(int texNum)
     {
-        var texture = _textures[texnum];
+        var texture = _textures[texNum];
 
-        var block = new byte[_textureCompositeSize[texnum]];
-        _textureComposite[texnum] = block;
+        var block = new byte[_textureCompositeSize[texNum]];
+        _textureComposite[texNum] = block;
         
-        var colLump = _textureColumnLump[texnum];
-        var colOfs = _textureColumnOfs[texnum];
+        var colLump = _textureColumnLump[texNum];
+        var colOfs = _textureColumnOfs[texNum];
 
         // Composite the columns together.
         for (var i = 0; i < texture.PatchCount; i++)
@@ -2914,7 +2962,7 @@ public class RenderEngine
         // thing clipping
         for (var i = 0; i < ViewWidth; i++)
         {
-            _screenHeightArray[i] = ViewHeight;
+            _screenHeightArray[i] = (short)ViewHeight;
         }
 
         // planes
@@ -3421,11 +3469,7 @@ public class RenderEngine
         {
             // Re-map color indices from wall texture column
             //  using a lighting/special effects LUT.
-            var idx = _dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127;
-            if (idx < _dcSource.Length)
-            {
-                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[idx]];
-            }
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[(frac >> Constants.FracBits) & 127]];
 
             dest += Constants.ScreenWidth;
             frac += fracStep;
@@ -3465,13 +3509,9 @@ public class RenderEngine
 
         do
         {
-            var idx = _dcSourceIdx.GetValueOrDefault() + (frac >> Constants.FracBits) & 127;
-            if (idx < _dcSource.Length)
-            {
-                DoomGame.Instance.Video.Screens[0][dest2] =
-                    DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[idx]];
-            }
-            
+            DoomGame.Instance.Video.Screens[0][dest2] =
+                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[(frac >> Constants.FracBits) & 127]];
+
             dest += Constants.ScreenWidth;
             dest2 += Constants.ScreenWidth;
             frac += fracStep;
@@ -3650,7 +3690,7 @@ public class RenderEngine
             //  used with PLAY sprites.
             // Thus the "green" ramp of the player 0 sprite
             //  is mapped to gray, red, black/indigo. 
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcTranslation[_dcSource[_dcSourceIdx.GetValueOrDefault() + frac >> Constants.FracBits]]];
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcTranslation[_dcSource[frac >> Constants.FracBits]]];
             dest += Constants.ScreenWidth;
 
             frac += fracStep;
@@ -3710,7 +3750,7 @@ public class RenderEngine
         //    return;
         //}
 
-        if (_dsColorMap is null || _dsSource is null)
+        if (_dsSource is null)
         {
             return;
         }
@@ -3749,7 +3789,7 @@ public class RenderEngine
         //    return;
         //}
 
-        if (_dsColorMap is null || _dsSource is null)
+        if (_dsSource is null)
         {
             return;
         }
@@ -3765,7 +3805,7 @@ public class RenderEngine
         var count = _dsX2 - _dsX1;
         do
         {
-            var spot = (((int)yFrac >> (16 - 6)) & (63 * 64)) + (((int)xFrac >> 16) & 63);
+            var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
             // Lowres/blocky mode does it twice,
             //  while scale is adjusted appropriately.
             DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
@@ -4129,9 +4169,9 @@ public class RenderEngine
     private Fixed _bottomStep;
 
     private int[]? _wallLights;
-    private int[]? _internalMaskedTextureCol;
+    private short[]? _internalMaskedTextureCol;
 
-    private int[]? MaskedTextureCol
+    private short[]? MaskedTextureCol
     {
         get => _internalMaskedTextureCol;
         set
@@ -4194,7 +4234,7 @@ public class RenderEngine
         if ((_currentLine.LineDef.Flags & Constants.Line.DontPegBottom) != 0)
         {
             _dcTextureMid = _frontSector.FloorHeight > _backSector!.FloorHeight ? _frontSector.FloorHeight : _backSector.FloorHeight;
-            _dcTextureMid = _dcTextureMid + _textureHeight[texNum] - _viewZ;
+            _dcTextureMid = _dcTextureMid + TextureHeight[texNum] - _viewZ;
         }
         else
         {
@@ -4333,18 +4373,9 @@ public class RenderEngine
                 _dcYh = yh;
                 _dcTextureMid = _rwMidTextureMid;
 
-                var column = GetColumn(_midTexture, textureColumn);
-                var pixels = new List<byte>();
-                do
-                {
-                    pixels.AddRange(column.Pixels);
-                    column = column.Next;
-                } while (column != null);
-
-                _dcSource = pixels.ToArray();
-                _dcSourceIdx = 0;
+                _dcSource = GetColumnBytes(_midTexture, textureColumn);
                 _colFunc();
-                _ceilingClip[_rwX] = ViewHeight;
+                _ceilingClip[_rwX] = (short)ViewHeight;
                 _floorClip[_rwX] = -1;
             }
             else
@@ -4368,22 +4399,13 @@ public class RenderEngine
                         _dcYh = mid;
                         _dcTextureMid = _rwTopTextureMid;
 
-                        var column = GetColumn(_topTexture, textureColumn);
-                        var pixels = new List<byte>();
-                        do
-                        {
-                            pixels.AddRange(column.Pixels);
-                            column = column.Next;
-                        } while (column != null);
-
-                        _dcSource = pixels.ToArray();
-                        _dcSourceIdx = 0;
+                        _dcSource = GetColumnBytes(_topTexture, textureColumn);
                         _colFunc();
-                        _ceilingClip[_rwX] = mid;
+                        _ceilingClip[_rwX] = (short)mid;
                     }
                     else
                     {
-                        _ceilingClip[_rwX] = yl - 1;
+                        _ceilingClip[_rwX] = (short)(yl - 1);
                     }
                 }
                 else
@@ -4391,7 +4413,7 @@ public class RenderEngine
                     // no top wall
                     if (_markCeiling)
                     {
-                        _ceilingClip[_rwX] = yl - 1;
+                        _ceilingClip[_rwX] = (short)(yl - 1);
                     }
                 }
 
@@ -4412,23 +4434,14 @@ public class RenderEngine
                         _dcYl = mid;
                         _dcYh = yh;
                         _dcTextureMid = _rwBottomTextureMid;
-                        
-                        var column = GetColumn(_bottomTexture, textureColumn);
-                        var pixels = new List<byte>();
-                        do
-                        {
-                            pixels.AddRange(column.Pixels);
-                            column = column.Next;
-                        } while (column != null);
 
-                        _dcSource = pixels.ToArray();
-                        _dcSourceIdx = 0;
-                        _colFunc.Invoke();
-                        _floorClip[_rwX] = mid;
+                        _dcSource = GetColumnBytes(_bottomTexture, textureColumn);
+                        _colFunc();
+                        _floorClip[_rwX] = (short)mid;
                     }
                     else
                     {
-                        _floorClip[_rwX] = yh + 1;
+                        _floorClip[_rwX] = (short)(yh + 1);
                     }
                 }
                 else
@@ -4436,7 +4449,7 @@ public class RenderEngine
                     // no bottom wall
                     if (_markFloor)
                     {
-                        _floorClip[_rwX] = yh + 1;
+                        _floorClip[_rwX] = (short)(yh + 1);
                     }
                 }
 
@@ -4444,7 +4457,7 @@ public class RenderEngine
                 {
                     // save texturecol
                     //  for backdrawing of masked mid texture
-                    MaskedTextureCol![MaskedTextureColIdx.GetValueOrDefault() + _rwX] = textureColumn;
+                    MaskedTextureCol![MaskedTextureColIdx.GetValueOrDefault() + _rwX] = (short)textureColumn;
                 }
             }
 
@@ -4482,7 +4495,7 @@ public class RenderEngine
 
         // calculate rw_distance for scale calculation
         _rwNormalAngle = _currentLine.Angle + Angle90;
-        uint offsetAngle = (uint)Math.Abs(_rwNormalAngle - _rwAngle1);
+        var offsetAngle = (uint)Math.Abs(_rwNormalAngle - _rwAngle1);
 
         if (offsetAngle > Angle90)
         {
@@ -4533,7 +4546,7 @@ public class RenderEngine
             _markFloor = _markCeiling = true;
             if ((_lineDef.Flags & Constants.Line.DontPegBottom) != 0)
             {
-                vTop = _frontSector.FloorHeight + _textureHeight[_sideDef.MidTexture];
+                vTop = _frontSector.FloorHeight + TextureHeight[_sideDef.MidTexture];
                 // bottom of texture at bottom
                 _rwMidTextureMid = vTop - _viewZ;
             }
@@ -4644,7 +4657,7 @@ public class RenderEngine
                 }
                 else
                 {
-                    vTop = _backSector.CeilingHeight + _textureHeight[_sideDef.TopTexture];
+                    vTop = _backSector.CeilingHeight + TextureHeight[_sideDef.TopTexture];
 
                     // bottom of texture
                     _rwTopTextureMid = vTop - _viewZ;
@@ -4798,15 +4811,7 @@ public class RenderEngine
         // save sprite clipping info
         if (((ds.Silhouette & SilhouetteTop) != 0 || _maskedTexture) && ds.SpriteTopClip == null)
         {
-            var count = 2 * (_rwStopX - start);
-
-            // TODO Check bugfix: clip to _ceilingClip max size
-            if (start + count > _ceilingClip.Length)
-            {
-                count = _ceilingClip.Length - start;
-            }
-
-            Array.Copy(_ceilingClip, start, _openings, _lastOpeningIdx, count);
+            Array.Copy(_ceilingClip, start, _openings, _lastOpeningIdx, _rwStopX - start);
 
             ds.SpriteTopClip = _openings;
             ds.SpriteTopClipIdx = _lastOpeningIdx - start;
@@ -4815,15 +4820,7 @@ public class RenderEngine
 
         if (((ds.Silhouette & SilhouetteBottom) != 0 || _maskedTexture) && ds.SpriteBottomClip == null)
         {
-            var count = 2 * (_rwStopX - start);
-
-            // TODO Check bugfix: clip to _ceilingClip max size
-            if (start + count > _floorClip.Length)
-            {
-                count = _floorClip.Length - start;
-            }
-
-            Array.Copy(_floorClip, start, _openings, _lastOpeningIdx, count);
+            Array.Copy(_floorClip, start, _openings, _lastOpeningIdx, _rwStopX - start);
 
             ds.SpriteBottomClip = _openings;
             ds.SpriteBottomClipIdx = _lastOpeningIdx - start;
@@ -5038,7 +5035,9 @@ public class RenderEngine
 
             // Totally off the left edge?
             if (tspan >= span)
+            {
                 return;
+            }
 
             angle1 = _clipAngle;
         }
@@ -5050,7 +5049,9 @@ public class RenderEngine
 
             // Totally off the left edge?
             if (tspan >= span)
+            {
                 return;
+            }
 
             // TODO again with the -uint
             angle2 = (uint)-_clipAngle;
@@ -5074,21 +5075,21 @@ public class RenderEngine
         // Single sided line?
         if (_backSector == null)
         {
-            ClipSolidWallSegment(x1, x2 - 1);
+            ClipSolid();
             return;
         }
 
         // Closed door.
         if (_backSector.CeilingHeight <= _frontSector!.FloorHeight || _backSector.FloorHeight >= _frontSector.CeilingHeight)
         {
-            ClipSolidWallSegment(x1, x2 - 1);
+            ClipSolid();
             return;
         }
 
         // Window.
         if (_backSector.CeilingHeight != _frontSector.CeilingHeight || _backSector.FloorHeight != _frontSector.FloorHeight)
         {
-            ClipPassWallSegment(x1, x2 - 1);
+            ClipPass();
             return;
         }
 
@@ -5105,7 +5106,18 @@ public class RenderEngine
             return;
         }
 
-        ClipPassWallSegment(x1, x2 - 1);
+        ClipPass();
+        return;
+
+        void ClipPass()
+        {
+            ClipPassWallSegment(x1, x2 - 1);
+        }
+
+        void ClipSolid()
+        {
+            ClipSolidWallSegment(x1, x2 - 1);
+        }
     }
 
     private static readonly int[][] CheckCoord =
@@ -5128,7 +5140,7 @@ public class RenderEngine
     /// Returns true
     ///  if some part of the bbox might be visible.
     /// </summary>
-    private bool CheckBBox(Fixed[] bspcoord)
+    private bool CheckBBox(IReadOnlyList<Fixed> bspcoord)
     {
         int boxx;
         int boxy;
@@ -5679,9 +5691,8 @@ public class RenderEngine
                     {
                         var angle = (_viewAngle + _xToViewAngle[x]) >> Sky.AngleToSkyShift;
                         _dcX = x;
-                        _dcSource = GetColumn(Sky.Texture, (int)angle).Pixels;
-                        _dcSourceIdx = 0;
-                        _colFunc?.Invoke();
+                        _dcSource = GetColumnBytes(Sky.Texture, (int)angle);
+                        _colFunc();
                     }
                 }
                 continue;
@@ -5845,12 +5856,12 @@ public class RenderEngine
     {
         Fixed scale;
 
-        var angleA = Angle90 + (visAngle - _viewAngle);
-        var angleB = Angle90 + (visAngle - _rwNormalAngle);
+        var angleA = (int)(Angle90 + (visAngle - _viewAngle));
+        var angleB = (int)(Angle90 + (visAngle - _rwNormalAngle));
 
-        // both sines are allways positive
-        var sineA = FineSine[angleA >> AngleToFineShift];
-        var sineB = FineSine[angleB >> AngleToFineShift];
+        // both sines are always positive
+        int sineA = FineSine[angleA >> AngleToFineShift];
+        int sineB = FineSine[angleB >> AngleToFineShift];
         Fixed num = (_projection * sineB) << _detailShift;
         int den = _rwDistance * sineA;
 
@@ -5909,7 +5920,6 @@ public class RenderEngine
             if (_dcYl <= _dcYh)
             {
                 _dcSource = column.Pixels;
-                _dcSourceIdx = 0;
                 _dcTextureMid = baseTextureMid - (column.TopDelta << Constants.FracBits);
                 // dc_source = (byte *)column + 3 - column->topdelta;
 
@@ -6282,7 +6292,7 @@ public class RenderEngine
     private void DrawPlayerSprites()
     {
         // get light level
-        var lightnum = -1; // TODO (_viewPlayer.MapObject.SubSector.Sector.LightLevel >> LightSegShift) + _extraLight;
+        var lightnum = (_viewPlayer!.MapObject!.SubSector!.Sector!.LightLevel >> LightSegShift) + _extraLight;
 
         if (lightnum < 0)
         {
@@ -6344,18 +6354,17 @@ public class RenderEngine
         // pull the vissprites out by scale
         //best = 0;		// shut up the compiler warning
 
-        Fixed bestscale;
         _sortedHead.Next = _sortedHead.Prev = _sortedHead;
 
         VisSprite? best = null;
         for (var i = 0; i < count; i++)
         {
-            bestscale = int.MaxValue;
+            var bestScale = Fixed.MaxValue;
             for (var ds = unsorted.Next; ds != unsorted; ds = ds.Next)
             {
-                if (ds.Scale < bestscale)
+                if (ds.Scale < bestScale)
                 {
-                    bestscale = ds.Scale;
+                    bestScale = ds.Scale;
                     best = ds;
                 }
             }
@@ -6370,14 +6379,12 @@ public class RenderEngine
 
     private void DrawSprite(VisSprite sprite)
     {
-        var clipbot = new int[Constants.ScreenWidth];
-        var cliptop = new int[Constants.ScreenWidth];
-
-        Fixed scale, lowScale;
+        var clipBottom = new short[Constants.ScreenWidth];
+        var clipTop = new short[Constants.ScreenWidth];
 
         for (var x = sprite.X1; x <= sprite.X2; x++)
         {
-            clipbot[x] = cliptop[x] = -2;
+            clipBottom[x] = clipTop[x] = -2;
         }
 
         // Scan drawsegs from end to start for obscuring segs.
@@ -6403,6 +6410,8 @@ public class RenderEngine
             var r1 = ds.X1 < sprite.X1 ? sprite.X1 : ds.X1;
             var r2 = ds.X2 > sprite.X2 ? sprite.X2 : ds.X2;
 
+            Fixed scale;
+            Fixed lowScale;
             if (ds.Scale1 > ds.Scale2)
             {
                 lowScale = ds.Scale2;
@@ -6445,9 +6454,9 @@ public class RenderEngine
                 // bottom sil
                 for (var x = r1; x <= r2; x++)
                 {
-                    if (clipbot[x] == -2)
+                    if (clipBottom[x] == -2)
                     {
-                        clipbot[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
+                        clipBottom[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
                     }
                 }
             }
@@ -6456,9 +6465,9 @@ public class RenderEngine
                 // top sil
                 for (var x = r1; x <= r2; x++)
                 {
-                    if (cliptop[x] == -2)
+                    if (clipTop[x] == -2)
                     {
-                        cliptop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
+                        clipTop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
                     }
                 }
             }
@@ -6467,14 +6476,14 @@ public class RenderEngine
                 // both
                 for (var x = r1; x <= r2; x++)
                 {
-                    if (clipbot[x] == -2)
+                    if (clipBottom[x] == -2)
                     {
-                        clipbot[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
+                        clipBottom[x] = ds.SpriteBottomClip[ds.SpriteBottomClipIdx.GetValueOrDefault() + x];
                     }
 
-                    if (cliptop[x] == -2)
+                    if (clipTop[x] == -2)
                     {
-                        cliptop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
+                        clipTop[x] = ds.SpriteTopClip[ds.SpriteTopClipIdx.GetValueOrDefault() + x];
                     }
                 }
             }
@@ -6485,21 +6494,21 @@ public class RenderEngine
         // check for unclipped columns
         for (var x = sprite.X1; x <= sprite.X2; x++)
         {
-            if (clipbot[x] == -2)
+            if (clipBottom[x] == -2)
             {
-                clipbot[x] = ViewHeight;
+                clipBottom[x] = (short)ViewHeight;
             }
 
-            if (cliptop[x] == -2)
+            if (clipTop[x] == -2)
             {
-                cliptop[x] = -1;
+                clipTop[x] = -1;
             }
         }
 
-        _mFloorClip = clipbot;
+        _mFloorClip = clipBottom;
         _mFloorClipIdx = 0;
         
-        _mCeilingClip = cliptop;
+        _mCeilingClip = clipTop;
         _mCeilingClipIdx = 0;
         DrawVisSprite(sprite, sprite.X1, sprite.X2);
     }

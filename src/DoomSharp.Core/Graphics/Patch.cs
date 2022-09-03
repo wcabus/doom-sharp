@@ -63,14 +63,14 @@ public record Patch(ushort Width, ushort Height, short LeftOffset, short TopOffs
         return new Patch(width, height, left, top, offsets, columns);
     }
 
-    public Column? GetColumnByOffset(uint offset)
+    public Column? GetColumnByOffset(uint offset, int skip = 0)
     {
         var i = 0;
         foreach (var columnOffset in ColumnOffsets)
         {
             if (columnOffset == offset)
             {
-                return Columns[i];
+                return i + skip >= Columns.Length ? Columns[i + skip - Columns.Length] : Columns[i + skip];
             }
 
             i++;
