@@ -4,6 +4,7 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -187,7 +188,7 @@ public class GameController
     // but don't process them until the move is proven valid
     private const int MaxSpecialCross = 8;
 
-    private Line[] _specHit = new Line[MaxSpecialCross];
+    private readonly Line[] _specHit = new Line[MaxSpecialCross];
     private int _numSpecHit;
 
     private MapObject? _lineTarget;
@@ -200,8 +201,6 @@ public class GameController
     private Fixed _attackRange;
     
     private Fixed _aimSlope;
-    private Fixed _topSlope;
-    private Fixed _bottomSlope;
 
     public GameController()
     {
@@ -2222,6 +2221,79 @@ public class GameController
         }
 
         return thing.CeilingZ - thing.FloorZ >= thing.Height;
+    }
+
+    //
+    // RADIUS ATTACK
+    //
+    private MapObject? _bombSource;
+    private MapObject? _bombSpot;
+    private int _bombDamage;
+
+    /// <summary>
+    /// "bombsource" is the creature
+    /// that caused the explosion at "bombspot".
+    /// </summary>
+    private bool PIT_RadiusAttack(MapObject thing)
+    {
+        if ((thing.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            return true;
+        }
+
+        // Boss spider and cyborg
+        // take no damage from concussion.
+        if (thing.Type is MapObjectType.MT_CYBORG or MapObjectType.MT_SPIDER)
+        {
+            return true;
+        }
+
+        Fixed dx = Math.Abs(thing.X - _bombSpot!.X);
+        Fixed dy = Math.Abs(thing.Y - _bombSpot.Y);
+
+        var dist = dx > dy ? dx : dy;
+        dist = (dist - thing.Radius) >> Constants.FracBits;
+
+        if (dist < 0)
+        {
+            dist = 0;
+        }
+
+        if (dist >= _bombDamage)
+        {
+            return true; // out of range
+        }
+
+        if (P_CheckSight(thing, _bombSpot))
+        {
+            // must be in direct path
+            MapObject.DamageMapObject(thing, _bombSpot, _bombSource, _bombDamage - dist);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Source is the creature that caused the explosion at spot.
+    /// </summary>
+    public void P_RadiusAttack(MapObject spot, MapObject source, int damage)
+    {
+        Fixed dist = (damage + Constants.MaxRadius) << Constants.FracBits;
+        var yh = (spot.Y + dist - _blockMapOriginY) >> Constants.MapBlockShift;
+        var yl = (spot.Y - dist - _blockMapOriginY) >> Constants.MapBlockShift;
+        var xh = (spot.X + dist - _blockMapOriginX) >> Constants.MapBlockShift;
+        var xl = (spot.X - dist - _blockMapOriginX) >> Constants.MapBlockShift;
+        _bombSpot = spot;
+        _bombSource = source;
+        _bombDamage = damage;
+
+        for (var y = yl; y < yh; y++)
+        {
+            for (var x = xl; x < xh; x++)
+            {
+                P_BlockThingsIterator(x, y, PIT_RadiusAttack);
+            }
+        }
     }
 
     //
@@ -5756,5 +5828,290 @@ public class GameController
         th.MomZ = th.Info.Speed * slope;
 
         P_CheckMissileSpawn(th);
+    }
+
+    //
+    // P_CheckSight
+    //
+    private Fixed _sightZStart;        // eye z of looker
+    private Fixed _topSlope;
+    private Fixed _bottomSlope;        // slopes to top and bottom of target
+
+    private DividerLine _sTrace = new();           // from t1 to t2
+    private Fixed _t2x;
+    private Fixed _t2y;
+
+    private int[] _sightCounts = { 0, 0 };
+
+    /// <summary>
+    /// Returns side 0 (front), 1 (back), or 2 (on).
+    /// </summary>
+    private int P_DivlineSide(Fixed x, Fixed y, DividerLine node)
+    {
+        if (node.Dx == 0)
+        {
+            if (x == node.X)
+            {
+                return 2;
+            }
+
+            if (x <= node.X)
+            {
+                return node.Dy > 0 ? 1 : 0;
+            }
+
+            return node.Dy < 0 ? 1 : 0;
+        }
+
+        if (node.Dy == 0)
+        {
+            // WEC: This is what the original source has, but shouldn't this be "y == node.Y"?
+            if (x == node.Y)
+            {
+                return 2;
+            }
+
+            if (y <= node.Y)
+            {
+                return node.Dx > 0 ? 1 : 0;
+            }
+
+            return node.Dx < 0 ? 1 : 0;
+        }
+
+        var dx = (x - node.X);
+        var dy = (y - node.Y);
+
+        Fixed left = (node.Dy >> Constants.FracBits) * (dx >> Constants.FracBits);
+        Fixed right = (dy >> Constants.FracBits) * (node.Dx >> Constants.FracBits);
+
+        if (right < left)
+        {
+            return 0; // front side
+        }
+
+        if (left == right)
+        {
+            return 2;
+        }
+
+        return 1; // back side
+    }
+
+    /// <summary>
+    /// Returns true
+    ///  if strace crosses the given subsector successfully.
+    /// </summary>
+    private bool P_CrossSubSector(int num)
+    {
+        var sub = SubSectors[num];
+
+        // check lines
+        var count = sub.NumLines;
+        for (var i = sub.FirstLine; i < count; i++)
+        {
+            var seg = Segments[i];
+            var line = seg.LineDef;
+
+            // already checked other side?
+            if (line.ValidCount == DoomGame.Instance.Renderer.ValidCount)
+            {
+                continue;
+            }
+
+            line.ValidCount = DoomGame.Instance.Renderer.ValidCount;
+
+            var v1 = line.V1;
+            var v2 = line.V2;
+            var s1 = P_DivlineSide(v1.X, v1.Y, _sTrace);
+            var s2 = P_DivlineSide(v2.X, v2.Y, _sTrace);
+
+            // line isn't crossed?
+            if (s1 == s2)
+            {
+                continue;
+            }
+
+            var divl = new DividerLine
+            {
+                X = v1.X,
+                Y = v1.Y,
+                Dx = v2.X - v1.X,
+                Dy = v2.Y - v1.Y
+            };
+
+            s1 = P_DivlineSide(_sTrace.X, _sTrace.Y, divl);
+            s2 = P_DivlineSide(_t2x, _t2y, divl);
+
+            // line isn't crossed?
+            if (s1 == s2)
+            {
+                continue;
+            }
+
+            // stop because it is not two sided anyway
+            // might do this after updating validcount?
+            if ((line.Flags & Constants.Line.TwoSided) == 0)
+            {
+                return false;
+            }
+
+            // crosses a two sided line
+            var front = seg.FrontSector;
+            var back = seg.BackSector!;
+
+            // no wall to block sight with?
+            if (front.FloorHeight == back.FloorHeight &&
+                front.CeilingHeight == back.CeilingHeight)
+            {
+                continue;
+            }
+
+            // possible occluder
+            // because of ceiling height differences
+            if (front.CeilingHeight < back.CeilingHeight)
+            {
+                _openTop = front.CeilingHeight;
+            }
+            else
+            {
+                _openTop = back.CeilingHeight;
+            }
+
+            // because of ceiling height differences
+            if (front.FloorHeight > back.FloorHeight)
+            {
+                _openBottom = front.FloorHeight;
+            }
+            else
+            {
+                _openBottom = back.FloorHeight;
+            }
+
+            // quick test for totally closed doors
+            if (_openBottom >= _openTop)
+            {
+                return false;		// stop
+            }
+
+            var frac = P_InterceptVector(_sTrace, divl);
+            Fixed slope;
+
+            if (front.FloorHeight != back.FloorHeight)
+            {
+                slope = (_openBottom - _sightZStart) / frac;
+                if (slope > _bottomSlope)
+                {
+                    _bottomSlope = slope;
+                }
+            }
+
+            if (front.CeilingHeight != back.CeilingHeight)
+            {
+                slope = (_openTop - _sightZStart) / frac;
+                if (slope < _topSlope)
+                {
+                    _topSlope = slope;
+                }
+            }
+
+            if (_topSlope <= _bottomSlope)
+            {
+                return false;		// stop	
+            }
+        }
+
+        // passed the subsector ok
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true
+    ///  if strace crosses the given node successfully.
+    /// </summary>
+    private bool P_CrossBSPNode(int bspnum)
+    {
+        if ((bspnum & Constants.NodeLeafSubSector) != 0)
+        {
+            if (bspnum == -1)
+            {
+                return P_CrossSubSector(0);
+            }
+            else
+            {
+                return P_CrossSubSector(bspnum & (~Constants.NodeLeafSubSector));
+            }
+        }
+
+        var bsp = Nodes[bspnum];
+
+        // decide which side the start point is on
+        var side = P_DivlineSide(_sTrace.X, _sTrace.Y, bsp);
+        if (side == 2)
+        {
+            side = 0; // an "on" should cross both sides
+        }
+
+        // cross the starting side
+        if (!P_CrossBSPNode(bsp.Children[side]))
+        {
+            return false;
+        }
+
+        // the partition plane is crossed here
+        if (side == P_DivlineSide(_t2x, _t2y, bsp))
+        {
+            // the line doesn't touch the other side
+            return true;
+        }
+
+        // cross the ending side
+        return P_CrossBSPNode(bsp.Children[side ^ 1]);
+    }
+
+    /// <summary>
+    /// Returns true
+    ///  if a straight line between t1 and t2 is unobstructed.
+    /// Uses REJECT.
+    /// </summary>
+    private bool P_CheckSight(MapObject t1, MapObject t2)
+    {
+        // First check for trivial rejection.
+
+        // Determine subsector entries in REJECT table.
+        var s1 = Sectors.IndexOf(t1.SubSector!.Sector!);
+        var s2 = Sectors.IndexOf(t2.SubSector!.Sector!);
+        var pnum = s1 * NumSectors + s2;
+        var bytenum = pnum >> 3;
+        var bitnum = 1 << (pnum & 7);
+
+        // Check in REJECT table.
+        if ((_rejectMatrix[bytenum] & bitnum) != 0)
+        {
+            _sightCounts[0]++;
+
+            // Can't possibly be connected
+            return false;
+        }
+
+        // An unobstructed LOS is possible.
+        // Now look from eyes of t1 to any part of t2.
+        _sightCounts[1]++;
+
+        DoomGame.Instance.Renderer.ValidCount++;
+
+        _sightZStart = t1.Z + t1.Height - (t1.Height >> 2);
+        _topSlope = (t2.Z + t2.Height) - _sightZStart;
+        _bottomSlope = (t2.Z) - _sightZStart;
+
+        _sTrace.X = t1.X;
+        _sTrace.Y = t1.Y;
+        _t2x = t2.X;
+        _t2y = t2.Y;
+        _sTrace.Dx = t2.X - t1.X;
+        _sTrace.Dy = t2.Y - t1.Y;
+
+        // the head node is the last node output
+        return P_CrossBSPNode(NumNodes - 1);
     }
 }

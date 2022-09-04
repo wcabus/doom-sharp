@@ -249,7 +249,7 @@ public record Segment(Vertex V1, Vertex V2, Fixed Offset, uint Angle, SideDef Si
 /// <summary>
 /// BSP Node
 /// </summary>
-public class Node
+public class Node : DividerLine
 {
     public Node(Fixed x, Fixed y, Fixed dx, Fixed dy)
     {
@@ -264,11 +264,6 @@ public class Node
             BoundingBox[i] = new Fixed[4];
         }
     }
-
-    public Fixed X { get; set; }
-    public Fixed Y { get; set; }
-    public Fixed Dx { get; set; }
-    public Fixed Dy { get; set; }
 
     /// <summary>
     /// Bounding box for each child.

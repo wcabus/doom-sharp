@@ -1,6 +1,7 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -180,7 +181,28 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
     }
 
-    private static void ActionReFire(ActionParams actionParams) { }
+    /// <summary>
+    /// The player can re-fire the weapon
+    /// without lowering it entirely.
+    /// </summary>
+    private static void ActionReFire(ActionParams actionParams)
+    {
+        // check for fire
+        //  (if a weaponchange is pending, let it go through instead)
+        var player = actionParams.Player!;
+        if ((player.Command.Buttons & ButtonCode.Attack) != 0 &&
+            player.PendingWeapon == WeaponType.NoChange &&
+            player.Health != 0)
+        {
+            player.Refire++;
+            DoomGame.Instance.Game.P_FireWeapon(player);
+        }
+        else
+        {
+            player.Refire = 0;
+            DoomGame.Instance.Game.P_CheckAmmo(player);
+        }
+    }
 
     private static void ActionFirePistol(ActionParams actionParams)
     {
@@ -405,17 +427,96 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             MapObject.DamageMapObject(game.LineTarget, mo.Target, mo.Target, damage);
         }
     }
-    
-    private static void ActionExplode(ActionParams actionParams) { }
-    private static void ActionPain(ActionParams actionParams) { }
-    private static void ActionPlayerScream(ActionParams actionParams) { }
-    private static void ActionFall(ActionParams actionParams) { }
-    private static void ActionXScream(ActionParams actionParams) { }
+
+    private static void ActionExplode(ActionParams actionParams)
+    {
+        var thingy = actionParams.MapObject!;
+        DoomGame.Instance.Game.P_RadiusAttack(thingy, thingy.Target, 128);
+    }
+
+    private static void ActionPain(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Info.PainSound != SoundType.sfx_None)
+        {
+            //S_StartSound(actor, actor.Info.PainSound);
+        }
+    }
+
+    private static void ActionPlayerScream(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+
+        // Default death sound.
+        var sound = SoundType.sfx_pldeth;
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial && mo.Health < -50)
+        {
+            // IF THE PLAYER DIES
+            // LESS THAN -50% WITHOUT GIBBING
+            sound = SoundType.sfx_pdiehi;
+        }
+
+        // S_StartSound(mo, sound);
+    }
+
+    private static void ActionFall(ActionParams actionParams)
+    {
+        // actor is on the ground, it can be walked over
+        actionParams.MapObject!.Flags &= ~MapObjectFlag.MF_SOLID;
+
+        // So change this if corpse objects
+        // are meant to be obstacles.
+    }
+
+    private static void ActionXScream(ActionParams actionParams)
+    {
+        // S_StartSound(actor, sfx_slop);
+    }
+
     private static void ActionLook(ActionParams actionParams) { }
     private static void ActionChase(ActionParams actionParams) { }
     private static void ActionFaceTarget(ActionParams actionParams) { }
     private static void ActionPosAttack(ActionParams actionParams) { }
-    private static void ActionScream(ActionParams actionParams) { }
+
+    private static void ActionScream(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        int sound;
+
+        switch (actor.Info.DeathSound)
+        {
+            case 0:
+                return;
+
+            case SoundType.sfx_podth1:
+            case SoundType.sfx_podth2:
+            case SoundType.sfx_podth3:
+                sound = (int)SoundType.sfx_podth1 + DoomRandom.P_Random() % 3;
+                break;
+
+            case SoundType.sfx_bgdth1:
+            case SoundType.sfx_bgdth2:
+                sound = (int)SoundType.sfx_bgdth1 + DoomRandom.P_Random() % 2;
+                break;
+
+            default:
+                sound = (int)actor.Info.DeathSound;
+                break;
+        }
+
+        // Check for bosses.
+        if (actor.Type is MapObjectType.MT_SPIDER or MapObjectType.MT_CYBORG)
+        {
+            // full volume
+            // S_StartSound(NULL, sound);
+        }
+        else
+        {
+            // S_StartSound(actor, sound);
+        }
+    }
+
     private static void ActionSPosAttack(ActionParams actionParams) { }
     private static void ActionVileChase(ActionParams actionParams) { }
     private static void ActionVileStart(ActionParams actionParams) { }
