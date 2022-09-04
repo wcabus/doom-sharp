@@ -2215,7 +2215,6 @@ public class RenderEngine
 
     public const int MaxVisSprites = 128;
     private readonly VisSprite?[] _visSprites = new VisSprite?[MaxVisSprites];
-    private int _visSpriteIdx = -1;
     private int _newVisSprite = 0;
     private VisSprite _overflowSprite = new();
 
@@ -6179,19 +6178,18 @@ public class RenderEngine
 
     private void ClearSprites()
     {
-        _visSpriteIdx = 0;
         _newVisSprite = 0;
     }
 
     private VisSprite NewVisSprite()
     {
-        if (_visSpriteIdx == MaxVisSprites)
+        if (_newVisSprite == MaxVisSprites)
         {
             return _overflowSprite;
         }
 
         var vp = new VisSprite();
-        _visSprites[_visSpriteIdx++] = vp;
+        _visSprites[_newVisSprite++] = vp;
         
         return vp;
     }
