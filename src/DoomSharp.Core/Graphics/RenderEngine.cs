@@ -2452,57 +2452,7 @@ public class RenderEngine
         Array.Copy(_textureComposite[tex]!, ofs, colData, 0, _textureComposite[tex]!.Length - ofs);
         return new Column(0, 0, colData);
     }
-
-    private byte[] GetColumnBytes(int tex, int col)
-    {
-        col &= _textureWidthMask[tex];
-        var lump = _textureColumnLump[tex][col];
-        var ofs = _textureColumnOfs[tex][col];
-
-        if (lump > 0)
-        {
-            var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!;
-            var patch = Patch.FromBytes(data);
-            var column = patch.GetColumnByOffset(ofs);
-
-            if (column is null)
-            {
-                return Array.Empty<byte>();
-            }
-
-            var pixels = new List<byte>(column.Length);
-            do
-            {
-                pixels.AddRange(column.Pixels);
-                column = column.Next;
-            } while (column != null);
-
-            // add the next column just in case
-            column = patch.GetColumnByOffset(ofs, 1);
-            while (column != null)
-            {
-                pixels.AddRange(column.Pixels);
-                column = column.Next;
-            }
-
-            return pixels.ToArray();
-        }
-
-        if (_textureComposite[tex] == null)
-        {
-            GenerateComposite(tex);
-        }
-
-        var colData = new byte[_textureComposite[tex]!.Length];
-        Array.Copy(_textureComposite[tex]!, ofs, colData, 0, _textureComposite[tex]!.Length - ofs);
-        if (ofs != 0)
-        {
-            // hack to wrap around sprite data to not go out of bounds in DrawColumn
-            Array.Copy(_textureComposite[tex]!, 0, colData, _textureComposite[tex]!.Length - ofs, ofs);
-        }
-        return colData;
-    }
-
+    
     // Initializes the texture list
     //  with the textures from the world map.
     private void InitTextures()
@@ -3468,7 +3418,13 @@ public class RenderEngine
         {
             // Re-map color indices from wall texture column
             //  using a lighting/special effects LUT.
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[(frac >> Constants.FracBits) & 127]];
+            var sourceIdx = (frac >> Constants.FracBits) & 127;
+            if (sourceIdx == _dcSource.Length)
+            {
+                sourceIdx--; // simulate patches repeating the last pixel byte
+            }
+
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx]];
 
             dest += Constants.ScreenWidth;
             frac += fracStep;
@@ -3508,8 +3464,14 @@ public class RenderEngine
 
         do
         {
+            var sourceIdx = (frac >> Constants.FracBits) & 127;
+            if (sourceIdx == _dcSource.Length)
+            {
+                sourceIdx--; // simulate patches repeating the last pixel byte
+            }
+
             DoomGame.Instance.Video.Screens[0][dest2] =
-                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[(frac >> Constants.FracBits) & 127]];
+                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx]];
 
             dest += Constants.ScreenWidth;
             dest2 += Constants.ScreenWidth;
@@ -3689,7 +3651,13 @@ public class RenderEngine
             //  used with PLAY sprites.
             // Thus the "green" ramp of the player 0 sprite
             //  is mapped to gray, red, black/indigo. 
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcTranslation[_dcSource[frac >> Constants.FracBits]]];
+            var sourceIdx = frac >> Constants.FracBits;
+            if (sourceIdx == _dcSource.Length)
+            {
+                sourceIdx--; // simulate patches repeating the last pixel byte
+            }
+
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcTranslation[_dcSource[sourceIdx]]];
             dest += Constants.ScreenWidth;
 
             frac += fracStep;
@@ -3749,11 +3717,6 @@ public class RenderEngine
         //    return;
         //}
 
-        if (_dsSource is null)
-        {
-            return;
-        }
-
         var xFrac = _dsXFrac;
         var yFrac = _dsYFrac;
 
@@ -3766,7 +3729,11 @@ public class RenderEngine
         {
             // Current texture index in u,v.
             var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
-
+            if (spot == _dsSource!.Length)
+            {
+                spot--; // simulate patches repeating the last pixel byte
+            }
+            
             // Lookup pixel from flat texture tile,
             //  re-index using light/colormap.
             DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
@@ -3788,11 +3755,6 @@ public class RenderEngine
         //    return;
         //}
 
-        if (_dsSource is null)
-        {
-            return;
-        }
-
         var xFrac = _dsXFrac;
         var yFrac = _dsYFrac;
 
@@ -3805,6 +3767,11 @@ public class RenderEngine
         do
         {
             var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
+            if (spot == _dsSource!.Length)
+            {
+                spot--; // simulate patches repeating the last pixel byte
+            }
+
             // Lowres/blocky mode does it twice,
             //  while scale is adjusted appropriately.
             DoomGame.Instance.Video.Screens[0][dest++] = _dsColorMap[_dsSource[spot]];
@@ -4107,10 +4074,7 @@ public class RenderEngine
         _lastOpeningIdx = 0;
 
         // texture calculation
-        for (var i = 0; i < _cachedHeight.Length; i++)
-        {
-            _cachedHeight[i] = Fixed.Zero;
-        }
+        Array.Clear(_cachedHeight);
 
         // left to right mapping
         var angle = (_viewAngle - Angle90) >> AngleToFineShift;
@@ -4372,7 +4336,8 @@ public class RenderEngine
                 _dcYh = yh;
                 _dcTextureMid = _rwMidTextureMid;
 
-                _dcSource = GetColumnBytes(_midTexture, textureColumn);
+                var col = GetColumn(_midTexture, textureColumn);
+                _dcSource = col.Pixels;
                 _colFunc();
                 _ceilingClip[_rwX] = (short)ViewHeight;
                 _floorClip[_rwX] = -1;
@@ -4398,7 +4363,8 @@ public class RenderEngine
                         _dcYh = mid;
                         _dcTextureMid = _rwTopTextureMid;
 
-                        _dcSource = GetColumnBytes(_topTexture, textureColumn);
+                        var col = GetColumn(_topTexture, textureColumn);
+                        _dcSource = col.Pixels;
                         _colFunc();
                         _ceilingClip[_rwX] = (short)mid;
                     }
@@ -4434,7 +4400,8 @@ public class RenderEngine
                         _dcYh = yh;
                         _dcTextureMid = _rwBottomTextureMid;
 
-                        _dcSource = GetColumnBytes(_bottomTexture, textureColumn);
+                        var col = GetColumn(_bottomTexture, textureColumn);
+                        _dcSource = col.Pixels;
                         _colFunc();
                         _floorClip[_rwX] = (short)mid;
                     }
@@ -5524,7 +5491,7 @@ public class RenderEngine
         for (vpIdx = 0; vpIdx < _lastVisPlaneIdx; vpIdx++)
         {
             check = _visPlanes[vpIdx];
-            if (height == check.Height && picNum == check.PicNum && lightLevel == check.LightLevel)
+            if (height == check!.Height && picNum == check.PicNum && lightLevel == check.LightLevel)
             {
                 break;
             }
@@ -5661,13 +5628,14 @@ public class RenderEngine
         //    return;
         //}
 
-        foreach (var pl in _visPlanes.Where(x => x != null)) 
-        { 
-            if (pl!.MinX > pl.MaxX)
+        for (var i = 0; i < _lastVisPlaneIdx; i++)
+        {
+            var pl = _visPlanes[i];
+            if (pl is null || pl.MinX > pl.MaxX)
             {
                 continue;
             }
-            
+
             // sky flat
             if (pl.PicNum == Sky.FlatNum)
             {
@@ -5690,7 +5658,9 @@ public class RenderEngine
                     {
                         var angle = (_viewAngle + _xToViewAngle[x]) >> Sky.AngleToSkyShift;
                         _dcX = x;
-                        _dcSource = GetColumnBytes(Sky.Texture, (int)angle);
+                        
+                        var col = GetColumn(Sky.Texture, (int)angle);
+                        _dcSource = col.Pixels;
                         _colFunc();
                     }
                 }
