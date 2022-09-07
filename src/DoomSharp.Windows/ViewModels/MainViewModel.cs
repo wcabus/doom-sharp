@@ -9,7 +9,6 @@ using DoomSharp.Core;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
 using DoomSharp.Windows.Annotations;
-using Microsoft.VisualBasic;
 using Constants = DoomSharp.Core.Constants;
 
 namespace DoomSharp.Windows.ViewModels;
