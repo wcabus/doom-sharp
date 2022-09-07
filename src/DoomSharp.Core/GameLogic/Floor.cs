@@ -4,7 +4,7 @@ namespace DoomSharp.Core.GameLogic;
 
 public class Floor : Thinker
 {
-    public const int FloorSpeed = Constants.FracUnit;
+    public static readonly Fixed FloorSpeed = Fixed.Unit;
 
     public FloorType Type { get; set; }
     public bool Crush { get; set; }

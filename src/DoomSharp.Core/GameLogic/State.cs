@@ -90,7 +90,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         // bob the weapon based on movement speed
         var angle = (128 * game.LevelTime) & RenderEngine.FineMask;
-        psp.SX = Constants.FracUnit + (player.Bob * RenderEngine.FineCosine[angle]);
+        psp.SX = Fixed.Unit + (player.Bob * RenderEngine.FineCosine[angle]);
         angle &= RenderEngine.FineAngles / 2 - 1;
         psp.SY = WeaponInfo.WeaponTop + (player.Bob * RenderEngine.FineSine[angle]);
     }
@@ -262,7 +262,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
                 player.MapObject, 
                 angle, 
                 Constants.MissileRange, 
-                game.BulletSlope + ((DoomRandom.P_Random() - DoomRandom.P_Random()) << 5), 
+                game.BulletSlope + new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 5), 
                 damage);
         }
     }
@@ -329,8 +329,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
         
         // use meleerange + 1 so the puff doesn't skip the flash
-        var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, Constants.MeleeRange + 1);
-        DoomGame.Instance.Game.P_LineAttack(player.MapObject, angle, Constants.MeleeRange + 1, slope, damage);
+        var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, new Fixed(Constants.MeleeRange.Value + 1));
+        DoomGame.Instance.Game.P_LineAttack(player.MapObject, angle, new Fixed(Constants.MeleeRange.Value + 1), slope, damage);
 
         // turn to face target
         var lineTarget = DoomGame.Instance.Game.LineTarget;
@@ -405,7 +405,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             var an = (uint)(mo.Angle - RenderEngine.Angle90 / 2 + RenderEngine.Angle90 / 40 * i);
 
             // mo->target is the originator (player) of the missile
-            game.P_AimLineAttack(mo.Target!, an, 16 * 64 * Constants.FracUnit);
+            game.P_AimLineAttack(mo.Target!, an, Fixed.FromInt(16 * 64));
 
             if (game.LineTarget == null)
             {

@@ -2,12 +2,14 @@
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
-using System.Numerics;
 
 namespace DoomSharp.Core.GameLogic;
 
 public class Player
 {
+    // player radius for movement checking
+    public static readonly Fixed PlayerRadius = Fixed.FromInt(16);
+
     public Player()
     {
         for (var i = 0; i < PlayerSprites.Length; i++)
@@ -303,17 +305,17 @@ public class Player
         DoomGame.Instance.Game.P_MovePlayerSprites(this);
 
         // fall to the ground
-        if (ViewHeight > 6 * Constants.FracUnit)
+        if (ViewHeight > Fixed.FromInt(6))
         {
-            ViewHeight -= Constants.FracUnit;
+            ViewHeight -= Fixed.Unit;
         }
 
-        if (ViewHeight < 6 * Constants.FracUnit)
+        if (ViewHeight < Fixed.FromInt(6))
         {
-            ViewHeight = 6 * Constants.FracUnit;
+            ViewHeight = Fixed.FromInt(6);
         }
 
-        DeltaViewHeight = 0;
+        DeltaViewHeight = Fixed.Zero;
         OnGround = (MapObject!.Z <= MapObject.FloorZ);
         CalcHeight();
 
@@ -354,7 +356,7 @@ public class Player
         }
     }
 
-    private const int MaxBob = 0x100000;
+    private static readonly Fixed MaxBob = new(0x100000);
 
     /// <summary>
     /// Calculate the walking / running height adjustment
@@ -380,9 +382,9 @@ public class Player
         {
             ViewZ = MapObject.Z + Constants.ViewHeight;
 
-            if (ViewZ > MapObject.CeilingZ - 4 * Constants.FracUnit)
+            if (ViewZ > MapObject.CeilingZ - Fixed.FromInt(4))
             {
-                ViewZ = MapObject.CeilingZ - 4 * Constants.FracUnit;
+                ViewZ = MapObject.CeilingZ - Fixed.FromInt(4);
             }
 
             ViewZ = MapObject.Z + ViewHeight;
@@ -390,7 +392,7 @@ public class Player
         }
 
         var angle = (RenderEngine.FineAngles / 20 * DoomGame.Instance.Game.LevelTime) & RenderEngine.FineMask;
-        var bob = (Fixed)((int)Bob / 2) * RenderEngine.FineSine[angle];
+        var bob = Bob / 2 * RenderEngine.FineSine[angle];
 
         // move viewheight
         if (PlayerState == PlayerState.Alive)
@@ -400,33 +402,33 @@ public class Player
             if (ViewHeight > Constants.ViewHeight)
             {
                 ViewHeight = Constants.ViewHeight;
-                DeltaViewHeight = 0;
+                DeltaViewHeight = Fixed.Zero;
             }
 
             if (ViewHeight < Constants.ViewHeight / 2)
             {
                 ViewHeight = Constants.ViewHeight / 2;
-                if (DeltaViewHeight <= 0)
+                if (DeltaViewHeight <= Fixed.Zero)
                 {
-                    DeltaViewHeight = 1;
+                    DeltaViewHeight = new Fixed(1);
                 }
             }
 
-            if (DeltaViewHeight != 0)
+            if (DeltaViewHeight != Fixed.Zero)
             {
-                DeltaViewHeight += Constants.FracUnit / 4;
-                if (DeltaViewHeight == 0)
+                DeltaViewHeight += new Fixed(Constants.FracUnit / 4);
+                if (DeltaViewHeight == Fixed.Zero)
                 {
-                    DeltaViewHeight = 1;
+                    DeltaViewHeight = new Fixed(1);
                 }
             }
         }
 
         ViewZ = MapObject.Z + ViewHeight + bob;
 
-        if (ViewZ > MapObject.CeilingZ - 4 * Constants.FracUnit)
+        if (ViewZ > MapObject.CeilingZ - Fixed.FromInt(4))
         {
-            ViewZ = MapObject.CeilingZ - 4 * Constants.FracUnit;
+            ViewZ = MapObject.CeilingZ - Fixed.FromInt(4);
         }
     }
 
@@ -440,12 +442,12 @@ public class Player
 
         if (Command.ForwardMove != 0 && OnGround)
         {
-            Thrust(MapObject.Angle, Command.ForwardMove * 2048);
+            Thrust(MapObject.Angle, new Fixed(Command.ForwardMove * 2048));
         }
 
         if (Command.SideMove != 0 && OnGround)
         {
-            Thrust(MapObject.Angle - RenderEngine.Angle90, Command.SideMove * 2048);
+            Thrust(MapObject.Angle - RenderEngine.Angle90, new Fixed(Command.SideMove * 2048));
         }
 
         if ((Command.ForwardMove != 0 || Command.SideMove != 0) && 
@@ -462,8 +464,8 @@ public class Player
     {
         angle >>= RenderEngine.AngleToFineShift;
 
-        MapObject!.MomX += (move * RenderEngine.FineCosine[angle]);
-        MapObject!.MomY += (move * RenderEngine.FineSine[angle]);
+        MapObject!.MomX = MapObject.MomX + (move * RenderEngine.FineCosine[angle]);
+        MapObject.MomY = MapObject.MomY + (move * RenderEngine.FineSine[angle]);
     }
 
     /// <summary>

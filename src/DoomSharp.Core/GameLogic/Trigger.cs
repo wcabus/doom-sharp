@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using DoomSharp.Core.Graphics;
+﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Data;
 
 namespace DoomSharp.Core.GameLogic;
@@ -574,7 +573,7 @@ public static class Trigger
             {
                 case DoorType.BlazeClose:
                     door.TopHeight = game.P_FindLowestCeilingSurrounding(sec);
-                    door.TopHeight -= 4 * Constants.FracUnit;
+                    door.TopHeight -= Fixed.FromInt(4);
                     door.Direction = -1;
                     door.Speed = Door.DefaultSpeed * 4;
                     //S_StartSound((mobj_t*)&door->sector->soundorg,
@@ -583,7 +582,7 @@ public static class Trigger
 
                 case DoorType.Close:
                     door.TopHeight = game.P_FindLowestCeilingSurrounding(sec);
-                    door.TopHeight -= 4 * Constants.FracUnit;
+                    door.TopHeight -= Fixed.FromInt(4);
                     door.Direction = -1;
                     //S_StartSound((mobj_t*)&door->sector->soundorg,
                     //    sfx_dorcls);
@@ -600,7 +599,7 @@ public static class Trigger
                 case DoorType.BlazeOpen:
                     door.Direction = 1;
                     door.TopHeight = game.P_FindLowestCeilingSurrounding(sec);
-                    door.TopHeight -= 4 * Constants.FracUnit;
+                    door.TopHeight -= Fixed.FromInt(4);
                     door.Speed = Door.DefaultSpeed * 4;
                     if (door.TopHeight != sec.CeilingHeight)
                     {
@@ -613,7 +612,7 @@ public static class Trigger
                 case DoorType.Open:
                     door.Direction = 1;
                     door.TopHeight = game.P_FindLowestCeilingSurrounding(sec);
-                    door.TopHeight -= 4 * Constants.FracUnit;
+                    door.TopHeight -= Fixed.FromInt(4);
                     if (door.TopHeight != sec.CeilingHeight)
                     {
                         //S_StartSound((mobj_t*)&door->sector->soundorg,
@@ -863,7 +862,7 @@ public static class Trigger
                     floor.FloorDestHeight = game.P_FindHighestFloorSurrounding(sec);
                     if (floor.FloorDestHeight != sec.FloorHeight)
                     {
-                        floor.FloorDestHeight += 8 * Constants.FracUnit;
+                        floor.FloorDestHeight += Fixed.FromInt(8);
                     }
                     break;
 
@@ -877,7 +876,7 @@ public static class Trigger
                     {
                         floor.FloorDestHeight = sec.CeilingHeight;
                     }
-                    floor.FloorDestHeight -= (8 * Constants.FracUnit);
+                    floor.FloorDestHeight -= (Fixed.FromInt(8));
                     break;
 
                 case FloorType.RaiseFloor:
@@ -909,28 +908,28 @@ public static class Trigger
                     floor.Direction = 1;
                     floor.Sector = sec;
                     floor.Speed = Floor.FloorSpeed;
-                    floor.FloorDestHeight = floor.Sector.FloorHeight + (24 * Constants.FracUnit);
+                    floor.FloorDestHeight = floor.Sector.FloorHeight + (Fixed.FromInt(24));
                     break;
 
                 case FloorType.RaiseFloor512:
                     floor.Direction = 1;
                     floor.Sector = sec;
                     floor.Speed = Floor.FloorSpeed;
-                    floor.FloorDestHeight = floor.Sector.FloorHeight + (512 * Constants.FracUnit);
+                    floor.FloorDestHeight = floor.Sector.FloorHeight + (Fixed.FromInt(512));
                     break;
 
                 case FloorType.RaiseFloor24AndChange:
                     floor.Direction = 1;
                     floor.Sector = sec;
                     floor.Speed = Floor.FloorSpeed;
-                    floor.FloorDestHeight = floor.Sector.FloorHeight + (24 * Constants.FracUnit);
+                    floor.FloorDestHeight = floor.Sector.FloorHeight + (Fixed.FromInt(24));
                     sec.FloorPic = line.FrontSector!.FloorPic;
                     sec.Special = line.FrontSector.Special;
                     break;
 
                 case FloorType.RaiseToTexture:
                 {
-                    var minSize = int.MaxValue;
+                    var minSize = Fixed.MaxValue;
 
                     floor.Direction = 1;
                     floor.Sector = sec;
@@ -1012,8 +1011,8 @@ public static class Trigger
         var secnum = -1;
         var game = DoomGame.Instance.Game;
 
-        var speed = 0;
-        var stairSize = 0;
+        var speed = Fixed.Zero;
+        var stairSize = Fixed.Zero;
         var ok = false;
 
         while ((secnum = game.P_FindSectorFromLineTag(line, secnum)) >= 0)
@@ -1039,12 +1038,12 @@ public static class Trigger
             {
                 case StaircaseType.Build8:
                     speed = Floor.FloorSpeed / 4;
-                    stairSize = 8 * Constants.FracUnit;
+                    stairSize = Fixed.FromInt(8);
                     break;
 
                 case StaircaseType.Turbo16:
                     speed = Floor.FloorSpeed * 4;
-                    stairSize = 16 * Constants.FracUnit;
+                    stairSize = Fixed.FromInt(16);
                     break;
             }
 
@@ -1310,7 +1309,7 @@ public static class Trigger
                 case CeilingType.FastCrushAndRaise:
                     ceiling.Crush = true;
                     ceiling.TopHeight = sec.CeilingHeight;
-                    ceiling.BottomHeight = sec.FloorHeight + (8 * Constants.FracUnit);
+                    ceiling.BottomHeight = sec.FloorHeight + (Fixed.FromInt(8));
                     ceiling.Direction = -1;
                     ceiling.Speed = Ceiling.DefaultSpeed * 2;
                     break;
@@ -1326,7 +1325,7 @@ public static class Trigger
                     ceiling.BottomHeight = sec.FloorHeight;
                     if (type != CeilingType.LowerToFloor)
                     {
-                        ceiling.BottomHeight += 8 * Constants.FracUnit;
+                        ceiling.BottomHeight += Fixed.FromInt(8);
                     }
 
                     ceiling.Direction = -1;
@@ -1475,7 +1474,7 @@ public static class Trigger
                 case PlatformType.RaiseAndChange:
                     plat.Speed = Platform.DefaultSpeed / 2;
                     sec.FloorPic = game.Sides[line.SideNum[0]].Sector.FloorPic;
-                    plat.High = sec.FloorHeight + amount * Constants.FracUnit;
+                    plat.High = sec.FloorHeight + Fixed.FromInt(amount);
                     plat.Wait = 0;
                     plat.Status = PlatformState.Up;
 
@@ -1601,8 +1600,8 @@ public static class Trigger
                 // S_StartSound(fog, sfx_telept);
                 var an = m.Angle >> RenderEngine.AngleToFineShift;
 
-                fog = game.P_SpawnMapObject(m.X + 20 * (int)RenderEngine.FineCosine[an],
-                    m.Y + 20 * (int)RenderEngine.FineSine[an],
+                fog = game.P_SpawnMapObject(m.X + 20 * RenderEngine.FineCosine[an],
+                    m.Y + 20 * RenderEngine.FineSine[an],
                     thing.Z, MapObjectType.MT_TFOG);
 
                 // emit sound, where?
@@ -1615,7 +1614,7 @@ public static class Trigger
                 }
 
                 thing.Angle = m.Angle;
-                thing.MomX = thing.MomY = thing.MomZ = 0;
+                thing.MomX = thing.MomY = thing.MomZ = Fixed.Zero;
                 return 1;
             }
         }

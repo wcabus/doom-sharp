@@ -4,7 +4,6 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -57,9 +56,9 @@ public class GameController
 
     public const int TurboThreshold = 0x32;
 
-    private static readonly Fixed[] ForwardMove = { 0x19, 0x32 };
-    private static readonly Fixed[] SideMove = { 0x18, 0x28 };
-    private static readonly Fixed[] AngleTurn = { 640, 1280, 320 };
+    private static readonly int[] ForwardMove = { 0x19, 0x32 };
+    private static readonly int[] SideMove = { 0x18, 0x28 };
+    private static readonly int[] AngleTurn = { 640, 1280, 320 };
 
     public const int SlowTurnTics = 6;
     public const int NumKeys = 256;
@@ -167,7 +166,7 @@ public class GameController
 
     // Map tracking
 
-    private Fixed[] _tmBoundingBox = { 0, 0, 0, 0 };
+    private Fixed[] _tmBoundingBox = { Fixed.Zero, Fixed.Zero, Fixed.Zero, Fixed.Zero };
     private MapObject? _tmThing;
     private MapObjectFlag _tmFlags;
     private Fixed _tmX;
@@ -341,8 +340,8 @@ public class GameController
         {
             if (PlayerInGame[i])
             {
-                var cmd = DoomGame.Instance.NetCommands[i][buf];
-                
+                var cmd = DoomGame.Instance.NetCommands[i][buf] ?? new();
+
                 if (DemoPlayback)
                 {
                     ReadDemoTicCommand(cmd);
@@ -374,7 +373,7 @@ public class GameController
 
                     if (Players[i].MapObject != null)
                     {
-                        _consistency[i][buf] = (short)Players[i].MapObject!.X;
+                        _consistency[i][buf] = (short)Players[i].MapObject!.X.Value;
                     }
                     else
                     {
@@ -509,7 +508,7 @@ public class GameController
             // first spawn of level, before corpses
             for (var i = 0; i < playernum; i++)
             {
-                if (Players[i].MapObject!.X == (mthing.X << Constants.FracBits) && Players[i].MapObject!.Y == (mthing.Y << Constants.FracBits))
+                if (Players[i].MapObject!.X == Fixed.FromInt(mthing.X) && Players[i].MapObject!.Y == Fixed.FromInt(mthing.Y))
                 {
                     return false;
                 } 
@@ -517,8 +516,8 @@ public class GameController
             return true;
         }
 
-        x = mthing.X << Constants.FracBits;
-        y = mthing.Y << Constants.FracBits;
+        x = Fixed.FromInt(mthing.X);
+        y = Fixed.FromInt(mthing.Y);
 
         if (!P_CheckPosition(Players[playernum].MapObject!, x, y))
         {
@@ -530,16 +529,16 @@ public class GameController
         {
             P_RemoveMapObject(_bodyQueue[_bodyQueueSlot % BodyQueueSize]);
         }
-        _bodyQueue[_bodyQueueSlot % BodyQueueSize] = Players[playernum].MapObject;
+        _bodyQueue[_bodyQueueSlot % BodyQueueSize] = Players[playernum].MapObject!;
         _bodyQueueSlot++;
 
         // spawn a teleport fog 
         ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
         an = (uint)((RenderEngine.Angle45 * (mthing.Angle / 45)) >> RenderEngine.AngleToFineShift);
 
-        P_SpawnMapObject(x + 20 * RenderEngine.FineCosine[an], y + 20 * RenderEngine.FineSine[an], ss.Sector.FloorHeight, MapObjectType.MT_TFOG);
+        P_SpawnMapObject(x + 20 * RenderEngine.FineCosine[an], y + 20 * RenderEngine.FineSine[an], ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
 
-        if (Players[ConsolePlayer].ViewZ != 1)
+        if (Players[ConsolePlayer].ViewZ != new Fixed(1))
         {
             // S_StartSound(mo, sfx_telept);   // don't start sound on first frame 
         }
@@ -1058,7 +1057,7 @@ public class GameController
         if (!NetGame
             && DoomGame.Instance.MenuActive
             && !DemoPlayback
-            && Players[ConsolePlayer].ViewZ != 1)
+            && Players[ConsolePlayer].ViewZ != new Fixed(1))
         {
             return;
         }
@@ -1234,8 +1233,8 @@ public class GameController
             p = PlayerReborn(mthing.Type - 1);
         }
 
-        x = mthing.X << Constants.FracBits;
-        y = mthing.Y << Constants.FracBits;
+        x = Fixed.FromInt(mthing.X);
+        y = Fixed.FromInt(mthing.Y);
         z = Constants.OnFloorZ;
         var mobj = P_SpawnMapObject(x, y, z, MapObjectType.MT_PLAYER);
 
@@ -1345,8 +1344,8 @@ public class GameController
             if (state.Misc1 != 0)
             {
                 // coordinate set
-                psp.SX = state.Misc1 << Constants.FracBits;
-                psp.SY = state.Misc2 << Constants.FracBits;
+                psp.SX = Fixed.FromInt(state.Misc1);
+                psp.SY = Fixed.FromInt(state.Misc2);
             }
 
             // Call action routine.
@@ -1649,8 +1648,8 @@ public class GameController
             }
             else
             {
-                var blockx = (thing.X - _blockMapOriginX) >> Constants.MapBlockShift;
-                var blocky = (thing.Y - _blockMapOriginY) >> Constants.MapBlockShift;
+                var blockx = (thing.X - _blockMapOriginX).Value >> Constants.MapBlockShift;
+                var blocky = (thing.Y - _blockMapOriginY).Value >> Constants.MapBlockShift;
 
                 if (blockx >= 0 && blockx < _blockMapWidth && blocky >= 0 && blocky < _blockMapHeight)
                 {
@@ -1686,8 +1685,8 @@ public class GameController
         if ((thing.Flags & MapObjectFlag.MF_NOBLOCKMAP) == 0)
         {
             // inert things don't need to be in blockmap		
-            var blockx = (thing.X - _blockMapOriginX) >> Constants.MapBlockShift;
-            var blocky = (thing.Y - _blockMapOriginY) >> Constants.MapBlockShift;
+            var blockx = (thing.X - _blockMapOriginX).Value >> Constants.MapBlockShift;
+            var blocky = (thing.Y - _blockMapOriginY).Value >> Constants.MapBlockShift;
 
             if (blockx >= 0
                 && blockx < _blockMapWidth
@@ -1715,7 +1714,7 @@ public class GameController
 
     private void P_ExplodeMissile(MapObject mo)
     {
-        mo.MomX = mo.MomY = mo.MomZ = 0;
+        mo.MomX = mo.MomY = mo.MomZ = Fixed.Zero;
         mo.SetState(MapObjectInfo.GetByType(mo.Type).DeathState);
 
         mo.Tics -= DoomRandom.P_Random() & 3;
@@ -1749,7 +1748,7 @@ public class GameController
         if (lineDef.SideNum[1] == -1)
         {
             // single sided line
-            _openRange = 0;
+            _openRange = Fixed.Zero;
             return;
         }
 
@@ -1868,8 +1867,8 @@ public class GameController
 
         var blockDist = thing.Radius + _tmThing!.Radius;
 
-        if (Math.Abs(thing.X - _tmX) >= blockDist ||
-            Math.Abs(thing.Y - _tmY) >= blockDist)
+        if (Fixed.Abs(thing.X - _tmX) >= blockDist ||
+            Fixed.Abs(thing.Y - _tmY) >= blockDist)
         {
             // didn't hit it
             return true;
@@ -1888,7 +1887,7 @@ public class GameController
             MapObject.DamageMapObject(thing, _tmThing, _tmThing, damage);
 
             _tmThing.Flags &= ~MapObjectFlag.MF_SKULLFLY;
-            _tmThing.MomX = _tmThing.MomY = _tmThing.MomZ = 0;
+            _tmThing.MomX = _tmThing.MomY = _tmThing.MomZ = Fixed.Zero;
 
             _tmThing.SetState(_tmThing.Info.SpawnState);
             
@@ -2078,10 +2077,10 @@ public class GameController
         // because mobj_ts are grouped into mapblocks
         // based on their origin point, and can overlap
         // into adjacent blocks by up to MAXRADIUS units.
-        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
-        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
-        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
-        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
+        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius).Value >> Constants.MapBlockShift;
 
         for (var bx = xl; bx <= xh; bx++)
         {
@@ -2095,10 +2094,10 @@ public class GameController
         }
 
         // check lines
-        xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX) >> Constants.MapBlockShift;
-        xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX) >> Constants.MapBlockShift;
-        yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY) >> Constants.MapBlockShift;
-        yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY) >> Constants.MapBlockShift;
+        xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX).Value >> Constants.MapBlockShift;
+        xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX).Value >> Constants.MapBlockShift;
+        yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY).Value >> Constants.MapBlockShift;
+        yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY).Value >> Constants.MapBlockShift;
 
         for (var bx = xl; bx <= xh; bx++)
         {
@@ -2140,13 +2139,13 @@ public class GameController
                 return false; // mapobject must lower itself to fit
             }
 
-            if ((thing.Flags & MapObjectFlag.MF_TELEPORT) == 0 && _tmFloorZ - thing.Z > 24 * Constants.FracUnit)
+            if ((thing.Flags & MapObjectFlag.MF_TELEPORT) == 0 && _tmFloorZ - thing.Z > Fixed.FromInt(24))
             {
                 return false; // too big a step up
             }
 
-            if ((thing.Flags & (MapObjectFlag.MF_DROPOFF | MapObjectFlag.MF_FLOAT)) == 0 && 
-                _tmFloorZ - _tmDropOffZ > 24 * Constants.FracUnit)
+            if ((thing.Flags & (MapObjectFlag.MF_DROPOFF | MapObjectFlag.MF_FLOAT)) == 0 &&
+                _tmFloorZ - _tmDropOffZ > Fixed.FromInt(24))
             {
                 return false; // don't stand over a dropoff
             }
@@ -2248,18 +2247,18 @@ public class GameController
             return true;
         }
 
-        Fixed dx = Math.Abs(thing.X - _bombSpot!.X);
-        Fixed dy = Math.Abs(thing.Y - _bombSpot.Y);
+        var dx = Fixed.Abs(thing.X - _bombSpot!.X);
+        var dy = Fixed.Abs(thing.Y - _bombSpot.Y);
 
         var dist = dx > dy ? dx : dy;
         dist = (dist - thing.Radius) >> Constants.FracBits;
 
-        if (dist < 0)
+        if (dist < Fixed.Zero)
         {
-            dist = 0;
+            dist = Fixed.Zero;
         }
 
-        if (dist >= _bombDamage)
+        if (dist.Value >= _bombDamage)
         {
             return true; // out of range
         }
@@ -2267,7 +2266,7 @@ public class GameController
         if (P_CheckSight(thing, _bombSpot))
         {
             // must be in direct path
-            MapObject.DamageMapObject(thing, _bombSpot, _bombSource, _bombDamage - dist);
+            MapObject.DamageMapObject(thing, _bombSpot, _bombSource, _bombDamage - dist.Value);
         }
 
         return true;
@@ -2278,11 +2277,11 @@ public class GameController
     /// </summary>
     public void P_RadiusAttack(MapObject spot, MapObject source, int damage)
     {
-        Fixed dist = (damage + Constants.MaxRadius) << Constants.FracBits;
-        var yh = (spot.Y + dist - _blockMapOriginY) >> Constants.MapBlockShift;
-        var yl = (spot.Y - dist - _blockMapOriginY) >> Constants.MapBlockShift;
-        var xh = (spot.X + dist - _blockMapOriginX) >> Constants.MapBlockShift;
-        var xl = (spot.X - dist - _blockMapOriginX) >> Constants.MapBlockShift;
+        var dist = Fixed.FromInt(damage + Constants.MaxRadius.Value);
+        var yh = (spot.Y + dist - _blockMapOriginY).Value >> Constants.MapBlockShift;
+        var yl = (spot.Y - dist - _blockMapOriginY).Value >> Constants.MapBlockShift;
+        var xh = (spot.X + dist - _blockMapOriginX).Value >> Constants.MapBlockShift;
+        var xl = (spot.X - dist - _blockMapOriginX).Value >> Constants.MapBlockShift;
         _bombSpot = spot;
         _bombSource = source;
         _bombDamage = damage;
@@ -2327,8 +2326,8 @@ public class GameController
             thing.SetState(StateNum.S_GIBS);
 
             thing.Flags &= ~MapObjectFlag.MF_SOLID;
-            thing.Height = 0;
-            thing.Radius = 0;
+            thing.Height = Fixed.Zero;
+            thing.Radius = Fixed.Zero;
 
             // keep checking
             return true;
@@ -2358,8 +2357,8 @@ public class GameController
             // spray blood in a random direction
             var mo = P_SpawnMapObject(thing.X, thing.Y, thing.Z + thing.Height / 2, MapObjectType.MT_BLOOD);
 
-            mo.MomX = (DoomRandom.P_Random() - DoomRandom.P_Random()) << 12;
-            mo.MomY = (DoomRandom.P_Random() - DoomRandom.P_Random()) << 12;
+            mo.MomX = new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 12);
+            mo.MomY = new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 12);
         }
 
         // keep checking (crush other things)	
@@ -2415,10 +2414,11 @@ public class GameController
         var dl = new DividerLine();
 
         // avoid precision problems with two routines
-        if (_trace.Dx > Constants.FracUnit * 16
-            || _trace.Dy > Constants.FracUnit * 16
-            || _trace.Dx < -Constants.FracUnit * 16
-            || _trace.Dy < -Constants.FracUnit * 16)
+        var fixed16 = Fixed.FromInt(16);
+        if (_trace.Dx > fixed16
+            || _trace.Dy > fixed16
+            || _trace.Dx < -fixed16
+            || _trace.Dy < -fixed16)
         {
             s1 = P_PointOnDivlineSide(line.V1.X, line.V1.Y, _trace);
             s2 = P_PointOnDivlineSide(line.V2.X, line.V2.Y, _trace);
@@ -2438,13 +2438,13 @@ public class GameController
         P_MakeDivline(line, dl);
         var frac = P_InterceptVector(_trace, dl);
 
-        if (frac < 0)
+        if (frac < Fixed.Zero)
         {
             return true;    // behind source
         }
 
         // try to early out the check
-        if (_earlyOut && frac < Constants.FracUnit && line.BackSector == null)
+        if (_earlyOut && frac < Fixed.Unit && line.BackSector == null)
         {
             return false;   // stop checking
         }
@@ -2466,7 +2466,7 @@ public class GameController
         Fixed x2;
         Fixed y2;
 
-        var tracePositive = (_trace.Dx ^ _trace.Dy) > 0;
+        var tracePositive = (_trace.Dx.Value ^ _trace.Dy.Value) > 0;
 
         // check a corner to corner crossection for hit
         if (tracePositive)
@@ -2503,7 +2503,7 @@ public class GameController
         };
 
         var frac = P_InterceptVector(_trace, dl);
-        if (frac < 0)
+        if (frac < Fixed.Zero)
         {
             return true;        // behind source
         }
@@ -2529,7 +2529,7 @@ public class GameController
         var count = _lastInterceptIdx;
         while (count-- != 0)
         {
-            Fixed dist = int.MaxValue;
+            var dist = Fixed.MaxValue;
             for (var i = 0; i < _lastInterceptIdx; i++)
             {
                 var scan = _intercepts[i];
@@ -2550,7 +2550,7 @@ public class GameController
                 return false;   // don't bother going farther
             }
 
-            intercept!.Frac = int.MaxValue;
+            intercept!.Frac = Fixed.MaxValue;
         }
 
         return true;		// everything was traversed
@@ -2579,14 +2579,14 @@ public class GameController
         DoomGame.Instance.Renderer.ValidCount++;
         _lastInterceptIdx = 0;
 
-        if (((x1 - _blockMapOriginX) & (Constants.MapBlockSize - 1)) == 0)
+        if (((x1 - _blockMapOriginX).Value & (Constants.MapBlockSize.Value - 1)) == 0)
         {
-            x1 += Constants.FracUnit; // don't side exactly on a line
+            x1 += Fixed.Unit; // don't side exactly on a line
         }
 
-        if (((y1 - _blockMapOriginY) & (Constants.MapBlockSize - 1)) == 0)
+        if (((y1 - _blockMapOriginY).Value & (Constants.MapBlockSize.Value - 1)) == 0)
         {
-            y1 += Constants.FracUnit; // don't side exactly on a line
+            y1 += Fixed.Unit; // don't side exactly on a line
         }
 
         _trace.X = x1;
@@ -2596,31 +2596,31 @@ public class GameController
 
         x1 -= _blockMapOriginX;
         y1 -= _blockMapOriginY;
-        Fixed xt1 = x1 >> Constants.MapBlockShift;
-        Fixed yt1 = y1 >> Constants.MapBlockShift;
+        var xt1 = x1.Value >> Constants.MapBlockShift;
+        var yt1 = y1.Value >> Constants.MapBlockShift;
 
         x2 -= _blockMapOriginX;
         y2 -= _blockMapOriginY;
-        Fixed xt2 = x2 >> Constants.MapBlockShift;
-        Fixed yt2 = y2 >> Constants.MapBlockShift;
+        var xt2 = x2.Value >> Constants.MapBlockShift;
+        var yt2 = y2.Value >> Constants.MapBlockShift;
 
         if (xt2 > xt1)
         {
             mapXStep = 1;
-            partial = Constants.FracUnit - ((x1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
-            yStep = (y2 - y1) / Math.Abs(x2 - x1);
+            partial = new Fixed(Constants.FracUnit - ((x1.Value >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1)));
+            yStep = (y2 - y1) / Fixed.Abs(x2 - x1);
         }
         else if (xt2 < xt1)
         {
             mapXStep = -1;
-            partial = (x1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1);
-            yStep = (y2 - y1) / Math.Abs(x2 - x1);
+            partial = new Fixed((x1.Value >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
+            yStep = (y2 - y1) / Fixed.Abs(x2 - x1);
         }
         else
         {
             mapXStep = 0;
-            partial = Constants.FracUnit;
-            yStep = 256 * Constants.FracUnit;
+            partial = Fixed.Unit;
+            yStep = Fixed.FromInt(256);
         }
 
         var yIntercept = (y1 >> Constants.MapBlockToFrac) + (partial * yStep);
@@ -2629,28 +2629,28 @@ public class GameController
         if (yt2 > yt1)
         {
             mapYStep = 1;
-            partial = Constants.FracUnit - ((y1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
-            xStep = (x2 - x1) / Math.Abs(y2 - y1);
+            partial = new Fixed(Constants.FracUnit - ((y1.Value >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1)));
+            xStep = (x2 - x1) / Fixed.Abs(y2 - y1);
         }
         else if (yt2 < yt1)
         {
             mapYStep = -1;
-            partial = (y1 >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1);
-            xStep = (x2 - x1) / Math.Abs(y2 - y1);
+            partial = new Fixed((y1.Value >> Constants.MapBlockToFrac) & (Constants.FracUnit - 1));
+            xStep = (x2 - x1) / Fixed.Abs(y2 - y1);
         }
         else
         {
             mapYStep = 0;
-            partial = Constants.FracUnit;
-            xStep = 256 * Constants.FracUnit;
+            partial = Fixed.Unit;
+            xStep = Fixed.FromInt(256);
         }
         var xIntercept = (x1 >> Constants.MapBlockToFrac) + (partial * xStep);
 
         // Step through map blocks.
         // Count is present to prevent a round off error
         // from skipping the break.
-        int mapX = xt1;
-        int mapY = yt1;
+        var mapX = xt1;
+        var mapY = yt1;
 
         for (count = 0; count < 64; count++)
         {
@@ -2675,12 +2675,12 @@ public class GameController
                 break;
             }
 
-            if ((yIntercept >> Constants.FracBits) == mapY)
+            if ((yIntercept.Value >> Constants.FracBits) == mapY)
             {
                 yIntercept += yStep;
                 mapX += mapXStep;
             }
-            else if ((xIntercept >> Constants.FracBits) == mapX)
+            else if ((xIntercept.Value >> Constants.FracBits) == mapX)
             {
                 xIntercept += xStep;
                 mapY += mapYStep;
@@ -2688,7 +2688,7 @@ public class GameController
         }
 
         // go through the sorted list
-        return P_TraverseIntercepts(traverserFunction, Constants.FracUnit);
+        return P_TraverseIntercepts(traverserFunction, Fixed.Unit);
     }
 
     //
@@ -2714,30 +2714,33 @@ public class GameController
     {
         if (line.SlopeType == SlopeType.Horizontal)
         {
-            _tmYMove = 0;
+            _tmYMove = Fixed.Zero;
             return;
         }
 
         if (line.SlopeType == SlopeType.Vertical)
         {
-            _tmXMove = 0;
+            _tmXMove = Fixed.Zero;
             return;
         }
 
         var side = P_PointOnLineSide(_slideMapObject!.X, _slideMapObject.Y, line);
-        var lineAngle = DoomGame.Instance.Renderer.PointToAngle2(0, 0, line.Dx, line.Dy);
+        var lineAngle = DoomGame.Instance.Renderer.PointToAngle2(Fixed.Zero, Fixed.Zero, line.Dx, line.Dy);
 
         if (side == 1)
         {
             lineAngle += RenderEngine.Angle180;
         }
 
-        var moveAngle = DoomGame.Instance.Renderer.PointToAngle2(0, 0, _tmXMove, _tmYMove);
+        var moveAngle = DoomGame.Instance.Renderer.PointToAngle2(Fixed.Zero, Fixed.Zero, _tmXMove, _tmYMove);
         var deltaAngle = moveAngle - lineAngle;
 
         if (deltaAngle > RenderEngine.Angle180)
         {
-            deltaAngle += RenderEngine.Angle180;
+            unchecked
+            {
+                deltaAngle += RenderEngine.Angle180;
+            }
         }
         //	I_Error ("SlideLine: ang>ANG180");
 
@@ -2787,7 +2790,7 @@ public class GameController
             return false;
         }
         
-        if (_openBottom - _slideMapObject.Z > 24 * Constants.FracUnit)
+        if (_openBottom - _slideMapObject.Z > Fixed.FromInt(24))
         {
             IsBlocking();        // too big a step up
             return false;
@@ -2833,7 +2836,7 @@ public class GameController
         Retry();
 
         // trace along the three leading corners
-        if (mo.MomX > 0)
+        if (mo.MomX > Fixed.Zero)
         {
             leadx = mo.X + mo.Radius;
             trailx = mo.X - mo.Radius;
@@ -2844,7 +2847,7 @@ public class GameController
             trailx = mo.X + mo.Radius;
         }
 
-        if (mo.MomY > 0)
+        if (mo.MomY > Fixed.Zero)
         {
             leady = mo.Y + mo.Radius;
             traily = mo.Y - mo.Radius;
@@ -2855,7 +2858,7 @@ public class GameController
             traily = mo.Y + mo.Radius;
         }
 
-        _bestSlideFrac = Constants.FracUnit + 1;
+        _bestSlideFrac = new Fixed(Constants.FracUnit + 1);
 
         P_PathTraverse(leadx, leady, leadx + mo.MomX, leady + mo.MomY,
             PT_AddLines, PTR_SlideTraverse);
@@ -2865,7 +2868,7 @@ public class GameController
             PT_AddLines, PTR_SlideTraverse);
 
         // move up to the wall
-        if (_bestSlideFrac == Constants.FracUnit + 1)
+        if (_bestSlideFrac == new Fixed(Constants.FracUnit + 1))
         {
             // the move most have hit the middle, so stairstep
             StairStep();
@@ -2873,8 +2876,8 @@ public class GameController
         }
 
         // fudge a bit to make sure it doesn't hit
-        _bestSlideFrac -= 0x800;
-        if (_bestSlideFrac > 0)
+        _bestSlideFrac -= new Fixed(0x800);
+        if (_bestSlideFrac > Fixed.Zero)
         {
             newx = (mo.MomX * _bestSlideFrac);
             newy = (mo.MomY * _bestSlideFrac);
@@ -2887,14 +2890,14 @@ public class GameController
 
         // Now continue along the wall.
         // First calculate remainder.
-        _bestSlideFrac = Constants.FracUnit - (_bestSlideFrac + 0x800);
+        _bestSlideFrac = Fixed.Unit - (_bestSlideFrac + new Fixed(0x800));
 
-        if (_bestSlideFrac > Constants.FracUnit)
+        if (_bestSlideFrac > Fixed.Unit)
         {
-            _bestSlideFrac = Constants.FracUnit;
+            _bestSlideFrac = Fixed.Unit;
         }
 
-        if (_bestSlideFrac <= 0)
+        if (_bestSlideFrac <= Fixed.Zero)
         {
             return;
         }
@@ -2929,18 +2932,18 @@ public class GameController
         }
     }
 
-    private const int StopSpeed = 0x1000;
-    private const int Friction = 0xe8000;
+    private static readonly Fixed StopSpeed = new(0x1000);
+    private static readonly Fixed Friction = new(0xe800);
 
     private void P_XYMovement(MapObject mo)
     {
-        if (mo.MomX == 0 && mo.MomY == 0)
+        if (mo.MomX == Fixed.Zero && mo.MomY == Fixed.Zero)
         {
             if ((mo.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
             {
                 // the skull slammed into something
                 mo.Flags &= ~MapObjectFlag.MF_SKULLFLY;
-                mo.MomX = mo.MomY = mo.MomZ= 0;
+                mo.MomX = mo.MomY = mo.MomZ = Fixed.Zero;
 
                 mo.SetState(mo.Info.SpawnState);
             }
@@ -2975,8 +2978,8 @@ public class GameController
         {
             if (xmove > Constants.MaxMove / 2 || ymove > Constants.MaxMove / 2)
             {
-                ptryx = mo.X + (int)xmove / 2;
-                ptryy = mo.Y + (int)ymove / 2;
+                ptryx = mo.X + xmove / 2;
+                ptryy = mo.Y + ymove / 2;
                 xmove >>= 1;
                 ymove >>= 1;
             }
@@ -2984,7 +2987,7 @@ public class GameController
             {
                 ptryx = mo.X + xmove;
                 ptryy = mo.Y + ymove;
-                xmove = ymove = 0;
+                xmove = ymove = Fixed.Zero;
             }
 
             if (!P_TryMove(mo, ptryx, ptryy))
@@ -3010,16 +3013,16 @@ public class GameController
                 }
                 else
                 {
-                    mo.MomX = mo.MomY = 0;
+                    mo.MomX = mo.MomY = Fixed.Zero;
                 }
             }
-        } while (xmove != 0 || ymove != 0);
+        } while (xmove != Fixed.Zero || ymove != Fixed.Zero);
 
         // slow down
         if (player != null && (player.Cheats & Cheat.NoMomentum) != 0)
         {
             // debug option for no sliding at all
-            mo.MomX = mo.MomY = 0;
+            mo.MomX = mo.MomY = Fixed.Zero;
             return;
         }
 
@@ -3037,12 +3040,13 @@ public class GameController
         {
             // do not stop sliding
             //  if halfway off a step with some momentum
-            if (mo.MomX > Constants.FracUnit / 4
-                || mo.MomX < -Constants.FracUnit / 4
-                || mo.MomY> Constants.FracUnit / 4
-                || mo.MomY < -Constants.FracUnit / 4)
+            var unitOver4 = Fixed.Unit / 4;
+            if (mo.MomX > unitOver4
+                || mo.MomX < -unitOver4
+                || mo.MomY > unitOver4
+                || mo.MomY < -unitOver4)
             {
-                if (mo.SubSector?.Sector == null || mo.FloorZ != mo.SubSector.Sector.FloorHeight)
+                if (mo.FloorZ != mo.SubSector!.Sector!.FloorHeight)
                 {
                     return;
                 }
@@ -3061,20 +3065,20 @@ public class GameController
                 player.MapObject.SetState(StateNum.S_PLAY);
             }
 
-            mo.MomX = 0;
-            mo.MomY = 0;
+            mo.MomX = Fixed.Zero;
+            mo.MomY = Fixed.Zero;
         }
         else
         {
-            mo.MomX = (mo.MomX * Friction);
-            mo.MomY = (mo.MomY * Friction);
+            mo.MomX *= Friction;
+            mo.MomY *= Friction;
         }
     }
 
     private Fixed P_AproxDistance(Fixed dx, Fixed dy)
     {
-        dx = Math.Abs(dx);
-        dy = Math.Abs(dy);
+        dx = Fixed.Abs(dx);
+        dy = Fixed.Abs(dy);
         if (dx < dy)
         {
             return dx + dy - (dx >> 1);
@@ -3085,31 +3089,31 @@ public class GameController
 
     private int P_PointOnLineSide(Fixed x, Fixed y, Line line)
     {
-        if (line.Dx == 0)
+        if (line.Dx == Fixed.Zero)
         {
             if (x <= line.V1.X)
             {
-                return line.Dy > 0 ? 1 : 0;
+                return line.Dy > Fixed.Zero ? 1 : 0;
             }
 
-            return line.Dy < 0 ? 1 : 0;
+            return line.Dy < Fixed.Zero ? 1 : 0;
         }
 
-        if (line.Dy == 0)
+        if (line.Dy == Fixed.Zero)
         {
             if (y <= line.V1.Y)
             {
-                return line.Dx < 0 ? 1 : 0;
+                return line.Dx < Fixed.Zero ? 1 : 0;
             }
 
-            return line.Dx > 0 ? 1 : 0;
+            return line.Dx > Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - line.V1.X);
         var dy = (y - line.V1.Y);
 
-        var left = (line.Dy >> Constants.FracBits * dx);
-        var right = (dy * line.Dx >> Constants.FracBits);
+        var left = new Fixed(line.Dy.Value >> Constants.FracBits) * dx;
+        var right = dy * new Fixed(line.Dx.Value >> Constants.FracBits);
 
         if (right < left)
         {
@@ -3132,7 +3136,7 @@ public class GameController
             case SlopeType.Horizontal:
                 p1 = boundingBox[BoundingBox.BoxTop] > line.V1.Y ? 1 : 0;
                 p2 = boundingBox[BoundingBox.BoxBottom] > line.V1.Y ? 1 : 0;
-                if (line.Dx < 0)
+                if (line.Dx < Fixed.Zero)
                 {
                     p1 ^= 1;
                     p2 ^= 1;
@@ -3142,7 +3146,7 @@ public class GameController
             case SlopeType.Vertical:
                 p1 = boundingBox[BoundingBox.BoxRight] < line.V1.X ? 1 : 0;
                 p2 = boundingBox[BoundingBox.BoxLeft] < line.V1.X ? 1 : 0;
-                if (line.Dy < 0)
+                if (line.Dy < Fixed.Zero)
                 {
                     p1 ^= 1;
                     p2 ^= 1;
@@ -3165,33 +3169,33 @@ public class GameController
 
     private int P_PointOnDivlineSide(Fixed x, Fixed y, DividerLine line)
     {
-        if (line.Dx == 0)
+        if (line.Dx == Fixed.Zero)
         {
             if (x <= line.X)
             {
-                return line.Dy > 0 ? 1 : 0;
+                return line.Dy > Fixed.Zero ? 1 : 0;
             }
 
-            return line.Dy < 0 ? 1 : 0;
+            return line.Dy < Fixed.Zero ? 1 : 0;
         }
         
-        if (line.Dy == 0)
+        if (line.Dy == Fixed.Zero)
         {
             if (y <= line.Y)
             {
-                return line.Dx < 0 ? 1 : 0;
+                return line.Dx < Fixed.Zero ? 1 : 0;
             }
 
-            return line.Dx > 0 ? 1 : 0;
+            return line.Dx > Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - line.X);
         var dy = (y - line.Y);
 
         // try to quickly decide by looking at sign bits
-        if (((line.Dy ^ line.Dx ^ dx ^ dy) & 0x80000000) != 0)
+        if (((line.Dy.Value ^ line.Dx.Value ^ dx.Value ^ dy.Value) & 0x80000000) != 0)
         {
-            if (((line.Dy ^ dx) & 0x80000000) != 0)
+            if (((line.Dy.Value ^ dx.Value) & 0x80000000) != 0)
             {
                 return 1;       // (left is negative)
             }
@@ -3199,8 +3203,8 @@ public class GameController
             return 0;
         }
 
-        var left = (Fixed)(line.Dy >> 8) * (dx >> 8);
-        var right = (Fixed)(dy >> 8) * (line.Dx >> 8);
+        var left = new Fixed(line.Dy.Value >> 8) * new Fixed(dx.Value >> 8);
+        var right = new Fixed(dy.Value >> 8) * new Fixed(line.Dx.Value >> 8);
 
         if (right < left)
         {
@@ -3228,9 +3232,9 @@ public class GameController
     {
         var den = ((v1.Dy >> 8) * v2.Dx) - ((v1.Dx >> 8) * v2.Dy);
 
-        if (den == 0)
+        if (den == Fixed.Zero)
         {
-            return 0;
+            return Fixed.Zero;
         }
 
         //	I_Error ("P_InterceptVector: parallel");
@@ -3244,7 +3248,7 @@ public class GameController
         // check for smooth step up
         if (mo.Player != null && mo.Z < mo.FloorZ)
         {
-            mo.Player.ViewHeight -= mo.FloorZ - mo.Z;
+            mo.Player.ViewHeight -= (mo.FloorZ - mo.Z);
             mo.Player.DeltaViewHeight = (Constants.ViewHeight - mo.Player.ViewHeight) >> 3;
         }
 
@@ -3259,11 +3263,11 @@ public class GameController
                 var dist = P_AproxDistance(mo.X - mo.Target.X, mo.Y - mo.Target.Y);
                 var delta = (mo.Target.Z + (mo.Height >> 1)) - mo.Z;
 
-                if (delta < 0 && dist < -(delta * 3))
+                if (delta < Fixed.Zero && dist < -(delta * 3))
                 {
                     mo.Z -= Constants.FloatSpeed;
                 }
-                else if (delta > 0 && dist < (delta * 3))
+                else if (delta > Fixed.Zero && dist < (delta * 3))
                 {
                     mo.Z += Constants.FloatSpeed;
                 }
@@ -3284,7 +3288,7 @@ public class GameController
                 mo.MomZ = -mo.MomZ;
             }
 
-            if (mo.MomZ < 0)
+            if (mo.MomZ < Fixed.Zero)
             {
                 if (mo.Player != null && mo.MomZ < -Constants.Gravity * 8)
                 {
@@ -3295,7 +3299,7 @@ public class GameController
                     mo.Player.DeltaViewHeight = mo.MomZ >> 3;
                     // S_StartSound(mo, sfx_oof);
                 }
-                mo.MomZ = 0;
+                mo.MomZ = Fixed.Zero;
             }
             mo.Z = mo.FloorZ;
 
@@ -3307,7 +3311,7 @@ public class GameController
         }
         else if ((mo.Flags & MapObjectFlag.MF_NOGRAVITY) == 0)
         {
-            if (mo.MomZ == 0)
+            if (mo.MomZ == Fixed.Zero)
             {
                 mo.MomZ = -Constants.Gravity * 2;
             }
@@ -3320,9 +3324,9 @@ public class GameController
         if (mo.Z + mo.Height > mo.CeilingZ)
         {
             // hit the ceiling
-            if (mo.MomZ > 0)
+            if (mo.MomZ > Fixed.Zero)
             {
-                mo.MomZ = 0;
+                mo.MomZ = Fixed.Zero;
             }
             
             mo.Z = mo.CeilingZ - mo.Height;
@@ -3349,8 +3353,8 @@ public class GameController
 
         var blockDist = thing.Radius + _tmThing!.Radius;
 
-        if (Math.Abs(thing.X - _tmX) >= blockDist ||
-            Math.Abs(thing.Y - _tmY) >= blockDist)
+        if (Fixed.Abs(thing.X - _tmX) >= blockDist ||
+            Fixed.Abs(thing.Y - _tmY) >= blockDist)
         {
             // didn't hit it
             return true;
@@ -3401,10 +3405,10 @@ public class GameController
         _numSpecHit = 0;
 
         // stomp on any things contacted
-        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
-        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
-        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
-        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
+        var xl = (_tmBoundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var xh = (_tmBoundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var yl = (_tmBoundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius).Value >> Constants.MapBlockShift;
+        var yh = (_tmBoundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius).Value >> Constants.MapBlockShift;
 
         for (var bx = xl; bx <= xh; bx++)
         {
@@ -3440,7 +3444,7 @@ public class GameController
         }
 
         // momentum movement
-        if (mobj.MomX != 0 || mobj.MomY != 0 || (mobj.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
+        if (mobj.MomX != Fixed.Zero || mobj.MomY != Fixed.Zero || (mobj.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
         {
             P_XYMovement(mobj);
 
@@ -3450,7 +3454,7 @@ public class GameController
             }
         }
 
-        if ((mobj.Z != mobj.FloorZ) || mobj.MomZ != 0)
+        if ((mobj.Z != mobj.FloorZ) || mobj.MomZ != Fixed.Zero)
         {
             P_ZMovement(mobj);
 
@@ -3542,7 +3546,7 @@ public class GameController
         }
         else if (z == Constants.OnCeilingZ)
         {
-            mobj.Z = mobj.CeilingZ - mobj.Info.Height;
+            mobj.Z = new Fixed(mobj.CeilingZ.Value - mobj.Info.Height);
         }
         else
         {
@@ -3601,17 +3605,17 @@ public class GameController
             var ld = Line.ReadFromWadData(reader, _vertices);
             _lines[i] = ld;
 
-            if (ld.Dx == 0)
+            if (ld.Dx == Fixed.Zero)
             {
                 ld.SlopeType = SlopeType.Vertical;
             }
-            else if (ld.Dy != 0)
+            else if (ld.Dy != Fixed.Zero)
             {
                 ld.SlopeType = SlopeType.Horizontal;
             }
             else
             {
-                ld.SlopeType = ld.Dy / ld.Dx > 0 ? SlopeType.Positive : SlopeType.Negative;
+                ld.SlopeType = ld.Dy / ld.Dx > Fixed.Zero ? SlopeType.Positive : SlopeType.Negative;
             }
 
             if (ld.V1.X < ld.V2.X)
@@ -3757,19 +3761,19 @@ public class GameController
             sector.SoundOrigin.Y = (boundingBox[BoundingBox.BoxTop] + boundingBox[BoundingBox.BoxBottom]) / 2;
 
             // adjust bounding box to map blocks
-            var block = (boundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius) >> Constants.MapBlockShift;
+            var block = (boundingBox[BoundingBox.BoxTop] - _blockMapOriginY + Constants.MaxRadius).Value >> Constants.MapBlockShift;
             block = block >= _blockMapHeight ? _blockMapHeight - 1 : block;
             sector.BlockBox[BoundingBox.BoxTop] = block;
 
-            block = (boundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxBottom] - _blockMapOriginY - Constants.MaxRadius).Value >> Constants.MapBlockShift;
             block = block < 0 ? 0 : block;
             sector.BlockBox[BoundingBox.BoxBottom] = block;
 
-            block = (boundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxRight] - _blockMapOriginX + Constants.MaxRadius).Value >> Constants.MapBlockShift;
             block = block >= _blockMapWidth ? _blockMapWidth - 1 : block;
             sector.BlockBox[BoundingBox.BoxRight] = block;
 
-            block = (boundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius) >> Constants.MapBlockShift;
+            block = (boundingBox[BoundingBox.BoxLeft] - _blockMapOriginX - Constants.MaxRadius).Value >> Constants.MapBlockShift;
             block = block < 0 ? 0 : block;
             sector.BlockBox[BoundingBox.BoxLeft] = block;
         }
@@ -3787,7 +3791,7 @@ public class GameController
 
         // Initial height of PointOfView
         // will be set by player think.
-        Players[ConsolePlayer].ViewZ = 1;
+        Players[ConsolePlayer].ViewZ = new Fixed(1);
 
         // Make sure all sounds are stopped before Z_FreeTags.
         // S_Start();
@@ -4283,7 +4287,7 @@ public class GameController
     {
         var delta = special.Z - toucher.Z;
 
-        if (delta > toucher.Height || delta < -8 * Constants.FracUnit)
+        if (delta > toucher.Height || delta < Fixed.FromInt(-8))
         {
             // out of reach
             return;
@@ -4769,7 +4773,7 @@ public class GameController
 
     public Fixed P_FindHighestFloorSurrounding(Sector sec)
     {
-        Fixed floor = -500 * Constants.FracUnit;
+        var floor = Fixed.FromInt(-500);
 
         for (var i = 0; i < sec.LineCount; i++)
         {
@@ -4792,7 +4796,7 @@ public class GameController
 
     private const int MaxAdjoiningSectors = 20;
 
-    public Fixed P_FindNextHighestFloor(Sector sec, int currentHeight)
+    public Fixed P_FindNextHighestFloor(Sector sec, Fixed currentHeight)
     {
         var heightList = new List<Fixed>();
         var h = 0;
@@ -5416,20 +5420,19 @@ public class GameController
     {
         // see which target is to be aimed at
         var an = mo.Angle;
-        _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+        _bulletSlope = P_AimLineAttack(mo, an, Fixed.FromInt(16 * 64));
 
         if (_lineTarget == null)
         {
             an += 1 << 26;
-            _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+            _bulletSlope = P_AimLineAttack(mo, an, Fixed.FromInt(16 * 64));
             if (_lineTarget == null)
             {
                 an -= 2 << 26;
-                _bulletSlope = P_AimLineAttack(mo, an, 16 * 64 * Constants.FracUnit);
+                _bulletSlope = P_AimLineAttack(mo, an, Fixed.FromInt(16 * 64));
             }
         }
     }
-
 
     //
     // P_GunShot
@@ -5540,7 +5543,7 @@ public class GameController
             thingBottomSlope = _bottomSlope;
         }
 
-        _aimSlope = (int)(thingTopSlope + thingBottomSlope) / 2;
+        _aimSlope = (thingTopSlope + thingBottomSlope) / 2;
         _lineTarget = th;
 
         return false;
@@ -5555,7 +5558,7 @@ public class GameController
             var li = intercept.Line!;
             if (li.Special != 0)
             {
-                P_ShootSpecialLine(_shootThing, li);
+                P_ShootSpecialLine(_shootThing!, li);
             }
 
             if ((li.Flags & Constants.Line.TwoSided) == 0)
@@ -5620,7 +5623,7 @@ public class GameController
 
         // hit thing
         // position a bit closer
-        var frac = intercept.Frac - ((10 * Constants.FracUnit) / _attackRange);
+        var frac = intercept.Frac - Fixed.FromInt(10) / _attackRange;
 
         var x = _trace.X + (_trace.Dx * frac);
         var y = _trace.Y + (_trace.Dy * frac);
@@ -5648,7 +5651,7 @@ public class GameController
         bool HitLine(Line li)
         {
             // position a bit closer
-            var frac = intercept.Frac - ((Constants.FracUnit * 4) / _attackRange);
+            var frac = intercept.Frac - Fixed.FromInt(4) / _attackRange;
             var x = _trace.X + (_trace.Dx * frac);
             var y = _trace.Y + (_trace.Dy * frac);
             var z = _shootZ + (_aimSlope * (frac * _attackRange));
@@ -5681,13 +5684,13 @@ public class GameController
         angle >>= RenderEngine.AngleToFineShift;
         _shootThing = thing;
 
-        var x2 = thing.X + (distance >> Constants.FracBits) * (int)RenderEngine.FineCosine[angle];
-        var y2 = thing.Y + (distance >> Constants.FracBits) * (int)RenderEngine.FineSine[angle];
-        _shootZ = thing.Z + (thing.Height >> 1) + 8 * Constants.FracUnit;
+        var x2 = thing.X + (distance.Value >> Constants.FracBits) * RenderEngine.FineCosine[angle];
+        var y2 = thing.Y + (distance.Value >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        _shootZ = new Fixed(thing.Z.Value + (thing.Height.Value >> 1) + 8 * Constants.FracUnit);
 
         // Can't shoot outside view angles
-        _topSlope = 100 * Constants.FracUnit / 160;
-        _bottomSlope = -100 * Constants.FracUnit / 160;
+        _topSlope = Fixed.FromInt(100) / 160;
+        _bottomSlope = Fixed.FromInt(-100) / 160;
 
         _attackRange = distance;
         _lineTarget = null;
@@ -5708,9 +5711,9 @@ public class GameController
         _shootThing = thing;
         _laDamage = damage;
 
-        var x2 = thing.X + (distance >> Constants.FracBits) * (int)RenderEngine.FineCosine[angle];
-        var y2 = thing.Y + (distance >> Constants.FracBits) * (int)RenderEngine.FineSine[angle];
-        _shootZ = thing.Z + (thing.Height >> 1) + 8 * Constants.FracUnit;
+        var x2 = thing.X + (distance >> Constants.FracBits) * RenderEngine.FineCosine[angle];
+        var y2 = thing.Y + (distance >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        _shootZ = new Fixed(thing.Z.Value + (thing.Height.Value >> 1) + 8 * Constants.FracUnit);
         _attackRange = distance;
         _aimSlope = slope;
 
@@ -5719,10 +5722,10 @@ public class GameController
 
     private void P_SpawnPuff(Fixed x, Fixed y, Fixed z)
     {
-        z += ((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
+        z += new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
 
         var th = P_SpawnMapObject(x, y, z, MapObjectType.MT_PUFF);
-        th.MomZ = Constants.FracUnit;
+        th.MomZ = Fixed.Unit;
         th.Tics -= DoomRandom.P_Random() & 3;
 
         if (th.Tics < 1)
@@ -5739,10 +5742,10 @@ public class GameController
 
     private void P_SpawnBlood(Fixed x, Fixed y, Fixed z, int damage)
     {
-        z += ((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
+        z += new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
 
         var th = P_SpawnMapObject(x, y, z, MapObjectType.MT_BLOOD);
-        th.MomZ = Constants.FracUnit * 2;
+        th.MomZ = Fixed.FromInt(2);
         th.Tics -= DoomRandom.P_Random() & 3;
 
         if (th.Tics < 1)
@@ -5791,29 +5794,29 @@ public class GameController
     {
         // see which target is to be aimed at
         var an = source.Angle;
-        var slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+        var slope = P_AimLineAttack(source, an, Fixed.FromInt(16 * 64));
 
         if (_lineTarget == null)
         {
             an += 1 << 26;
-            slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+            slope = P_AimLineAttack(source, an, Fixed.FromInt(16 * 64));
 
             if (_lineTarget == null)
             {
                 an -= 2 << 26;
-                slope = P_AimLineAttack(source, an, 16 * 64 * Constants.FracUnit);
+                slope = P_AimLineAttack(source, an, Fixed.FromInt(16 * 64));
             }
 
             if (_lineTarget == null)
             {
                 an = source.Angle;
-                slope = 0;
+                slope = Fixed.Zero;
             }
         }
 
         var x = source.X;
         var y = source.Y;
-        var z = source.Z + 4 * 8 * Constants.FracUnit;
+        var z = source.Z + Fixed.FromInt(4 * 8);
 
         var th = P_SpawnMapObject(x, y, z, type);
         if (th.Info.SeeSound != SoundType.sfx_None)
@@ -5848,7 +5851,7 @@ public class GameController
     /// </summary>
     private int P_DivlineSide(Fixed x, Fixed y, DividerLine node)
     {
-        if (node.Dx == 0)
+        if (node.Dx == Fixed.Zero)
         {
             if (x == node.X)
             {
@@ -5857,13 +5860,13 @@ public class GameController
 
             if (x <= node.X)
             {
-                return node.Dy > 0 ? 1 : 0;
+                return node.Dy > Fixed.Zero ? 1 : 0;
             }
 
-            return node.Dy < 0 ? 1 : 0;
+            return node.Dy < Fixed.Zero ? 1 : 0;
         }
 
-        if (node.Dy == 0)
+        if (node.Dy == Fixed.Zero)
         {
             // WEC: This is what the original source has, but shouldn't this be "y == node.Y"?
             if (x == node.Y)
@@ -5873,17 +5876,17 @@ public class GameController
 
             if (y <= node.Y)
             {
-                return node.Dx > 0 ? 1 : 0;
+                return node.Dx > Fixed.Zero ? 1 : 0;
             }
 
-            return node.Dx < 0 ? 1 : 0;
+            return node.Dx < Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - node.X);
         var dy = (y - node.Y);
 
-        Fixed left = (node.Dy >> Constants.FracBits) * (dx >> Constants.FracBits);
-        Fixed right = (dy >> Constants.FracBits) * (node.Dx >> Constants.FracBits);
+        var left = new Fixed(node.Dy.Value >> Constants.FracBits) * (dx.Value >> Constants.FracBits);
+        var right = new Fixed(dy.Value >> Constants.FracBits) * (node.Dx.Value >> Constants.FracBits);
 
         if (right < left)
         {

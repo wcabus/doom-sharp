@@ -78,8 +78,8 @@ public class MapObject : Thinker
     {
         Type = info.Type;
         Info = info;
-        Radius = info.Radius;
-        Height = info.Height;
+        Radius = new Fixed(info.Radius);
+        Height = new Fixed(info.Height);
         Flags = info.Flags;
         Health = info.SpawnHealth;
     }
@@ -213,7 +213,7 @@ public class MapObject : Thinker
 
         if ((target.Flags & MapObjectFlag.MF_SKULLFLY) != 0)
         {
-            target.MomX = target.MomY = target.MomZ = 0;
+            target.MomX = target.MomY = target.MomZ = Fixed.Zero;
         }
 
         var player = target.Player;
@@ -235,11 +235,11 @@ public class MapObject : Thinker
             // make fall forwards sometimes
             if (damage < 40 &&
                 damage > target.Health &&
-                target.Z - inflictor.Z > 64 * Constants.FracUnit &&
+                target.Z - inflictor.Z > Fixed.FromInt(64) &&
                 (DoomRandom.P_Random() & 1) != 0)
             {
                 ang += RenderEngine.Angle180;
-                thrust = (int)thrust * 4;
+                thrust *= 4;
             }
 
             ang >>= RenderEngine.AngleToFineShift;

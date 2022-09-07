@@ -185,7 +185,6 @@ public class Video
             sourceIdx += width;
             destIdx += Constants.ScreenWidth;
         }
-        
     }
 
     //
@@ -508,8 +507,8 @@ public class Video
 
     public void MarkRectangle(int x, int y, int width, int height)
     {
-        BoundingBox.AddToBox(_dirtyBox, x, y);
-        BoundingBox.AddToBox(_dirtyBox, x + width - 1, y + height - 1);
+        BoundingBox.AddToBox(_dirtyBox, Fixed.FromInt(x), Fixed.FromInt(y));
+        BoundingBox.AddToBox(_dirtyBox, Fixed.FromInt(x + width - 1), Fixed.FromInt(y + height - 1));
     }
 
     public void CopyRectangle(int srcX, int srcY, int srcScreen, int width, int height, int destX, int destY, int destScreen)

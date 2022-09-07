@@ -4,7 +4,7 @@ namespace DoomSharp.Core.GameLogic;
 
 public class Door : Thinker
 {
-    public const int DefaultSpeed = 2 * Constants.FracUnit;
+    public static readonly Fixed DefaultSpeed = Fixed.FromInt(2);
     public const int Wait = 150;
 
     public DoorType Type { get; set; }

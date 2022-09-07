@@ -5,7 +5,6 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
 using System.Runtime.InteropServices;
 using DoomSharp.Core.GameLogic;
-using System;
 
 namespace DoomSharp.Core;
 
@@ -429,6 +428,8 @@ public class DoomGame : IDisposable
 
                 _game.GameTic++;
                 MakeTic++;
+
+                Thread.Sleep(1000 / Constants.TicRate);
             }
             else
             {
@@ -1287,7 +1288,7 @@ public class DoomGame : IDisposable
 
     public void WaitVBL(int count)
     {
-        Thread.Sleep(count * (1000 / 70));
+        Thread.Sleep((int)(count * (1000 / 70.0)));
     }
 
     private void IdentifyVersion()

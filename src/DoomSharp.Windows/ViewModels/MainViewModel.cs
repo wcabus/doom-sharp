@@ -79,10 +79,9 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             colors.Add(Color.FromRgb(palette[i], palette[i + 1], palette[i + 2]));
         }
         
-        var bitmapPalette = new BitmapPalette(colors);
-
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher?.Invoke(() =>
         {
+            var bitmapPalette = new BitmapPalette(colors);
             _newPaletteOutput = new WriteableBitmap(Constants.ScreenWidth, Constants.ScreenHeight, 96, 96, PixelFormats.Indexed8, bitmapPalette);
         });
     }
@@ -91,23 +90,22 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     {
         Array.Copy(output, 0, _screenBuffer, 0, output.Length);
         
+        var bitmap = _output;
+        var switchOutput = false;
+        if (_newPaletteOutput is not null)
+        {
+            bitmap = _newPaletteOutput;
+            _newPaletteOutput = null;
+            switchOutput = true;
+        }
+
+        if (bitmap is null)
+        {
+            return;
+        }
+
         Application.Current?.Dispatcher?.Invoke(() =>
         {
-            var bitmap = _output;
-            var switchOutput = false;
-
-            if (_newPaletteOutput is not null)
-            {
-                bitmap = _newPaletteOutput;
-                _newPaletteOutput = null;
-                switchOutput = true;
-            }
-
-            if (bitmap is null)
-            {
-                return;
-            }
-
             bitmap.WritePixels(_rectangle, _screenBuffer, _stride, 0);
             if (switchOutput)
             {

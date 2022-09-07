@@ -4,7 +4,7 @@ namespace DoomSharp.Core.GameLogic;
 
 public class Ceiling : Thinker
 {
-    public const int DefaultSpeed = Constants.FracUnit;
+    public static readonly Fixed DefaultSpeed = Fixed.Unit;
     public const int Wait = 150;
     public const int MaxCeilings = 30;
 

@@ -33,7 +33,8 @@ public class RenderEngine
     /// <summary>
     /// Tangens lookup table
     /// </summary>
-    public static readonly Fixed[] FineTangent = new Fixed[FineAngles / 2]
+    public static readonly Fixed[] FineTangent = new Fixed[FineAngles / 2];
+    private static readonly int[] FineTangentInts = 
     {
         -170910304, -56965752, -34178904, -24413316, -18988036, -15535599, -13145455, -11392683,
         -10052327, -8994149, -8137527, -7429880, -6835455, -6329090, -5892567, -5512368,
@@ -552,7 +553,8 @@ public class RenderEngine
     /// <summary>
     /// Sine (and cosine) lookup table
     /// </summary>
-    public static readonly Fixed[] FineSine = new Fixed[5 * FineAngles / 4]
+    public static readonly Fixed[] FineSine = new Fixed[5 * FineAngles / 4];
+    private static readonly int[] FineSineInts = 
     {
         25, 75, 125, 175, 226, 276, 326, 376,
         427, 477, 527, 578, 628, 678, 728, 779,
@@ -2255,9 +2257,9 @@ public class RenderEngine
     private int[] _textureTranslation = Array.Empty<int>();
 
     // needed for pre rendering
-    private Fixed[] _spriteWidth = Array.Empty<Fixed>();
-    private Fixed[] _spriteOffset = Array.Empty<Fixed>();
-    private Fixed[] _spriteTopOffset = Array.Empty<Fixed>();
+    private int[] _spriteWidth = Array.Empty<int>();
+    private int[] _spriteOffset = Array.Empty<int>();
+    private int[] _spriteTopOffset = Array.Empty<int>();
 
     private byte[] _colorMaps = Array.Empty<byte>();
 
@@ -2378,6 +2380,16 @@ public class RenderEngine
 
     static RenderEngine()
     {
+        for (var i = 0; i < FineTangentInts.Length; i++)
+        {
+            FineTangent[i] = new Fixed(FineTangentInts[i]);
+        }
+
+        for (var i = 0; i < FineSineInts.Length; i++)
+        {
+            FineSine[i] = new Fixed(FineSineInts[i]);
+        }
+
         const int cosStart = FineAngles / 4;
         Array.Copy(FineSine, cosStart, FineCosine, 0, FineSine.Length - cosStart);
         Array.Copy(FineSine, 0, FineCosine, FineSine.Length - cosStart, cosStart);
@@ -2404,14 +2416,14 @@ public class RenderEngine
 
     public Sky Sky { get; } = new();
 
-    public static int SlopeDiv(uint num, uint den)
+    public static int SlopeDiv(Fixed num, Fixed den)
     {
-        if (den < 512)
+        if ((uint)den.Value < 512)
         {
             return SlopeRange;
         }
 
-        var ans = (num << 3) / (den >> 8);
+        var ans = ((uint)num.Value << 3) / ((uint)den.Value >> 8);
         return ans <= SlopeRange ? (int)ans : SlopeRange;
     }
 
@@ -2765,9 +2777,9 @@ public class RenderEngine
         _lastSpriteLump = DoomGame.Instance.WadData.GetNumForName("S_END") - 1;
 
         _numSpriteLumps = _lastSpriteLump - _firstSpriteLump + 1;
-        _spriteWidth = new Fixed[_numSpriteLumps];
-        _spriteOffset = new Fixed[_numSpriteLumps];
-        _spriteTopOffset = new Fixed[_numSpriteLumps];
+        _spriteWidth = new int[_numSpriteLumps];
+        _spriteOffset = new int[_numSpriteLumps];
+        _spriteTopOffset = new int[_numSpriteLumps];
 
         for (var i = 0; i < _numSpriteLumps; i++)
         {
@@ -2778,9 +2790,9 @@ public class RenderEngine
 
             var patchData = DoomGame.Instance.WadData.GetLumpNum(_firstSpriteLump + i, PurgeTag.Cache);
             var patch = Patch.FromBytes(patchData!);
-            _spriteWidth[i] = new Fixed(patch.Width << Constants.FracBits);
-            _spriteOffset[i] = new Fixed(patch.LeftOffset << Constants.FracBits);
-            _spriteTopOffset[i] = new Fixed(patch.TopOffset << Constants.FracBits);
+            _spriteWidth[i] = patch.Width;
+            _spriteOffset[i] = patch.LeftOffset;
+            _spriteTopOffset[i] = patch.TopOffset;
         }
     }
 
@@ -2881,8 +2893,8 @@ public class RenderEngine
 
         _centerY = ViewHeight / 2;
         _centerX = ViewWidth / 2;
-        _centerXFrac = _centerX << Constants.FracBits;
-        _centerYFrac = _centerY << Constants.FracBits;
+        _centerXFrac = Fixed.FromInt(_centerX);
+        _centerYFrac = Fixed.FromInt(_centerY);
         _projection = _centerXFrac;
 
         if (_detailShift == 0)
@@ -2905,8 +2917,8 @@ public class RenderEngine
         InitTextureMapping();
 
         // psprite scales
-        _pSpriteScale = Constants.FracUnit * ViewWidth / Constants.ScreenWidth;
-        _pSpriteIScale = Constants.FracUnit * Constants.ScreenWidth / ViewWidth;
+        _pSpriteScale =  Fixed.FromInt(ViewWidth / Constants.ScreenWidth);
+        _pSpriteIScale = Fixed.FromInt(Constants.ScreenWidth / ViewWidth);
 
         // thing clipping
         for (var i = 0; i < ViewWidth; i++)
@@ -2917,15 +2929,15 @@ public class RenderEngine
         // planes
         for (var i = 0; i < ViewHeight; i++)
         {
-            Fixed dy = ((i - ViewHeight / 2) << Constants.FracBits) + Constants.FracUnit / 2;
-            dy = Math.Abs(dy);
-            _ySlope[i] = ((ViewWidth << _detailShift) / 2 * Constants.FracUnit) / dy;
+            var dy = Fixed.FromInt(i - ViewHeight / 2) + Fixed.Unit / 2;
+            dy = Fixed.Abs(dy);
+            _ySlope[i] = Fixed.FromInt((ViewWidth << _detailShift) / 2) / dy;
         }
 
         for (var i = 0; i < ViewWidth; i++)
         {
-            Fixed cosAdj = Math.Abs(FineCosine[_xToViewAngle[i] >> AngleToFineShift]);
-            _distScale[i] = Constants.FracUnit / cosAdj;
+            var cosAdj = Fixed.Abs(FineCosine[_xToViewAngle[i] >> AngleToFineShift]);
+            _distScale[i] = Fixed.Unit / cosAdj;
         }
 
         // Calculate the light levels to use
@@ -2965,9 +2977,9 @@ public class RenderEngine
             var startMap = ((LightLevels - 1 - i) * 2) * NumColorMaps / LightLevels;
             for (var j = 0; j < MaxLightZ; j++)
             {
-                int scale = (Constants.ScreenWidth / 2 * Constants.FracUnit) / (Fixed)((j + 1) << LightZShift);
+                var scale = Fixed.FromInt(Constants.ScreenWidth / 2) / new Fixed((j + 1) << LightZShift);
                 scale >>= LightScaleShift;
-                var level = startMap - scale / DistMap;
+                var level = startMap - scale.Value / DistMap;
 
                 if (level < 0)
                 {
@@ -3312,18 +3324,17 @@ public class RenderEngine
 
         for (i = 0; i < FineAngles / 2; i++)
         {
-            if (FineTangent[i] > Constants.FracUnit * 2)
+            if (FineTangent[i] > Fixed.FromInt(2))
             {
                 t = -1;
             }
-            else if (FineTangent[i] < -Constants.FracUnit * 2)
+            else if (FineTangent[i] < Fixed.FromInt(-2))
             {
                 t = ViewWidth + 1;
             }
             else
             {
-                t = FineTangent[i] * focalLength;
-                t = (_centerXFrac - t + Constants.FracUnit - 1) >> Constants.FracBits;
+                t = ((_centerXFrac - FineTangent[i] * focalLength).Value + Constants.FracUnit - 1) >> Constants.FracBits;
 
                 if (t < -1)
                 {
@@ -3355,9 +3366,6 @@ public class RenderEngine
         // Take out the fencepost cases from viewangletox.
         for (i = 0; i < FineAngles / 2; i++)
         {
-            t = FineTangent[i] * focalLength;
-            t = _centerX - t;
-
             if (_viewAngleToX[i] == -1)
             {
                 _viewAngleToX[i] = 0;
@@ -3409,7 +3417,7 @@ public class RenderEngine
         // Determine scaling,
         //  which is the only mapping to be done.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
 
         // Inner loop that does the actual texture mapping,
         //  e.g. a DDA-lile scaling.
@@ -3418,13 +3426,13 @@ public class RenderEngine
         {
             // Re-map color indices from wall texture column
             //  using a lighting/special effects LUT.
-            var sourceIdx = (frac >> Constants.FracBits) & 127;
+            var sourceIdx = (frac.Value >> Constants.FracBits) & 127;
             if (sourceIdx == _dcSource.Length)
             {
                 sourceIdx--; // simulate patches repeating the last pixel byte
             }
 
-            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx]];
+            DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx % _dcSource.Length]];
 
             dest += Constants.ScreenWidth;
             frac += fracStep;
@@ -3460,18 +3468,18 @@ public class RenderEngine
         var dest2 = _yLookup[_dcYl] + _columnOfs[_dcX + 1];
 
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
 
         do
         {
-            var sourceIdx = (frac >> Constants.FracBits) & 127;
+            var sourceIdx = (frac.Value >> Constants.FracBits) & 127;
             if (sourceIdx == _dcSource.Length)
             {
                 sourceIdx--; // simulate patches repeating the last pixel byte
             }
 
             DoomGame.Instance.Video.Screens[0][dest2] =
-                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx]];
+                DoomGame.Instance.Video.Screens[0][dest] = _dcColorMap[_dcSource[sourceIdx % _dcSource.Length]];
 
             dest += Constants.ScreenWidth;
             dest2 += Constants.ScreenWidth;
@@ -3560,7 +3568,7 @@ public class RenderEngine
 
         // Looks familiar.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
 
         // Looks like an attempt at dithering,
         //  using the colormap #6 (of 0-31, a bit
@@ -3641,7 +3649,7 @@ public class RenderEngine
 
         // Looks familiar.
         var fracStep = _dcIScale;
-        var frac = _dcTextureMid + ((_dcYl - _centerY) * (int)fracStep);
+        var frac = _dcTextureMid + ((_dcYl - _centerY) * fracStep);
 
         // Here we do an additional index re-mapping.
         do
@@ -3651,7 +3659,7 @@ public class RenderEngine
             //  used with PLAY sprites.
             // Thus the "green" ramp of the player 0 sprite
             //  is mapped to gray, red, black/indigo. 
-            var sourceIdx = frac >> Constants.FracBits;
+            var sourceIdx = frac.Value >> Constants.FracBits;
             if (sourceIdx == _dcSource.Length)
             {
                 sourceIdx--; // simulate patches repeating the last pixel byte
@@ -3728,7 +3736,7 @@ public class RenderEngine
         do
         {
             // Current texture index in u,v.
-            var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
+            var spot = ((yFrac.Value >> (16 - 6)) & (63 * 64)) + ((xFrac.Value >> 16) & 63);
             if (spot == _dsSource!.Length)
             {
                 spot--; // simulate patches repeating the last pixel byte
@@ -3766,7 +3774,7 @@ public class RenderEngine
         var count = _dsX2 - _dsX1;
         do
         {
-            var spot = ((yFrac >> (16 - 6)) & (63 * 64)) + ((xFrac >> 16) & 63);
+            var spot = ((yFrac.Value >> (16 - 6)) & (63 * 64)) + ((xFrac.Value >> 16) & 63);
             if (spot == _dsSource!.Length)
             {
                 spot--; // simulate patches repeating the last pixel byte
@@ -4115,10 +4123,10 @@ public class RenderEngine
     private Fixed _rwTopTextureMid;
     private Fixed _rwBottomTextureMid;
 
-    private int _worldTop;
-    private int _worldBottom;
-    private int _worldHigh;
-    private int _worldLow;
+    private Fixed _worldTop;
+    private Fixed _worldBottom;
+    private Fixed _worldHigh;
+    private Fixed _worldLow;
 
     private Fixed _pixHigh;
     private Fixed _pixLow;
@@ -4187,7 +4195,7 @@ public class RenderEngine
         MaskedTextureColIdx = ds.MaskedTextureColIdx;
 
         _rwScaleStep = ds.ScaleStep;
-        _sprYScale = (int)ds.Scale1 + (x1 - ds.X1) * (int)_rwScaleStep;
+        _sprYScale = ds.Scale1 + (x1 - ds.X1) * _rwScaleStep;
         _mFloorClip = ds.SpriteBottomClip;
         _mFloorClipIdx = ds.SpriteBottomClipIdx;
         _mCeilingClip = ds.SpriteTopClip;
@@ -4202,7 +4210,7 @@ public class RenderEngine
         else
         {
             _dcTextureMid = _frontSector.CeilingHeight < _backSector!.CeilingHeight ? _frontSector.CeilingHeight : _backSector.CeilingHeight;
-            _dcTextureMid = _dcTextureMid - _viewZ;
+            _dcTextureMid -= _viewZ;
         }
 
         _dcTextureMid += _currentLine.SideDef.RowOffset;
@@ -4221,7 +4229,7 @@ public class RenderEngine
             {
                 if (_fixedColorMapIdx == null)
                 {
-                    var index = _sprYScale >> LightScaleShift;
+                    var index = _sprYScale.Value >> LightScaleShift;
 
                     if (index >= MaxLightScale)
                     {
@@ -4233,7 +4241,7 @@ public class RenderEngine
                 }
 
                 _sprTopScreen = _centerYFrac - (_dcTextureMid * _sprYScale);
-                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_sprYScale));
+                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_sprYScale.Value));
 
                 // draw the texture
                 var col = GetColumn(texNum, MaskedTextureCol[MaskedTextureColIdx.GetValueOrDefault() + _dcX]);
@@ -4253,12 +4261,12 @@ public class RenderEngine
     /// </summary>
     private void RenderSegLoop()
     {
-        var textureColumn = Fixed.Zero;
+        var textureColumn = 0;
 
         for (; _rwX < _rwStopX; _rwX++)
         {
             // mark floor / ceiling areas
-            var yl = (_topFrac + HeightUnit - 1) >> HeightBits;
+            var yl = (_topFrac.Value + HeightUnit - 1) >> HeightBits;
 
             // no space above wall?
             if (yl < _ceilingClip[_rwX] + 1)
@@ -4285,7 +4293,7 @@ public class RenderEngine
                 }
             }
 
-            var yh = _bottomFrac >> HeightBits;
+            var yh = _bottomFrac.Value >> HeightBits;
 
             if (yh >= _floorClip[_rwX])
             {
@@ -4313,10 +4321,10 @@ public class RenderEngine
             {
                 // calculate texture offset
                 var angle = (_rwCenterAngle + _xToViewAngle[_rwX]) >> AngleToFineShift;
-                textureColumn = _rwOffset - (FineTangent[angle] * _rwDistance);
-                textureColumn >>= Constants.FracBits;
+                textureColumn = (_rwOffset - (FineTangent[angle] * _rwDistance)).Value >> Constants.FracBits;
+                
                 // calculate lighting
-                var index = (uint)(_rwScale >> LightScaleShift);
+                var index = (uint)(_rwScale.Value >> LightScaleShift);
 
                 if (index >= MaxLightScale)
                 {
@@ -4325,7 +4333,7 @@ public class RenderEngine
 
                 Array.Copy(_colorMaps, _wallLights![index], _dcColorMap, 0, 256);
                 _dcX = _rwX;
-                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_rwScale));
+                _dcIScale = new Fixed((int)(0xffffffffu / (uint)_rwScale.Value));
             }
 
             // draw the wall tiers
@@ -4349,7 +4357,7 @@ public class RenderEngine
                 if (_topTexture != 0)
                 {
                     // top wall
-                    mid = _pixHigh >> HeightBits;
+                    mid = _pixHigh.Value >> HeightBits;
                     _pixHigh += _pixHighStep;
 
                     if (mid >= _floorClip[_rwX])
@@ -4385,7 +4393,7 @@ public class RenderEngine
                 if (_bottomTexture != 0)
                 {
                     // bottom wall
-                    mid = (_pixLow + HeightUnit - 1) >> HeightBits;
+                    mid = (_pixLow.Value + HeightUnit - 1) >> HeightBits;
                     _pixLow += _pixLowStep;
 
                     // no space above wall?
@@ -4487,7 +4495,7 @@ public class RenderEngine
         if (stop > start)
         {
             ds.Scale2 = ScaleFromGlobalAngle(_viewAngle + _xToViewAngle[stop]);
-            ds.ScaleStep = _rwScaleStep = (int)(ds.Scale2 - _rwScale) / (stop - start);
+            ds.ScaleStep = _rwScaleStep = (ds.Scale2 - _rwScale) / (stop - start);
         }
         else
         {
@@ -4527,8 +4535,8 @@ public class RenderEngine
             ds.Silhouette = SilhouetteBoth;
             ds.SpriteTopClip = _screenHeightArray;
             ds.SpriteBottomClip = _negoneArray;
-            ds.BottomSilhouetteHeight = int.MaxValue;
-            ds.TopSilhouetteHeight = int.MinValue;
+            ds.BottomSilhouetteHeight = Fixed.MaxValue;
+            ds.TopSilhouetteHeight = Fixed.MinValue;
         }
         else
         {
@@ -4544,7 +4552,7 @@ public class RenderEngine
             else if (_backSector.FloorHeight > _viewZ)
             {
                 ds.Silhouette = SilhouetteBottom;
-                ds.BottomSilhouetteHeight = int.MaxValue;
+                ds.BottomSilhouetteHeight = Fixed.MaxValue;
             }
 
             if (_frontSector.CeilingHeight < _backSector.CeilingHeight)
@@ -4555,20 +4563,20 @@ public class RenderEngine
             else if (_backSector.CeilingHeight < _viewZ)
             {
                 ds.Silhouette |= SilhouetteTop;
-                ds.TopSilhouetteHeight = int.MinValue;
+                ds.TopSilhouetteHeight = Fixed.MinValue;
             }
 
             if (_backSector.CeilingHeight <= _frontSector.FloorHeight)
             {
                 ds.SpriteBottomClip = _negoneArray;
-                ds.BottomSilhouetteHeight = int.MaxValue;
+                ds.BottomSilhouetteHeight = Fixed.MaxValue;
                 ds.Silhouette |= SilhouetteBottom;
             }
 
             if (_backSector.FloorHeight >= _frontSector.CeilingHeight)
             {
                 ds.SpriteTopClip = _screenHeightArray;
-                ds.TopSilhouetteHeight = int.MinValue;
+                ds.TopSilhouetteHeight = Fixed.MinValue;
                 ds.Silhouette |= SilhouetteTop;
             }
 
@@ -4796,13 +4804,13 @@ public class RenderEngine
         if (_maskedTexture && (ds.Silhouette & SilhouetteTop) == 0)
         {
             ds.Silhouette |= SilhouetteTop;
-            ds.TopSilhouetteHeight = int.MinValue;
+            ds.TopSilhouetteHeight = Fixed.MinValue;
         }
 
         if (_maskedTexture && (ds.Silhouette & SilhouetteBottom) == 0)
         {
             ds.Silhouette |= SilhouetteBottom;
-            ds.BottomSilhouetteHeight = int.MaxValue;
+            ds.BottomSilhouetteHeight = Fixed.MaxValue;
         }
 
         _drawSegIdx++;
@@ -5275,33 +5283,33 @@ public class RenderEngine
     /// </summary>
     private int PointOnSide(Fixed x, Fixed y, Node node)
     {
-        if (node.Dx == 0)
+        if (node.Dx == Fixed.Zero)
         {
             if (x <= node.X)
             {
-                return node.Dy > 0 ? 1 : 0;
+                return node.Dy > Fixed.Zero ? 1 : 0;
             }
 
-            return node.Dy < 0 ? 1 : 0;
+            return node.Dy < Fixed.Zero ? 1 : 0;
         }
 
-        if (node.Dy == 0)
+        if (node.Dy == Fixed.Zero)
         {
             if (y <= node.Y)
             {
-                return node.Dx < 0 ? 1 : 0;
+                return node.Dx < Fixed.Zero ? 1 : 0;
             }
 
-            return node.Dx > 0 ? 1 : 0;
+            return node.Dx > Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - node.X);
         var dy = (y - node.Y);
 
         // Try to quickly decide by looking at sign bits.
-        if (((node.Dy ^ node.Dx ^ dx ^ dy) & 0x80000000) != 0)
+        if (((node.Dy.Value ^ node.Dx.Value ^ dx.Value ^ dy.Value) & 0x80000000) != 0)
         {
-            if (((node.Dy ^ dx) & 0x80000000) != 0)
+            if (((node.Dy.Value ^ dx.Value) & 0x80000000) != 0)
             {
                 // (left is negative)
                 return 1;
@@ -5310,8 +5318,8 @@ public class RenderEngine
             return 0;
         }
 
-        var left = (node.Dy >> Constants.FracBits) * dx;
-        var right = dy * (node.Dx >> Constants.FracBits);
+        var left = new Fixed(node.Dy.Value >> Constants.FracBits) * dx;
+        var right = dy * new Fixed(node.Dx.Value >> Constants.FracBits);
 
         if (right < left)
         {
@@ -5331,33 +5339,33 @@ public class RenderEngine
         var ldx = line.V2.X - lx;
         var ldy = line.V2.Y - ly;
 
-        if (ldx == 0)
+        if (ldx == Fixed.Zero)
         {
             if (x <= lx)
             {
-                return ldy > 0 ? 1 : 0;
+                return ldy > Fixed.Zero ? 1 : 0;
             }
 
-            return ldy < 0 ? 1 : 0;
+            return ldy < Fixed.Zero ? 1 : 0;
         }
 
-        if (ldy == 0)
+        if (ldy == Fixed.Zero)
         {
             if (y <= ly)
             {
-                return ldx < 0 ? 1 : 0;
+                return ldx < Fixed.Zero ? 1 : 0;
             }
 
-            return ldx > 0 ? 1 : 0;
+            return ldx > Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - lx);
         var dy = (y - ly);
 
         // Try to quickly decide by looking at sign bits.
-        if (((ldy ^ ldx ^ dx ^ dy) & 0x80000000) != 0)
+        if (((ldy.Value ^ ldx.Value ^ dx.Value ^ dy.Value) & 0x80000000) != 0)
         {
-            if (((ldy ^ dx) & 0x80000000) != 0)
+            if (((ldy.Value ^ dx.Value) & 0x80000000) != 0)
             {
                 // (left is negative)
                 return 1;
@@ -5365,8 +5373,8 @@ public class RenderEngine
             return 0;
         }
 
-        var left = (ldy >> Constants.FracBits) * dx;
-        var right = dy * (ldx >> Constants.FracBits);
+        var left = new Fixed(ldy.Value >> Constants.FracBits) * dx;
+        var right = dy * new Fixed(ldx.Value >> Constants.FracBits);
 
         if (right < left)
         {
@@ -5459,7 +5467,7 @@ public class RenderEngine
         }
         else
         {
-            var index = (uint)(distance >> LightZShift);
+            var index = (uint)(distance.Value >> LightZShift);
 
             if (index >= MaxLightZ)
             {
@@ -5481,7 +5489,7 @@ public class RenderEngine
     {
         if (picNum == Sky.FlatNum)
         {
-            height = 0; // all sky's map together
+            height = Fixed.Zero; // all sky's map together
             lightLevel = 0;
         }
 
@@ -5670,7 +5678,7 @@ public class RenderEngine
             // regular flat
             _dsSource = DoomGame.Instance.WadData.GetLumpNum(_firstFlat + _flatTranslation[pl.PicNum], PurgeTag.Static)!;
 
-            _planeHeight = Math.Abs(pl.Height - _viewZ);
+            _planeHeight = Fixed.Abs(pl.Height - _viewZ);
             var light = (pl.LightLevel >> LightSegShift) + _extraLight;
 
             if (light >= LightLevels)
@@ -5712,15 +5720,15 @@ public class RenderEngine
         x -= _viewX;
         y -= _viewY;
 
-        if (x == 0 && y == 0)
+        if (x == Fixed.Zero && y == Fixed.Zero)
         {
             return 0;
         }
 
-        if (x >= 0)
+        if (x >= Fixed.Zero)
         {
             // x >=0
-            if (y >= 0)
+            if (y >= Fixed.Zero)
             {
                 // y>= 0
 
@@ -5758,7 +5766,7 @@ public class RenderEngine
             // x<0
             x = -x;
 
-            if (y >= 0)
+            if (y >= Fixed.Zero)
             {
                 // y>= 0
                 if (x > y)
@@ -5801,15 +5809,15 @@ public class RenderEngine
 
     private Fixed PointToDist(Fixed x, Fixed y)
     {
-        Fixed dx = Math.Abs(x - _viewX);
-        Fixed dy = Math.Abs(y - _viewY);
+        var dx = Fixed.Abs(x - _viewX);
+        var dy = Fixed.Abs(y - _viewY);
 
         if (dy > dx)
         {
             (dx, dy) = (dy, dx);
         }
 
-        var angle = (TanToAngle[(dy / dx) >> DBits] + Angle90) >> AngleToFineShift;
+        var angle = (TanToAngle[(dy / dx).Value >> DBits] + Angle90) >> AngleToFineShift;
 
         // use as cosine
         return dx / FineSine[angle];
@@ -5829,27 +5837,27 @@ public class RenderEngine
         var angleB = (int)(Angle90 + (visAngle - _rwNormalAngle));
 
         // both sines are always positive
-        int sineA = FineSine[angleA >> AngleToFineShift];
-        int sineB = FineSine[angleB >> AngleToFineShift];
-        Fixed num = (_projection * sineB) << _detailShift;
-        int den = _rwDistance * sineA;
+        var sineA = FineSine[angleA >> AngleToFineShift];
+        var sineB = FineSine[angleB >> AngleToFineShift];
+        var num = (_projection * sineB) << _detailShift;
+        var den = _rwDistance * sineA;
 
         if (den > (num >> 16))
         {
             scale = num / den;
 
-            if (scale > 64 * Constants.FracUnit)
+            if (scale > Fixed.FromInt(64))
             {
-                scale = 64 * Constants.FracUnit;
+                scale = Fixed.FromInt(64);
             }
-            else if (scale < 256)
+            else if (scale.Value < 256)
             {
-                scale = 256;
+                scale = new Fixed(256);
             }
         }
         else
         {
-            scale = 64 * Constants.FracUnit;
+            scale = Fixed.FromInt(64);
         }
 
         return scale;
@@ -5870,11 +5878,11 @@ public class RenderEngine
         {
             // calculate unclipped screen coordinates
             //  for post
-            int topscreen = _sprTopScreen + (int)_sprYScale * column.TopDelta;
-            int bottomscreen = topscreen + (int)_sprYScale * column.Length;
+            var topscreen = _sprTopScreen + _sprYScale * column.TopDelta;
+            var bottomscreen = topscreen + _sprYScale * column.Length;
 
-            _dcYl = (topscreen + Constants.FracUnit - 1) >> Constants.FracBits;
-            _dcYh = (bottomscreen - 1) >> Constants.FracBits;
+            _dcYl = (topscreen.Value + Constants.FracUnit - 1) >> Constants.FracBits;
+            _dcYh = (bottomscreen.Value - 1) >> Constants.FracBits;
 
             if (_dcYh >= _mFloorClip[_mFloorClipIdx.GetValueOrDefault() + _dcX])
             {
@@ -5889,7 +5897,7 @@ public class RenderEngine
             if (_dcYl <= _dcYh)
             {
                 _dcSource = column.Pixels;
-                _dcTextureMid = baseTextureMid - (column.TopDelta << Constants.FracBits);
+                _dcTextureMid = baseTextureMid - Fixed.FromInt(column.TopDelta);
                 // dc_source = (byte *)column + 3 - column->topdelta;
 
                 // Drawn by either R_DrawColumn
@@ -5929,7 +5937,7 @@ public class RenderEngine
             //                 ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT - 8));
         }
 
-        _dcIScale = Math.Abs(vis.XiScale) >> _detailShift;
+        _dcIScale = Fixed.Abs(vis.XiScale) >> _detailShift;
         _dcTextureMid = vis.TextureMid;
         var frac = vis.StartFrac;
         _sprYScale = vis.Scale;
@@ -5937,7 +5945,7 @@ public class RenderEngine
 
         for (_dcX = vis.X1; _dcX <= vis.X2; _dcX++, frac += vis.XiScale)
         {
-            var textureColumn = frac >> Constants.FracBits;
+            var textureColumn = frac.Value >> Constants.FracBits;
             //# ifdef RANGECHECK
             //            if (texturecolumn < 0 || texturecolumn >= SHORT(patch->width))
             //                I_Error("R_DrawSpriteRange: bad texturecolumn");
@@ -5949,7 +5957,7 @@ public class RenderEngine
         _colFunc = _baseColFunc;
     }
 
-    private const int MinZ = Constants.FracUnit * 4;
+    private static readonly Fixed MinZ = Fixed.FromInt(4);
     private const int BaseYCenter = 100;
 
     /// <summary>
@@ -5979,7 +5987,7 @@ public class RenderEngine
         var tx = -(gyt + gxt);
 
         // too far off the side?
-        if (Math.Abs(tx) > (tz << 2))
+        if (Fixed.Abs(tx) > (tz << 2))
         {
             return;
         }
@@ -6016,8 +6024,8 @@ public class RenderEngine
         }
 
         // calculate edges of the shape
-        tx -= _spriteOffset[lump];
-        var x1 = (_centerXFrac + (tx * xscale)) >> Constants.FracBits;
+        tx -= Fixed.FromInt(_spriteOffset[lump]);
+        var x1 = (_centerXFrac + (tx * xscale)).Value >> Constants.FracBits;
 
         // off the right side?
         if (x1 > ViewWidth)
@@ -6025,8 +6033,8 @@ public class RenderEngine
             return;
         }
 
-        tx += _spriteWidth[lump];
-        var x2 = ((_centerXFrac + (tx * xscale)) >> Constants.FracBits) - 1;
+        tx += Fixed.FromInt(_spriteWidth[lump]);
+        var x2 = ((_centerXFrac + (tx * xscale)).Value >> Constants.FracBits) - 1;
 
         // off the left side
         if (x2 < 0)
@@ -6041,26 +6049,26 @@ public class RenderEngine
         vis.GX = thing.X;
         vis.GY = thing.Y;
         vis.GZ = thing.Z;
-        vis.GZTop = thing.Z + _spriteTopOffset[lump];
+        vis.GZTop = thing.Z + Fixed.FromInt(_spriteTopOffset[lump]);
         vis.TextureMid = vis.GZTop - _viewZ;
         vis.X1 = x1 < 0 ? 0 : x1;
         vis.X2 = x2 >= ViewWidth ? ViewWidth - 1 : x2;
-        var iscale = Constants.FracUnit / xscale;
+        var iscale = Fixed.Unit / xscale;
 
         if (flip)
         {
-            vis.StartFrac = _spriteWidth[lump] - 1;
+            vis.StartFrac = new Fixed(Fixed.FromInt(_spriteWidth[lump]).Value - 1);
             vis.XiScale = -iscale;
         }
         else
         {
-            vis.StartFrac = 0;
+            vis.StartFrac = Fixed.Zero;
             vis.XiScale = iscale;
         }
 
         if (vis.X1 > x1)
         {
-            vis.StartFrac += (int)vis.XiScale * (vis.X1 - x1);
+            vis.StartFrac += vis.XiScale * (vis.X1 - x1);
         }
         vis.Patch = lump;
 
@@ -6087,7 +6095,7 @@ public class RenderEngine
         else
         {
             // diminished light
-            var index = xscale >> (LightScaleShift - _detailShift);
+            var index = xscale.Value >> (LightScaleShift - _detailShift);
 
             if (index >= MaxLightScale)
             {
@@ -6178,10 +6186,10 @@ public class RenderEngine
         var flip = spriteFrame.Flip[0];
 
         // calculate edges of the shape
-        var tx = psp.SX - (160 * Constants.FracUnit);
-        tx -= _spriteOffset[lump];
+        var tx = psp.SX - Fixed.FromInt(160);
+        tx -= Fixed.FromInt(_spriteOffset[lump]);
 
-        var x1 = (_centerXFrac + (tx * _pSpriteScale)) >> Constants.FracBits;
+        var x1 = (_centerXFrac + (tx * _pSpriteScale)).Value >> Constants.FracBits;
 
         // off the right side
         if (x1 > ViewWidth)
@@ -6189,8 +6197,8 @@ public class RenderEngine
             return;
         }
 
-        tx += _spriteWidth[lump];
-        var x2 = ((_centerXFrac + (tx * _pSpriteScale)) >> Constants.FracBits) - 1;
+        tx += Fixed.FromInt(_spriteWidth[lump]);
+        var x2 = ((_centerXFrac + (tx * _pSpriteScale)).Value >> Constants.FracBits) - 1;
 
         // off the left side
         if (x2 < 0)
@@ -6202,7 +6210,7 @@ public class RenderEngine
         var vis = new VisSprite()
         {
             MapObjectFlags = 0,
-            TextureMid = (BaseYCenter << Constants.FracBits) + Constants.FracUnit / 2 - (psp.SY - _spriteTopOffset[lump]),
+            TextureMid = Fixed.FromInt(BaseYCenter) + Fixed.Unit / 2 - (psp.SY - Fixed.FromInt(_spriteTopOffset[lump])),
             X1 = x1 < 0 ? 0 : x1,
             X2 = x2 >= ViewWidth ? ViewWidth - 1 : x2,
             Scale = _pSpriteScale << _detailShift
@@ -6211,17 +6219,17 @@ public class RenderEngine
         if (flip)
         {
             vis.XiScale = -_pSpriteIScale;
-            vis.StartFrac = _spriteWidth[lump] - 1;
+            vis.StartFrac = new Fixed(Fixed.FromInt(_spriteWidth[lump]).Value - 1);
         }
         else
         {
             vis.XiScale = _pSpriteIScale;
-            vis.StartFrac = 0;
+            vis.StartFrac = Fixed.Zero;
         }
 
         if (vis.X1 > x1)
         {
-            vis.StartFrac += (int)vis.XiScale * (vis.X1 - x1);
+            vis.StartFrac += vis.XiScale * (vis.X1 - x1);
         }
 
         vis.Patch = lump;
