@@ -20,6 +20,7 @@ public partial class MainPage : ContentPage
             (GameMode, string) doomVersion = await IdentifyVersion();
             await DoomGame.Instance.RunAsync(doomVersion.Item1, doomVersion.Item2);
         });
+        App.Locator.MainViewModel.PropertyChanged += Output_PropertyChanged;
     }
 
     private void Output_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -32,11 +33,11 @@ public partial class MainPage : ContentPage
 
     private void SKCanvasView_OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
     {
-        if (App.Locator.MainViewModel.Output is null)
+        if (App.Locator.MainViewModel.Output.ByteCount == 0)
         {
             return;
         }
-
+        
         SKImageInfo resizeInfo = new SKImageInfo((int)GameSurface.Width, (int)GameSurface.Height);
         SKBitmap resizedBitmap = new(resizeInfo);
         App.Locator.MainViewModel.Output.ScalePixels(resizedBitmap, SKFilterQuality.High);
