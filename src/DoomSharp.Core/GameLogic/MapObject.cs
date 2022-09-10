@@ -94,7 +94,7 @@ public class MapObject : Thinker
     public MapObject? SectorPrev { get; set; }
 
     // More drawing info: to determine current sprite.
-    public uint Angle { get; set; } // orientation
+    public Angle Angle { get; set; } // orientation
     public SpriteNum Sprite { get; set; } // used to find patch_t and flip value
     public int Frame { get; set; } // might be ORed with FF_FULLBRIGHT
 
@@ -238,13 +238,12 @@ public class MapObject : Thinker
                 target.Z - inflictor.Z > Fixed.FromInt(64) &&
                 (DoomRandom.P_Random() & 1) != 0)
             {
-                ang += RenderEngine.Angle180;
+                ang += Angle.Angle180;
                 thrust *= 4;
             }
 
-            ang >>= RenderEngine.AngleToFineShift;
-            target.MomX += (thrust * RenderEngine.FineCosine[ang]);
-            target.MomY += (thrust * RenderEngine.FineSine[ang]);
+            target.MomX += (thrust * DoomMath.Cos(ang));
+            target.MomY += (thrust * DoomMath.Sin(ang));
         }
 
         // player specific

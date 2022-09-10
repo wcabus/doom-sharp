@@ -89,10 +89,10 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
 
         // bob the weapon based on movement speed
-        var angle = (128 * game.LevelTime) & RenderEngine.FineMask;
-        psp.SX = Fixed.Unit + (player.Bob * RenderEngine.FineCosine[angle]);
-        angle &= RenderEngine.FineAngles / 2 - 1;
-        psp.SY = WeaponInfo.WeaponTop + (player.Bob * RenderEngine.FineSine[angle]);
+        var angle = (128 * game.LevelTime) & DoomMath.FineMask;
+        psp.SX = Fixed.Unit + (player.Bob * DoomMath.Cos(angle));
+        angle &= DoomMath.FineAngleCount / 2 - 1;
+        psp.SY = WeaponInfo.WeaponTop + (player.Bob * DoomMath.Sin(angle));
     }
 
     // Lowers current weapon,
@@ -164,7 +164,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
 
         var angle = player.MapObject!.Angle;
-        angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+        angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
         var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, Constants.MeleeRange);
         DoomGame.Instance.Game.P_LineAttack(player.MapObject, angle, Constants.MeleeRange, slope, damage);
 
@@ -256,7 +256,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         {
             var damage = 5 * (DoomRandom.P_Random() % 3 + 1);
             var angle = player.MapObject.Angle;
-            angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 19);
+            angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 19);
 
             game.P_LineAttack(
                 player.MapObject, 
@@ -326,7 +326,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         var damage = 2 * (DoomRandom.P_Random() % 10 + 1);
         var angle = player.MapObject!.Angle;
-        angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+        angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
         
         // use meleerange + 1 so the puff doesn't skip the flash
         var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, new Fixed(Constants.MeleeRange.Value + 1));
@@ -349,19 +349,19 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
                 lineTarget.X,
                 lineTarget.Y);
 
-        if (angle - player.MapObject.Angle > RenderEngine.Angle180)
+        if (angle - player.MapObject.Angle > Angle.Angle180)
         {
-            if (angle - player.MapObject.Angle < unchecked((uint)(-RenderEngine.Angle90 / 20)))
-                player.MapObject.Angle = angle + RenderEngine.Angle90 / 21;
+            if (angle - player.MapObject.Angle < -Angle.Angle90 / 20)
+                player.MapObject.Angle = angle + Angle.Angle90 / 21;
             else
-                player.MapObject.Angle -= RenderEngine.Angle90 / 20;
+                player.MapObject.Angle -= Angle.Angle90 / 20;
         }
         else
         {
-            if (angle - player.MapObject.Angle > RenderEngine.Angle90 / 20)
-                player.MapObject.Angle = angle - RenderEngine.Angle90 / 21;
+            if (angle - player.MapObject.Angle > Angle.Angle90 / 20)
+                player.MapObject.Angle = angle - Angle.Angle90 / 21;
             else
-                player.MapObject.Angle += RenderEngine.Angle90 / 20;
+                player.MapObject.Angle += Angle.Angle90 / 20;
         }
         player.MapObject.Flags |= MapObjectFlag.MF_JUSTATTACKED;
     }
@@ -402,7 +402,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         for (var i = 0; i < 40; i++)
         {
-            var an = (uint)(mo.Angle - RenderEngine.Angle90 / 2 + RenderEngine.Angle90 / 40 * i);
+            var an = new Angle((uint)(mo.Angle.Value - Angle.Angle90.Value / 2 + Angle.Angle90.Value / 40 * i));
 
             // mo->target is the originator (player) of the missile
             game.P_AimLineAttack(mo.Target!, an, Fixed.FromInt(16 * 64));

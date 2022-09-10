@@ -1598,10 +1598,10 @@ public static class Trigger
                 // spawn teleport fog at source and destination
                 var fog = game.P_SpawnMapObject(oldX, oldY, oldZ, MapObjectType.MT_TFOG);
                 // S_StartSound(fog, sfx_telept);
-                var an = m.Angle >> RenderEngine.AngleToFineShift;
+                var an = m.Angle;
 
-                fog = game.P_SpawnMapObject(m.X + 20 * RenderEngine.FineCosine[an],
-                    m.Y + 20 * RenderEngine.FineSine[an],
+                fog = game.P_SpawnMapObject(m.X + 20 * DoomMath.Cos(an),
+                    m.Y + 20 * DoomMath.Sin(an),
                     thing.Z, MapObjectType.MT_TFOG);
 
                 // emit sound, where?

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -104,14 +105,18 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             return;
         }
 
-        Application.Current?.Dispatcher?.Invoke(() =>
+        try
         {
-            bitmap.WritePixels(_rectangle, _screenBuffer, _stride, 0);
-            if (switchOutput)
+            Application.Current?.Dispatcher?.Invoke(() =>
             {
-                Output = bitmap;
-            }
-        });
+                bitmap.WritePixels(_rectangle, _screenBuffer, _stride, 0);
+                if (switchOutput)
+                {
+                    Output = bitmap;
+                }
+            });
+        }
+        catch (TaskCanceledException) {}
     }
 
     public void StartTic()

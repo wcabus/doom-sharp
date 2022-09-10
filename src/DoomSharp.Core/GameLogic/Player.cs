@@ -1,6 +1,5 @@
 ﻿using DoomSharp.Core.Networking;
 using DoomSharp.Core.Data;
-using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
 
 namespace DoomSharp.Core.GameLogic;
@@ -286,16 +285,16 @@ public class Player
     /// </summary>
     private void UseLines()
     {
-        var angle = MapObject!.Angle >> RenderEngine.AngleToFineShift;
-        var x1 = MapObject.X;
-        var y1 = MapObject.Y;
-        var x2 = x1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineCosine[angle];
-        var y2 = y1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        //var angle = MapObject!.Angle >> RenderEngine.AngleToFineShift;
+        //var x1 = MapObject.X;
+        //var y1 = MapObject.Y;
+        //var x2 = x1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineCosine[angle];
+        //var y2 = y1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineSine[angle];
 
         // TODO P_PathTraverse(x1, y1, x2, y2, PT_ADDLINES, PTR_UseTraverse);
     }
 
-    private const uint Angle5 = RenderEngine.Angle90 / 18;
+    private static readonly Angle Angle5 = new(Angle.Angle90.Value / 18);
 
     /// <summary>
     /// Fall on your face when dying. Decrease POV height to floor height.
@@ -325,7 +324,7 @@ public class Player
             var delta = angle - MapObject.Angle;
 
             var inverseAngle5 = Angle5;
-            if (delta < Angle5 || delta > (uint)-inverseAngle5)
+            if (delta < Angle5 || delta > -inverseAngle5)
             {
                 // Looking at killer,
                 //  so fade damage flash down.
@@ -336,7 +335,7 @@ public class Player
                     DamageCount--;
                 }
             }
-            else if (delta < RenderEngine.Angle180)
+            else if (delta < Angle.Angle180)
             {
                 MapObject.Angle += Angle5;
             }
@@ -391,8 +390,8 @@ public class Player
             return;
         }
 
-        var angle = (RenderEngine.FineAngles / 20 * DoomGame.Instance.Game.LevelTime) & RenderEngine.FineMask;
-        var bob = Bob / 2 * RenderEngine.FineSine[angle];
+        var angle = (DoomMath.FineAngleCount / 20 * DoomGame.Instance.Game.LevelTime) & DoomMath.FineMask;
+        var bob = Bob / 2 * DoomMath.Sin(angle);
 
         // move viewheight
         if (PlayerState == PlayerState.Alive)
@@ -434,7 +433,7 @@ public class Player
 
     public void Move()
     {
-        MapObject!.Angle += (uint)(Command.AngleTurn << 16);
+        MapObject!.Angle += new Angle(Command.AngleTurn << 16);
 
         // Do not let the player control movement
         //  if not onground.
@@ -447,7 +446,7 @@ public class Player
 
         if (Command.SideMove != 0 && OnGround)
         {
-            Thrust(MapObject.Angle - RenderEngine.Angle90, new Fixed(Command.SideMove * 2048));
+            Thrust(MapObject.Angle - Angle.Angle90, new Fixed(Command.SideMove * 2048));
         }
 
         if ((Command.ForwardMove != 0 || Command.SideMove != 0) && 
@@ -460,12 +459,10 @@ public class Player
     /// <summary>
     /// Moves the given origin along a given angle.
     /// </summary>
-    public void Thrust(uint angle, Fixed move)
+    public void Thrust(Angle angle, Fixed move)
     {
-        angle >>= RenderEngine.AngleToFineShift;
-
-        MapObject!.MomX = MapObject.MomX + (move * RenderEngine.FineCosine[angle]);
-        MapObject.MomY = MapObject.MomY + (move * RenderEngine.FineSine[angle]);
+        MapObject!.MomX += (move * DoomMath.Cos(angle));
+        MapObject.MomY += (move * DoomMath.Sin(angle));
     }
 
     /// <summary>

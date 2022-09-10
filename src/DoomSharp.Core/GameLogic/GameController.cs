@@ -498,11 +498,6 @@ public class GameController
     /// </summary>
     private bool CheckSpot(int playernum, MapThing mthing)
     {
-        Fixed x;
-        Fixed y;
-        SubSector ss;
-        uint an;
-
         if (Players[playernum].MapObject == null)
         {
             // first spawn of level, before corpses
@@ -516,8 +511,8 @@ public class GameController
             return true;
         }
 
-        x = Fixed.FromInt(mthing.X);
-        y = Fixed.FromInt(mthing.Y);
+        var x = Fixed.FromInt(mthing.X);
+        var y = Fixed.FromInt(mthing.Y);
 
         if (!P_CheckPosition(Players[playernum].MapObject!, x, y))
         {
@@ -533,10 +528,12 @@ public class GameController
         _bodyQueueSlot++;
 
         // spawn a teleport fog 
-        ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
-        an = (uint)((RenderEngine.Angle45 * (mthing.Angle / 45)) >> RenderEngine.AngleToFineShift);
+        var ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+        var mapThingAngle = new Angle(Angle.Angle45.Value * (uint)(mthing.Angle / 45));
+        var an = (int)((Angle.Angle45.Value >> DoomMath.AngleToFineShift) *
+                    ((int)Math.Round(mapThingAngle.ToDegrees()) / 45));
 
-        P_SpawnMapObject(x + 20 * RenderEngine.FineCosine[an], y + 20 * RenderEngine.FineSine[an], ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
+        P_SpawnMapObject(x + 20 * DoomMath.Cos(an), y + 20 * DoomMath.Sin(an), ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
 
         if (Players[ConsolePlayer].ViewZ != new Fixed(1))
         {
@@ -1244,7 +1241,7 @@ public class GameController
             mobj.Flags |= (MapObjectFlag)((mthing.Type - 1) << (int)MapObjectFlag.MF_TRANSSHIFT);
         }
 
-        mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
+        mobj.Angle = new Angle(Angle.Angle45.Value * (uint)(mthing.Angle / 45));
         mobj.Player = p;
         mobj.Health = p.Health;
 
@@ -1370,20 +1367,21 @@ public class GameController
     private Fixed _swingX;
     private Fixed _swingY;
 
-    private void P_CalcSwing(Player player)
-    {
-        // OPTIMIZE: tablify this.
-        // A LUT would allow for different modes,
-        //  and add flexibility.
+    // TODO Fixme
+    //private void P_CalcSwing(Player player)
+    //{
+    //    // OPTIMIZE: tablify this.
+    //    // A LUT would allow for different modes,
+    //    //  and add flexibility.
 
-        var swing = player.Bob;
+    //    var swing = player.Bob;
 
-        var angle = (RenderEngine.FineAngles / 70 * LevelTime) & RenderEngine.FineMask;
-        _swingX = swing * RenderEngine.FineSine[angle];
+    //    var angle = (RenderEngine.FineAngles / 70 * LevelTime) & RenderEngine.FineMask;
+    //    _swingX = swing * RenderEngine.FineSine[angle];
 
-        angle = (RenderEngine.FineAngles / 70 * LevelTime + RenderEngine.FineAngles / 2) & RenderEngine.FineMask;
-        _swingY = -(_swingX * RenderEngine.FineSine[angle]);
-    }
+    //    angle = (RenderEngine.FineAngles / 70 * LevelTime + RenderEngine.FineAngles / 2) & RenderEngine.FineMask;
+    //    _swingY = -(_swingX * RenderEngine.FineSine[angle]);
+    //}
 
     /// <summary>
     /// Starts bringing the pending weapon up
@@ -1605,7 +1603,7 @@ public class GameController
             TotalItems++;
         }
 
-        mobj.Angle = (uint)(RenderEngine.Angle45 * (mthing.Angle / 45));
+        mobj.Angle = new Angle(Angle.Angle45.Value * (uint)(mthing.Angle / 45));
         if ((mthing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
         {
             mobj.Flags |= MapObjectFlag.MF_AMBUSH;
@@ -2729,29 +2727,26 @@ public class GameController
 
         if (side == 1)
         {
-            lineAngle += RenderEngine.Angle180;
+            lineAngle += Angle.Angle180;
         }
 
         var moveAngle = DoomGame.Instance.Renderer.PointToAngle2(Fixed.Zero, Fixed.Zero, _tmXMove, _tmYMove);
         var deltaAngle = moveAngle - lineAngle;
 
-        if (deltaAngle > RenderEngine.Angle180)
+        if (deltaAngle > Angle.Angle180)
         {
             unchecked
             {
-                deltaAngle += RenderEngine.Angle180;
+                deltaAngle += Angle.Angle180;
             }
         }
         //	I_Error ("SlideLine: ang>ANG180");
 
-        lineAngle >>= RenderEngine.AngleToFineShift;
-        deltaAngle >>= RenderEngine.AngleToFineShift;
-
         var moveLen = P_AproxDistance(_tmXMove, _tmYMove);
-        var newLen = (moveLen * RenderEngine.FineCosine[deltaAngle]);
+        var newLen = (moveLen * DoomMath.Cos(deltaAngle));
 
-        _tmXMove = (newLen * RenderEngine.FineCosine[lineAngle]);
-        _tmYMove = (newLen * RenderEngine.FineSine[lineAngle]);
+        _tmXMove = (newLen * DoomMath.Cos(lineAngle));
+        _tmYMove = (newLen * DoomMath.Sin(lineAngle));
     }
 
     private bool PTR_SlideTraverse(Intercept intercept)
@@ -5424,11 +5419,11 @@ public class GameController
 
         if (_lineTarget == null)
         {
-            an += 1 << 26;
+            an += new Angle(1 << 26);
             _bulletSlope = P_AimLineAttack(mo, an, Fixed.FromInt(16 * 64));
             if (_lineTarget == null)
             {
-                an -= 2 << 26;
+                an -= new Angle(2 << 26);
                 _bulletSlope = P_AimLineAttack(mo, an, Fixed.FromInt(16 * 64));
             }
         }
@@ -5444,7 +5439,7 @@ public class GameController
 
         if (!accurate)
         {
-            angle += (uint)((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+            angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
         }
 
         P_LineAttack(mo, angle, Constants.MissileRange, _bulletSlope, damage);
@@ -5679,13 +5674,12 @@ public class GameController
         }
     }
 
-    public Fixed P_AimLineAttack(MapObject thing, uint angle, Fixed distance)
+    public Fixed P_AimLineAttack(MapObject thing, Angle angle, Fixed distance)
     {
-        angle >>= RenderEngine.AngleToFineShift;
         _shootThing = thing;
 
-        var x2 = thing.X + (distance.Value >> Constants.FracBits) * RenderEngine.FineCosine[angle];
-        var y2 = thing.Y + (distance.Value >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        var x2 = thing.X + (distance.Value >> Constants.FracBits) * DoomMath.Cos(angle);
+        var y2 = thing.Y + (distance.Value >> Constants.FracBits) * DoomMath.Sin(angle);
         _shootZ = new Fixed(thing.Z.Value + (thing.Height.Value >> 1) + 8 * Constants.FracUnit);
 
         // Can't shoot outside view angles
@@ -5705,14 +5699,13 @@ public class GameController
         return Fixed.Zero;
     }
 
-    public void P_LineAttack(MapObject thing, uint angle, Fixed distance, Fixed slope, int damage)
+    public void P_LineAttack(MapObject thing, Angle angle, Fixed distance, Fixed slope, int damage)
     {
-        angle >>= RenderEngine.AngleToFineShift;
         _shootThing = thing;
         _laDamage = damage;
 
-        var x2 = thing.X + (distance >> Constants.FracBits) * RenderEngine.FineCosine[angle];
-        var y2 = thing.Y + (distance >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        var x2 = thing.X + (distance >> Constants.FracBits) * DoomMath.Cos(angle);
+        var y2 = thing.Y + (distance >> Constants.FracBits) * DoomMath.Sin(angle);
         _shootZ = new Fixed(thing.Z.Value + (thing.Height.Value >> 1) + 8 * Constants.FracUnit);
         _attackRange = distance;
         _aimSlope = slope;
@@ -5798,12 +5791,12 @@ public class GameController
 
         if (_lineTarget == null)
         {
-            an += 1 << 26;
+            an += new Angle(1 << 26);
             slope = P_AimLineAttack(source, an, Fixed.FromInt(16 * 64));
 
             if (_lineTarget == null)
             {
-                an -= 2 << 26;
+                an -= new Angle(2 << 26);
                 slope = P_AimLineAttack(source, an, Fixed.FromInt(16 * 64));
             }
 
@@ -5826,8 +5819,8 @@ public class GameController
 
         th.Target = source;
         th.Angle = an;
-        th.MomX = th.Info.Speed * RenderEngine.FineCosine[an >> RenderEngine.AngleToFineShift];
-        th.MomY = th.Info.Speed * RenderEngine.FineSine[an >> RenderEngine.AngleToFineShift];
+        th.MomX = th.Info.Speed * DoomMath.Cos(an);
+        th.MomY = th.Info.Speed * DoomMath.Sin(an);
         th.MomZ = th.Info.Speed * slope;
 
         P_CheckMissileSpawn(th);

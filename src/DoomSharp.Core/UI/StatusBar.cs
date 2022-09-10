@@ -761,11 +761,6 @@ public class StatusBar
     private int _ufwPriority = 0;
     private void UpdateFaceWidget()
     {
-        var doevilgrin = false;
-        uint badguyangle;
-        uint diffang;
-        bool faceRight;
-
         if (_ufwPriority < 10)
         {
             // dead
@@ -782,17 +777,17 @@ public class StatusBar
             if (_player!.BonusCount != 0)
             {
                 // picking up bonus
-                doevilgrin = false;
+                var doEvilGrin = false;
 
                 for (var i = 0; i < (int)WeaponType.NumberOfWeapons; i++)
                 {
                     if (_oldWeaponsOwned[i] != _player.WeaponOwned[i])
                     {
-                        doevilgrin = true;
+                        doEvilGrin = true;
                         _oldWeaponsOwned[i] = _player.WeaponOwned[i];
                     }
                 }
-                if (doevilgrin)
+                if (doEvilGrin)
                 {
                     // evil grin if just picked up weapon
                     _ufwPriority = 8;
@@ -819,26 +814,28 @@ public class StatusBar
                 }
                 else
                 {
-                    badguyangle = DoomGame.Instance.Renderer.PointToAngle2(_player.MapObject!.X, _player.MapObject.Y, _player.Attacker.X, _player.Attacker.Y);
+                    var badGuyAngle = DoomGame.Instance.Renderer.PointToAngle2(_player.MapObject!.X, _player.MapObject.Y, _player.Attacker.X, _player.Attacker.Y);
 
-                    if (badguyangle > _player.MapObject.Angle)
+                    Angle diffAngle;
+                    bool faceRight;
+                    if (badGuyAngle > _player.MapObject.Angle)
                     {
                         // whether right or left
-                        diffang = badguyangle - _player.MapObject.Angle;
-                        faceRight = diffang > RenderEngine.Angle180;
+                        diffAngle = badGuyAngle - _player.MapObject.Angle;
+                        faceRight = diffAngle > Angle.Angle180;
                     }
                     else
                     {
                         // whether left or right
-                        diffang = _player.MapObject.Angle - badguyangle;
-                        faceRight = diffang <= RenderEngine.Angle180;
+                        diffAngle = _player.MapObject.Angle - badGuyAngle;
+                        faceRight = diffAngle <= Angle.Angle180;
                     } // confusing, aint it?
 
 
                     _faceCount = ST_TURNCOUNT;
                     _faceIndex = CalcPainOffset();
 
-                    if (diffang < RenderEngine.Angle45)
+                    if (diffAngle < Angle.Angle45)
                     {
                         // head-on    
                         _faceIndex += ST_RAMPAGEOFFSET;
