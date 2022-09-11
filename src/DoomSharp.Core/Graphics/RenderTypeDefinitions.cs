@@ -86,6 +86,8 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
 
 public record SideDef(Fixed TextureOffset, Fixed RowOffset, Sector Sector)
 {
+    public Fixed TextureOffset { get; set; } = TextureOffset;
+
     public int TopTexture { get; set; }
     public int BottomTexture { get; set; }
     public int MidTexture { get; set; }

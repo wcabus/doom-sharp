@@ -1,8 +1,8 @@
 ﻿namespace DoomSharp.Core;
 
-public struct Angle
+public readonly struct Angle
 {
-    private uint _value;
+    private readonly uint _value;
 
     // Binary Angle Measument, BAM.
     public static readonly Angle Angle0 = new(0);
@@ -10,6 +10,8 @@ public struct Angle
     public static readonly Angle Angle90 = new(0x40000000);
     public static readonly Angle Angle180 = new(0x80000000);
     public static readonly Angle Angle270 = new(0xc0000000);
+                               
+    public static readonly Angle TraceAngle = new(0xc000000);
 
     public Angle(uint value)
     {

@@ -171,6 +171,9 @@ public class RenderEngine
     private int[] _flatTranslation = Array.Empty<int>();
     private int[] _textureTranslation = Array.Empty<int>();
 
+    public int[] FlatTranslation => _flatTranslation;
+    public int[] TextureTranslation => _textureTranslation;
+
     // needed for pre rendering
     private int[] _spriteWidth = Array.Empty<int>();
     private int[] _spriteOffset = Array.Empty<int>();

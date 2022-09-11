@@ -4,7 +4,6 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
-using System.Runtime.InteropServices;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -156,7 +155,7 @@ public class GameController
     private int _numSwitches = -1;
     private readonly Button[] _buttonList = new Button[Constants.MaxButtons];
 
-    private AnimatingItem[] _animations = new AnimatingItem[Constants.MaxAnimations];
+    private readonly AnimatingItem[] _animations = new AnimatingItem[Constants.MaxAnimations];
     private AnimatingItem? _lastAnimation = null;
 
     private int _numLineSpecials;
@@ -1070,11 +1069,86 @@ public class GameController
         }
 
         RunThinkers();
-        //UpdateSpecials();
+        UpdateSpecials();
         //RespawnSpecials();
 
         // for par times
         LevelTime++;
+    }
+
+    private bool _levelTimer;
+    private int _levelTimeCount;
+
+    private void UpdateSpecials()
+    {
+        //	LEVEL TIMER
+        if (_levelTimer)
+        {
+            _levelTimeCount--;
+            if (_levelTimeCount == 0)
+            {
+                ExitLevel();
+            }
+        }
+
+        //	ANIMATE FLATS AND TEXTURES GLOBALLY
+        foreach (var anim in _animations)
+        {
+            for (var i = anim.BasePic; i < anim.BasePic + anim.NumPics; i++)
+            {
+                var pic = anim.BasePic + ((LevelTime / anim.Speed + i) % anim.NumPics);
+                if (anim.IsTexture)
+                {
+                    DoomGame.Instance.Renderer.TextureTranslation[i] = pic;
+                }
+                else
+                {
+                    DoomGame.Instance.Renderer.FlatTranslation[i] = pic;
+                }
+            }
+        }
+
+        //	ANIMATE LINE SPECIALS
+        for (var i = 0; i < _numLineSpecials; i++)
+        {
+            var line = _lineSpecialList[i];
+            switch (line.Special)
+            {
+                case 48:
+                    // EFFECT FIRSTCOL SCROLL +
+                    Sides[line.SideNum[0]].TextureOffset += Fixed.Unit;
+                    break;
+            }
+        }
+
+        //	DO BUTTONS
+        for (var i = 0; i < Constants.MaxButtons; i++)
+        {
+            if (_buttonList[i].Timer != 0)
+            {
+                _buttonList[i].Timer--;
+                if (_buttonList[i].Timer == 0)
+                {
+                    switch (_buttonList[i].Where)
+                    {
+                        case ButtonWhere.Top:
+                            Sides[_buttonList[i].Line!.SideNum[0]].TopTexture = _buttonList[i].Texture;
+                            break;
+
+                        case ButtonWhere.Middle:
+                            Sides[_buttonList[i].Line!.SideNum[0]].MidTexture = _buttonList[i].Texture;
+                            break;
+
+                        case ButtonWhere.Bottom:
+                            Sides[_buttonList[i].Line!.SideNum[0]].BottomTexture = _buttonList[i].Texture;
+                            break;
+                    }
+
+                    // S_StartSound((mobj_t*)&buttonlist[i].soundorg, sfx_swtchn);
+                    _buttonList[i] = new Button();
+                }
+            }
+        }
     }
 
     private void P_LoadVertexes(int lump)
@@ -1361,28 +1435,6 @@ public class GameController
         } while (psp.Tics == 0);
         // an initial state of 0 could cycle through
     }
-
-    //
-    // P_CalcSwing
-    //	
-    private Fixed _swingX;
-    private Fixed _swingY;
-
-    // TODO Fixme
-    //private void P_CalcSwing(Player player)
-    //{
-    //    // OPTIMIZE: tablify this.
-    //    // A LUT would allow for different modes,
-    //    //  and add flexibility.
-
-    //    var swing = player.Bob;
-
-    //    var angle = (RenderEngine.FineAngles / 70 * LevelTime) & RenderEngine.FineMask;
-    //    _swingX = swing * RenderEngine.FineSine[angle];
-
-    //    angle = (RenderEngine.FineAngles / 70 * LevelTime + RenderEngine.FineAngles / 2) & RenderEngine.FineMask;
-    //    _swingY = -(_swingX * RenderEngine.FineSine[angle]);
-    //}
 
     /// <summary>
     /// Starts bringing the pending weapon up
@@ -2389,7 +2441,7 @@ public class GameController
     private Intercept?[] _intercepts = new Intercept?[MaxIntercepts];
     private int _lastInterceptIdx = 0;
 
-    private const int PT_AddLines = 1;
+    public const int PT_AddLines = 1;
     private const int PT_AddThings = 2;
     private const int PT_EarlyOut = 4;
 
@@ -2555,13 +2607,46 @@ public class GameController
         return true;		// everything was traversed
     }
 
+    public MapObject? UseThing { get; set; }
+
+    public bool PTR_UseTraverse(Intercept intercept)
+    {
+        if (intercept.Line!.Special == 0)
+        {
+            P_LineOpening(intercept.Line);
+            if (_openRange <= Fixed.Zero)
+            {
+                // S_StartSound (usething, sfx_noway);
+
+                // can't use through a wall
+                return false;
+            }
+
+            // not a special line, but keep checking
+            return true;
+        }
+
+        var side = 0;
+        if (P_PointOnLineSide(UseThing!.X, UseThing.Y, intercept.Line) == 1)
+        {
+            side = 1;
+        }
+
+        //	return false;		// don't use back side
+
+        P_UseSpecialLine(UseThing, intercept.Line, side);
+
+        // can't use for than one special line in a row
+        return false;
+    }
+
     /// <summary>
     /// Traces a line from x1,y1 to x2,y2,
     /// calling the traverser function for each.
     /// Returns true if the traverser function returns true
     /// for all lines.
     /// </summary>
-    private bool P_PathTraverse(Fixed x1, Fixed y1, Fixed x2, Fixed y2, int flags, Func<Intercept, bool> traverserFunction)
+    public bool P_PathTraverse(Fixed x1, Fixed y1, Fixed x2, Fixed y2, int flags, Func<Intercept, bool> traverserFunction)
     {
         Fixed xStep;
         Fixed yStep;
@@ -2736,10 +2821,7 @@ public class GameController
 
         if (deltaAngle > Angle.Angle180)
         {
-            unchecked
-            {
-                deltaAngle += Angle.Angle180;
-            }
+            deltaAngle += Angle.Angle180;
         }
         //	I_Error ("SlideLine: ang>ANG180");
 
@@ -3071,7 +3153,7 @@ public class GameController
         }
     }
 
-    private Fixed P_AproxDistance(Fixed dx, Fixed dy)
+    public Fixed P_AproxDistance(Fixed dx, Fixed dy)
     {
         dx = Fixed.Abs(dx);
         dy = Fixed.Abs(dy);
@@ -6181,7 +6263,7 @@ public class GameController
         P_PathTraverse(thing.X, thing.Y, x2, y2, PT_AddLines | PT_AddThings, PTR_ShootTraverse);
     }
 
-    private void P_SpawnPuff(Fixed x, Fixed y, Fixed z)
+    public void P_SpawnPuff(Fixed x, Fixed y, Fixed z)
     {
         z += new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 10);
 
@@ -6246,6 +6328,43 @@ public class GameController
         {
             P_ExplodeMissile(th);
         }
+    }
+
+    public MapObject P_SpawnMissile(MapObject source, MapObject dest, MapObjectType type)
+    {
+        var th = P_SpawnMapObject(source.X, source.Y, source.Z + Fixed.FromInt(4 * 8), type);
+
+        if (th.Info.SeeSound != SoundType.sfx_None)
+        {
+            // S_StartSound (th, th->info->seesound);
+        }
+
+        th.Target = source; // where it came from
+        var an = DoomGame.Instance.Renderer.PointToAngle2(source.X, source.Y, dest.X, dest.Y);
+
+        // fuzzy player
+        if ((dest.Flags & MapObjectFlag.MF_SHADOW) != 0)
+        {
+            an += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 20);
+        }
+
+        th.Angle = an;
+        // BUG May need to convert speed into a Fixed first to get FixedMul behavior
+        th.MomX = th.Info.Speed * DoomMath.Cos(an);
+        th.MomY = th.Info.Speed * DoomMath.Sin(an);
+
+        var dist = P_AproxDistance(dest.X - source.X, dest.Y - source.Y);
+        dist /= th.Info.Speed;
+
+        if (dist < new Fixed(1))
+        {
+            dist = new Fixed(1);
+        }
+
+        th.MomZ = (dest.Z - source.Z) / dist.Value;
+        P_CheckMissileSpawn(th);
+
+        return th;
     }
 
     /// <summary>

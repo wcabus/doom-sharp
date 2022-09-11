@@ -285,13 +285,16 @@ public class Player
     /// </summary>
     private void UseLines()
     {
-        //var angle = MapObject!.Angle >> RenderEngine.AngleToFineShift;
-        //var x1 = MapObject.X;
-        //var y1 = MapObject.Y;
-        //var x2 = x1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineCosine[angle];
-        //var y2 = y1 + (Constants.UseRange >> Constants.FracBits) * RenderEngine.FineSine[angle];
+        var game = DoomGame.Instance.Game;
+        game.UseThing = MapObject;
 
-        // TODO P_PathTraverse(x1, y1, x2, y2, PT_ADDLINES, PTR_UseTraverse);
+        var angle = MapObject!.Angle;
+        var x1 = MapObject.X;
+        var y1 = MapObject.Y;
+        var x2 = x1 + (Constants.UseRange.Value >> Constants.FracBits) * DoomMath.Cos(angle);
+        var y2 = y1 + (Constants.UseRange.Value >> Constants.FracBits) * DoomMath.Sin(angle);
+
+        game.P_PathTraverse(x1, y1, x2, y2, GameController.PT_AddLines, game.PTR_UseTraverse);
     }
 
     private static readonly Angle Angle5 = new(Angle.Angle90.Value / 18);
