@@ -1,5 +1,6 @@
 ﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Data;
+using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -419,7 +420,7 @@ public static class Trigger
         }
     }
 
-    private static void VerticalDoor(ActionParams actionParams)
+    public static void VerticalDoor(ActionParams actionParams)
     {
         if (actionParams.Thinker is not Door door)
         {
@@ -542,12 +543,62 @@ public static class Trigger
         }
     }
 
-    public static int DoorEvent(Line line, DoorType type)
+    public static bool LockedDoorEvent(Line line, DoorType type, MapObject thing)
+    {
+        var player = thing.Player;
+        if (player == null)
+        {
+            return false;
+        }
+
+        switch (line.Special)
+        {
+            case 99: // blue lock
+            case 133:
+                if (!player.Cards[(int)KeyCardType.BlueCard] &&
+                    !player.Cards[(int)KeyCardType.BlueSkull])
+                {
+                    player.Message = Messages.PD_BLUEO;
+                    // S_StartSound(NULL, sfx_oof);
+                    return false;
+                }
+
+                break;
+
+            case 134: // red lock
+            case 135:
+                if (!player.Cards[(int)KeyCardType.RedCard] &&
+                    !player.Cards[(int)KeyCardType.RedSkull])
+                {
+                    player.Message = Messages.PD_REDO;
+                    // S_StartSound(NULL, sfx_oof);
+                    return false;
+                }
+
+                break;
+
+            case 136: // yellow lock
+            case 137:
+                if (!player.Cards[(int)KeyCardType.YellowCard] &&
+                    !player.Cards[(int)KeyCardType.YellowSkull])
+                {
+                    player.Message = Messages.PD_YELLOWO;
+                    // S_StartSound(NULL, sfx_oof);
+                    return false;
+                }
+
+                break;
+        }
+
+        return DoorEvent(line, type);
+    }
+
+    public static bool DoorEvent(Line line, DoorType type)
     {
         var secnum = -1;
         var game = DoomGame.Instance.Game;
 
-        var rtn = 0;
+        var rtn = false;
 
         while ((secnum = game.P_FindSectorFromLineTag(line, secnum)) >= 0)
         {
@@ -558,7 +609,7 @@ public static class Trigger
             }
 
             // new door thinker
-            rtn = 1;
+            rtn = true;
             var door = new Door();
             game.AddThinker(door);
             sec.SpecialData = door;
@@ -625,10 +676,157 @@ public static class Trigger
         return rtn;
     }
 
+    public static void VerticalDoorEvent(Line line, MapObject thing)
+    {
+        var side = 0; // only front sides can be used
+
+        // check for locks
+        var player = thing.Player;
+
+        switch (line.Special)
+        {
+            case 26: // Blue Lock
+            case 32:
+                if (player == null)
+                {
+                    return;
+                }
+
+                if (!player.Cards[(int)KeyCardType.BlueCard] && !player.Cards[(int)KeyCardType.BlueSkull])
+                {
+                    player.Message = Messages.PD_BLUEK;
+                    // S_StartSound(NULL, sfx_oof);
+                    return;
+                }
+                break;
+
+            case 27: // Yellow Lock
+            case 34:
+                if (player == null)
+                {
+                    return;
+                }
+
+                if (!player.Cards[(int)KeyCardType.YellowCard] && !player.Cards[(int)KeyCardType.YellowSkull])
+                {
+                    player.Message = Messages.PD_YELLOWK;
+                    // S_StartSound(NULL, sfx_oof);
+                    return;
+                }
+                break;
+
+            case 28: // Red Lock
+            case 33:
+                if (player == null)
+                {
+                    return;
+                }
+
+                if (!player.Cards[(int)KeyCardType.RedCard] && !player.Cards[(int)KeyCardType.RedSkull])
+                {
+                    player.Message = Messages.PD_REDK;
+                    // S_StartSound(NULL, sfx_oof);
+                    return;
+                }
+                break;
+        }
+
+        // if the sector has an active thinker, use it
+        var sec = DoomGame.Instance.Game.Sides[line.SideNum[side ^ 1]].Sector;
+        var secnum = DoomGame.Instance.Game.Sectors.IndexOf(sec);
+
+        if (sec.SpecialData is Door door)
+        {
+            switch (line.Special)
+            {
+                case 1: // ONLY FOR "RAISE" DOORS, NOT "OPEN"s
+                case 26:
+                case 27:
+                case 28:
+                case 117:
+                    if (door.Direction == -1)
+                    {
+                        door.Direction = 1;    // go back up
+                    }
+                    else
+                    {
+                        if (player == null)
+                        {
+                            return;     // JDC: bad guys never close doors
+                        }
+
+                        door.Direction = -1;   // start going down immediately
+                    }
+                    return;
+            }
+        }
+
+        // for proper sound
+        switch (line.Special)
+        {
+            case 117:   // BLAZING DOOR RAISE
+            case 118:   // BLAZING DOOR OPEN
+                // S_StartSound((mobj_t*)&sec->soundorg, sfx_bdopn);
+                break;
+
+            case 1: // NORMAL DOOR SOUND
+            case 31:
+                // S_StartSound((mobj_t*)&sec->soundorg, sfx_doropn);
+                break;
+
+            default:    // LOCKED DOOR SOUND
+                // S_StartSound((mobj_t*)&sec->soundorg, sfx_doropn);
+                break;
+        }
+
+        // new door thinker
+        var newDoor = new Door();
+        DoomGame.Instance.Game.AddThinker(newDoor);
+        sec.SpecialData = newDoor;
+
+        newDoor.Action = VerticalDoor;
+        newDoor.Sector = sec;
+        newDoor.Direction = 1;
+        newDoor.TopWait = Door.Wait;
+        newDoor.Speed = Door.DefaultSpeed;
+
+        switch (line.Special)
+        {
+            case 1:
+            case 26:
+            case 27:
+            case 28:
+                newDoor.Type = DoorType.Normal;
+                break;
+
+            case 31:
+            case 32:
+            case 33:
+            case 34:
+                newDoor.Type = DoorType.Open;
+                line.Special = 0;
+                break;
+
+            case 117:   // blazing door raise
+                newDoor.Type = DoorType.BlazeRaise;
+                newDoor.Speed = Door.DefaultSpeed * 4;
+                break;
+            case 118:   // blazing door open
+                newDoor.Type = DoorType.BlazeOpen;
+                line.Special = 0;
+                newDoor.Speed = Door.DefaultSpeed * 4;
+                break;
+        }
+
+        // find the top and bottom of the movement range
+        newDoor.TopHeight = DoomGame.Instance.Game.P_FindLowestCeilingSurrounding(sec);
+        newDoor.TopHeight -= Fixed.FromInt(4);
+    }
+
     /// <summary>
     /// Move a plane (floor or ceiling) and check for crushing
     /// </summary>
-    private static Result MovePlane(Sector sector, Fixed speed, Fixed dest, bool crush, int floorOrCeiling, int direction)
+    public static Result MovePlane(Sector sector, Fixed speed, Fixed dest, bool crush, int floorOrCeiling, int direction)
     {
         Fixed lastPos;
         bool flag;
@@ -771,7 +969,7 @@ public static class Trigger
         return Result.Ok;
     }
 
-    private static void MoveFloor(ActionParams actionParams)
+    public static void MoveFloor(ActionParams actionParams)
     {
         if (actionParams.Thinker is not Floor floor)
         {
@@ -813,10 +1011,10 @@ public static class Trigger
         }
     }
 
-    public static int FloorEvent(Line line, FloorType type)
+    public static bool FloorEvent(Line line, FloorType type)
     {
         var secnum = -1;
-        var rtn = 0;
+        var rtn = false;
         var game = DoomGame.Instance.Game;
         var renderer = DoomGame.Instance.Renderer;
 
@@ -831,7 +1029,7 @@ public static class Trigger
             }
 
             // new floor thinker
-            rtn = 1;
+            rtn = true;
             var floor = new Floor();
             game.AddThinker(floor);
             sec.SpecialData = floor;
@@ -1005,15 +1203,14 @@ public static class Trigger
         return rtn;
     }
 
-    private static int BuildStairsEvent(Line line, StaircaseType type)
+    public static bool BuildStairsEvent(Line line, StaircaseType type)
     {
-        var rtn = 0;
+        var rtn = false;
         var secnum = -1;
         var game = DoomGame.Instance.Game;
 
         var speed = Fixed.Zero;
         var stairSize = Fixed.Zero;
-        var ok = false;
 
         while ((secnum = game.P_FindSectorFromLineTag(line, secnum)) >= 0)
         {
@@ -1026,7 +1223,7 @@ public static class Trigger
             }
 
             // new floor thinker
-            rtn = 1;
+            rtn = true;
             var floor = new Floor();
             game.AddThinker(floor);
             sec.SpecialData = floor;
@@ -1056,6 +1253,7 @@ public static class Trigger
             // Find next sector to raise
             // 1. Find 2-sided line with same sector side[0]
             // 2. Other side is the next sector to raise
+            bool ok;
             do
             {
                 ok = false;
@@ -1108,9 +1306,9 @@ public static class Trigger
         return rtn;
     }
 
-    private static int DonutEvent(Line line)
+    public static bool DonutEvent(Line line)
     {
-        var rtn = 0;
+        var rtn = false;
         var secnum = -1;
         var game = DoomGame.Instance.Game;
 
@@ -1124,7 +1322,7 @@ public static class Trigger
                 continue;
             }
 
-            rtn = 1;
+            rtn = true;
             var s2 = s1.Lines[0].GetNextSector(s1)!;
             for (var i = 0; i < s2.LineCount; i++)
             {
@@ -1272,10 +1470,10 @@ public static class Trigger
         }
     }
 
-    private static int CeilingEvent(Line line, CeilingType type)
+    public static bool CeilingEvent(Line line, CeilingType type)
     {
         var secnum = -1;
-        var rtn = 0;
+        var rtn = false;
 
         // Reactivate in-statis ceilings... for certain types.
         switch (type)
@@ -1296,7 +1494,7 @@ public static class Trigger
             }
 
             // new door thinker
-            rtn = 1;
+            rtn = true;
             var ceiling = new Ceiling();
             DoomGame.Instance.Game.AddThinker(ceiling);
             sec.SpecialData = ceiling;
@@ -1422,10 +1620,10 @@ public static class Trigger
         }
     }
 
-    public static int PlatformEvent(Line line, PlatformType type, int amount)
+    public static bool PlatformEvent(Line line, PlatformType type, int amount)
     {
         var secnum = -1;
-        var rtn = 0;
+        var rtn = false;
         var game = DoomGame.Instance.Game;
 
         // Activate all <type> platforms that are in stasis
@@ -1446,7 +1644,7 @@ public static class Trigger
             }
 
             // Find lowest & highest floors around sector
-            rtn = 1;
+            rtn = true;
             var plat = new Platform();
             game.AddThinker(plat);
 
@@ -1542,7 +1740,7 @@ public static class Trigger
         return rtn;
     }
 
-    private static int TeleportEvent(Line line, int side, MapObject thing)
+    public static int TeleportEvent(Line line, int side, MapObject thing)
     {
         // Don't teleport missiles
         if ((thing.Flags & MapObjectFlag.MF_MISSILE) != 0)
@@ -1622,7 +1820,7 @@ public static class Trigger
         return 0;
     }
 
-    private static void TagLightsTurnOffEvent(Line line)
+    public static void TagLightsTurnOffEvent(Line line)
     {
         var game = DoomGame.Instance.Game;
         foreach (var sector in game.Sectors.Where(x => x.Tag == line.Tag))
@@ -1648,7 +1846,7 @@ public static class Trigger
         }
     }
 
-    private static void LightTurnOnEvent(Line line, int bright)
+    public static void LightTurnOnEvent(Line line, int bright)
     {
         var game = DoomGame.Instance.Game;
         foreach (var sector in game.Sectors.Where(x => x.Tag == line.Tag))
@@ -1679,7 +1877,7 @@ public static class Trigger
         }
     }
 
-    private static void LightStrobingEvent(Line line)
+    public static void LightStrobingEvent(Line line)
     {
         var game = DoomGame.Instance.Game;
         var secnum = -1;
@@ -1696,7 +1894,7 @@ public static class Trigger
         }
     }
 
-    private static void SpawnStrobeFlash(Sector sec, int fastOrSlow, int inSync)
+    public static void SpawnStrobeFlash(Sector sec, int fastOrSlow, int inSync)
     {
         var flash = new StrobeFlash();
 
@@ -1727,7 +1925,7 @@ public static class Trigger
         }
     }
 
-    private static void PerformStrobeFlash(ActionParams actionParams)
+    public static void PerformStrobeFlash(ActionParams actionParams)
     {
         if (actionParams.Thinker is not StrobeFlash flash)
         {
@@ -1751,24 +1949,24 @@ public static class Trigger
         }
     }
 
-    private static bool TwoSided(int sectorIdx, int lineIdx)
+    public static bool TwoSided(int sectorIdx, int lineIdx)
     {
         var game = DoomGame.Instance.Game;
         return (game.Sectors[sectorIdx].Lines[lineIdx].Flags & Constants.Line.TwoSided) != 0;
     }
 
-    private static SideDef GetSide(int currentSector, int lineIdx, int sideIdx)
+    public static SideDef GetSide(int currentSector, int lineIdx, int sideIdx)
     {
         var game = DoomGame.Instance.Game;
         return game.Sides[game.Sectors[currentSector].Lines[lineIdx].SideNum[sideIdx]];
     }
 
-    private static Sector GetSector(int currentSector, int lineIdx, int sideIdx)
+    public static Sector GetSector(int currentSector, int lineIdx, int sideIdx)
     {
         return GetSide(currentSector, lineIdx, sideIdx).Sector;
     }
 
-    private static bool IsSideSectorCurrent(int currentSector, int lineIdx, int sideIdx)
+    public static bool IsSideSectorCurrent(int currentSector, int lineIdx, int sideIdx)
     {
         var game = DoomGame.Instance.Game;
         var side = GetSide(currentSector, lineIdx, sideIdx);

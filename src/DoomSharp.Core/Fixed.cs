@@ -16,12 +16,17 @@ public readonly struct Fixed
     public static readonly Fixed Zero = new(0);
     public static readonly Fixed Unit = new(Constants.FracUnit);
 
+    public int Value => _value;
+
+    public Fixed AddRadius(int radius)
+    {
+        return new Fixed(_value + radius);
+    }
+
     public static Fixed FromInt(int value)
     {
         return new Fixed(value << Constants.FracBits);
     }
-
-    public int Value => _value;
 
     public static Fixed Abs(Fixed value)
     {

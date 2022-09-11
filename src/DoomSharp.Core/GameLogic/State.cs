@@ -1,5 +1,4 @@
 ﻿using DoomSharp.Core.Data;
-using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Sound;
 
@@ -431,7 +430,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     private static void ActionExplode(ActionParams actionParams)
     {
         var thingy = actionParams.MapObject!;
-        DoomGame.Instance.Game.P_RadiusAttack(thingy, thingy.Target, 128);
+        DoomGame.Instance.Game.P_RadiusAttack(thingy, thingy.Target!, 128);
     }
 
     private static void ActionPain(ActionParams actionParams)
@@ -474,8 +473,200 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         // S_StartSound(actor, sfx_slop);
     }
 
-    private static void ActionLook(ActionParams actionParams) { }
-    private static void ActionChase(ActionParams actionParams) { }
+    /// <summary>
+    /// Stay in state until a player is sighted.
+    /// </summary>
+    private static void ActionLook(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+
+        actor.Threshold = 0; // any shot will wake up
+        var target = actor.SubSector?.Sector?.SoundTarget;
+
+        if (target != null && (target.Flags & MapObjectFlag.MF_SHOOTABLE) != 0)
+        {
+            actor.Target = target;
+            if ((actor.Flags & MapObjectFlag.MF_AMBUSH) != 0)
+            {
+                DoomGame.Instance.Game.P_CheckSight(actor, actor.Target);
+                SeeYou();
+                return;
+            }
+
+            SeeYou();
+            return;
+        }
+
+        if (!DoomGame.Instance.Game.P_LookForPlayers(actor, false))
+        {
+            return;
+        }
+
+        SeeYou();
+
+        // go into chase state
+        void SeeYou()
+        {
+            if (actor.Info.SeeSound != SoundType.sfx_None)
+            {
+                //int sound;
+
+                //switch (actor->info->seesound)
+                //{
+                //    case sfx_posit1:
+                //    case sfx_posit2:
+                //    case sfx_posit3:
+                //        sound = sfx_posit1 + P_Random() % 3;
+                //        break;
+
+                //    case sfx_bgsit1:
+                //    case sfx_bgsit2:
+                //        sound = sfx_bgsit1 + P_Random() % 2;
+                //        break;
+
+                //    default:
+                //        sound = actor->info->seesound;
+                //        break;
+                //}
+
+                //if (actor->type == MT_SPIDER
+                //    || actor->type == MT_CYBORG)
+                //{
+                //    // full volume
+                //    S_StartSound(NULL, sound);
+                //}
+                //else
+                //    S_StartSound(actor, sound);
+            }
+
+            actor.SetState(actor.Info.SeeState);
+        }
+    }
+
+    /// <summary>
+    /// Actor has a melee attack, so it tries to close as fast as possible
+    /// </summary>
+    private static void ActionChase(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.ReactionTime != 0)
+        {
+            actor.ReactionTime--;
+        }
+
+        // modify target threshold
+        if (actor.Threshold != 0)
+        {
+            if (actor.Target is not { Health: > 0 })
+            {
+                actor.Threshold = 0;
+            }
+            else
+            {
+                actor.Threshold--;
+            }
+        }
+
+        // turn towards movement direction if not there yet
+        if ((int)actor.MoveDir < 8)
+        {
+            actor.Angle = new Angle((uint)(actor.Angle.Value & (7 << 29)));
+            var delta = (int)(actor.Angle.Value - ((int)actor.MoveDir << 29));
+
+            if (delta > 0)
+            {
+                actor.Angle -= Angle.Angle90 / 2;
+            }
+            else if (delta < 0)
+            {
+                actor.Angle += Angle.Angle90 / 2;
+            }
+        }
+
+        if (actor.Target == null || (actor.Target.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            // look for a new target
+            if (game.P_LookForPlayers(actor, true))
+            {
+                return; // got a new target
+            }
+
+            actor.SetState(actor.Info.SpawnState);
+        }
+
+        // do not attack twice in a row
+        if ((actor.Flags & MapObjectFlag.MF_JUSTATTACKED) != 0)
+        {
+            actor.Flags &= ~MapObjectFlag.MF_JUSTATTACKED;
+            if (game.GameSkill != SkillLevel.Nightmare /* && !fastparm */)
+            {
+                game.P_NewChaseDir(actor);
+            }
+
+            return;
+        }
+
+        // check for melee attack
+        if (actor.Info.MeleeState != StateNum.S_NULL && game.P_CheckMeleeRange(actor))
+        {
+            if (actor.Info.AttackSound != SoundType.sfx_None)
+            {
+                // S_StartSound (actor, actor->info->attacksound);
+            }
+
+            actor.SetState(actor.Info.MeleeState);
+            return;
+        }
+
+        // check for missile attack
+        if (actor.Info.MissileState != StateNum.S_NULL)
+        {
+            if (game.GameSkill < SkillLevel.Nightmare && actor.MoveCount != 0 /* && !fastparm */)
+            {
+                NoMissile();
+                return;
+            }
+
+            if (!game.P_CheckMissileRange(actor))
+            {
+                NoMissile();
+                return;
+            }
+
+            actor.SetState(actor.Info.MissileState);
+            actor.Flags |= MapObjectFlag.MF_JUSTATTACKED;
+            return;
+        }
+
+        NoMissile();
+
+        void NoMissile()
+        {
+            // possibly choose another target
+            if (game.NetGame && actor.Threshold == 0 && !game.P_CheckSight(actor, actor.Target!))
+            {
+                if (game.P_LookForPlayers(actor, true))
+                {
+                    return; // got a new target
+                }
+            }
+
+            // chase towards player
+            if (--actor.MoveCount < 0 || !game.P_Move(actor))
+            {
+                game.P_NewChaseDir(actor);
+            }
+
+            // make active sound
+            if (actor.Info.ActiveSound != SoundType.sfx_None && DoomRandom.P_Random() < 3)
+            {
+                // S_StartSound (actor, actor->info->activesound);
+            }
+        }
+    }
+
     private static void ActionFaceTarget(ActionParams actionParams) { }
     private static void ActionPosAttack(ActionParams actionParams) { }
 

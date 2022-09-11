@@ -130,7 +130,7 @@ public class MapObject : Thinker
     public int Health { get; set; }
 
     // Movement direction, movement generation (zig-zagging).
-    public int MoveDir { get; set; }	// 0-7
+    public DirectionType MoveDir { get; set; }	// 0-7
     public int MoveCount { get; set; }	// when 0, select a new dir
 
     // Thing being chased/attacked (or NULL),

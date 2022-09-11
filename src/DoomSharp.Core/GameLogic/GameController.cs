@@ -4,6 +4,7 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
+using System.Runtime.InteropServices;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -3955,6 +3956,473 @@ public class GameController
     }
 
     /// <summary>
+    /// Called when a thing uses a special line.
+    /// Only the front sides of lines are usable.
+    /// </summary>
+    public bool P_UseSpecialLine(MapObject thing, Line line, int side)
+    {
+        // Err...
+        // Use the back sides of VERY SPECIAL lines...
+        if (side != 0)
+        {
+            switch (line.Special)
+            {
+                case 124:
+                    // Sliding door open&close
+                    // UNUSED?
+                    break;
+
+                default:
+                    return false;
+            }
+        }
+
+        // Switches that other things can activate.
+        if (thing.Player == null)
+        {
+            // never open secret doors
+            if ((line.Flags & Constants.Line.Secret) != 0)
+            {
+                return false;
+            }
+
+            switch (line.Special)
+            {
+                case 1:     // MANUAL DOOR RAISE
+                case 32:    // MANUAL BLUE
+                case 33:    // MANUAL RED
+                case 34:    // MANUAL YELLOW
+                    break;
+
+                default:
+                    return false;
+            }
+        }
+
+        // do something  
+        switch (line.Special)
+        {
+            // MANUALS
+            case 1:     // Vertical Door
+            case 26:        // Blue Door/Locked
+            case 27:        // Yellow Door /Locked
+            case 28:        // Red Door /Locked
+
+            case 31:        // Manual door open
+            case 32:        // Blue locked door open
+            case 33:        // Red locked door open
+            case 34:        // Yellow locked door open
+
+            case 117:       // Blazing door raise
+            case 118:       // Blazing door open
+                Trigger.VerticalDoorEvent(line, thing);
+                break;
+
+            //UNUSED - Door Slide Open&Close
+            // case 124:
+            // EV_SlidingDoor (line, thing);
+            // break;
+
+            // SWITCHES
+            case 7:
+                // Build Stairs
+                if (Trigger.BuildStairsEvent(line, StaircaseType.Build8))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 9:
+                // Change Donut
+                if (Trigger.DonutEvent(line))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 11:
+                // Exit level
+                P_ChangeSwitchTexture(line, false);
+                ExitLevel();
+                break;
+
+            case 14:
+                // Raise Floor 32 and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseAndChange, 32))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 15:
+                // Raise Floor 24 and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseAndChange, 24))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 18:
+                // Raise Floor to next highest floor
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorToNearest))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 20:
+                // Raise Plat next highest floor and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseToNearestAndChange, 0))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 21:
+                // PlatDownWaitUpStay
+                if (Trigger.PlatformEvent(line, PlatformType.DownWaitUpStay, 0))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 23:
+                // Lower Floor to Lowest
+                if (Trigger.FloorEvent(line, FloorType.LowerFloorToLowest))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 29:
+                // Raise Door
+                if (Trigger.DoorEvent(line, DoorType.Normal))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 41:
+                // Lower Ceiling to Floor
+                if (Trigger.CeilingEvent(line, CeilingType.LowerToFloor))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 71:
+                // Turbo Lower Floor
+                if (Trigger.FloorEvent(line, FloorType.TurboLower))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 49:
+                // Ceiling Crush And Raise
+                if (Trigger.CeilingEvent(line, CeilingType.CrushAndRaise))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 50:
+                // Close Door
+                if (Trigger.DoorEvent(line, DoorType.Close))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 51:
+                // Secret EXIT
+                P_ChangeSwitchTexture(line, false);
+                SecretExitLevel();
+                break;
+
+            case 55:
+                // Raise Floor Crush
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorCrush))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 101:
+                // Raise Floor
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloor))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 102:
+                // Lower Floor to Surrounding floor height
+                if (Trigger.FloorEvent(line, FloorType.LowerFloor))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 103:
+                // Open Door
+                if (Trigger.DoorEvent(line, DoorType.Open))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 111:
+                // Blazing Door Raise (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeRaise))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 112:
+                // Blazing Door Open (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeOpen))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 113:
+                // Blazing Door Close (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeClose))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 122:
+                // Blazing PlatDownWaitUpStay
+                if (Trigger.PlatformEvent(line, PlatformType.BlazeDWUS, 0))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 127:
+                // Build Stairs Turbo 16
+                if (Trigger.BuildStairsEvent(line, StaircaseType.Turbo16))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 131:
+                // Raise Floor Turbo
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorTurbo))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 133:
+            // BlzOpenDoor BLUE
+            case 135:
+            // BlzOpenDoor RED
+            case 137:
+                // BlzOpenDoor YELLOW
+                if (Trigger.LockedDoorEvent(line, DoorType.BlazeOpen, thing))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            case 140:
+                // Raise Floor 512
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloor512))
+                {
+                    P_ChangeSwitchTexture(line, false);
+                }
+                break;
+
+            // BUTTONS
+            case 42:
+                // Close Door
+                if (Trigger.DoorEvent(line, DoorType.Close))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 43:
+                // Lower Ceiling to Floor
+                if (Trigger.CeilingEvent(line, CeilingType.LowerToFloor))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 45:
+                // Lower Floor to Surrounding floor height
+                if (Trigger.FloorEvent(line, FloorType.LowerFloor))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 60:
+                // Lower Floor to Lowest
+                if (Trigger.FloorEvent(line, FloorType.LowerFloorToLowest))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 61:
+                // Open Door
+                if (Trigger.DoorEvent(line, DoorType.Open))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 62:
+                // PlatDownWaitUpStay
+                if (Trigger.PlatformEvent(line, PlatformType.DownWaitUpStay, 1))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 63:
+                // Raise Door
+                if (Trigger.DoorEvent(line, DoorType.Normal))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 64:
+                // Raise Floor to ceiling
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloor))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 66:
+                // Raise Floor 24 and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseAndChange, 24))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 67:
+                // Raise Floor 32 and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseAndChange, 32))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 65:
+                // Raise Floor Crush
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorCrush))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 68:
+                // Raise Plat to next highest floor and change texture
+                if (Trigger.PlatformEvent(line, PlatformType.RaiseToNearestAndChange, 0))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 69:
+                // Raise Floor to next highest floor
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorToNearest))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 70:
+                // Turbo Lower Floor
+                if (Trigger.FloorEvent(line, FloorType.TurboLower))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 114:
+                // Blazing Door Raise (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeRaise))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 115:
+                // Blazing Door Open (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeOpen))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 116:
+                // Blazing Door Close (faster than TURBO!)
+                if (Trigger.DoorEvent(line, DoorType.BlazeClose))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 123:
+                // Blazing PlatDownWaitUpStay
+                if (Trigger.PlatformEvent(line, PlatformType.BlazeDWUS, 0))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 132:
+                // Raise Floor Turbo
+                if (Trigger.FloorEvent(line, FloorType.RaiseFloorTurbo))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 99:
+            // BlzOpenDoor BLUE
+            case 134:
+            // BlzOpenDoor RED
+            case 136:
+                // BlzOpenDoor YELLOW
+                if (Trigger.LockedDoorEvent(line, DoorType.BlazeOpen, thing))
+                {
+                    P_ChangeSwitchTexture(line, true);
+                }
+                break;
+
+            case 138:
+                // Light Turn On
+                Trigger.LightTurnOnEvent(line, 255);
+                P_ChangeSwitchTexture(line, true);
+                break;
+
+            case 139:
+                // Light Turn Off
+                Trigger.LightTurnOnEvent(line, 35);
+                P_ChangeSwitchTexture(line, true);
+                break;
+
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Start a button counting down until it turns off.
     /// </summary>
     private void P_StartButton(Line line, ButtonWhere w, int texture, int time)
@@ -6070,7 +6538,7 @@ public class GameController
     ///  if a straight line between t1 and t2 is unobstructed.
     /// Uses REJECT.
     /// </summary>
-    private bool P_CheckSight(MapObject t1, MapObject t2)
+    public bool P_CheckSight(MapObject t1, MapObject t2)
     {
         // First check for trivial rejection.
 
@@ -6109,5 +6577,422 @@ public class GameController
 
         // the head node is the last node output
         return P_CrossBSPNode(NumNodes - 1);
+    }
+
+    /// <summary>
+    /// If allaround is false, only look 180 degrees in front.
+    /// Returns true if a player is targeted. 
+    /// </summary>
+    public bool P_LookForPlayers(MapObject actor, bool allAround)
+    {
+        var sector = actor.SubSector!.Sector!;
+        var c = 0;
+        var stop = (actor.LastLook - 1) & 3;
+
+        for (;; actor.LastLook = (actor.LastLook + 1) & 3)
+        {
+            if (!PlayerInGame[actor.LastLook])
+            {
+                continue;
+            }
+
+            if (c++ == 2 || actor.LastLook == stop)
+            {
+                // done looking
+                return false;
+            }
+
+            var player = Players[actor.LastLook];
+            if (player.Health <= 0)
+            {
+                continue; // dead
+            }
+
+            if (!P_CheckSight(actor, player.MapObject!))
+            {
+                continue; // out of sight
+            }
+
+            if (!allAround)
+            {
+                var angle = DoomGame.Instance.Renderer.PointToAngle2(actor.X, actor.Y,
+                    player.MapObject!.X, player.MapObject.Y) - actor.Angle;
+
+                if (angle > Angle.Angle90 && angle < Angle.Angle270)
+                {
+                    var dist = P_AproxDistance(
+                        player.MapObject.X - actor.X,
+                        player.MapObject.Y - actor.Y);
+
+                    // if real close, react anyway
+                    if (dist > Constants.MeleeRange)
+                    {
+                        continue; // behind back
+                    }
+                }
+            }
+
+            actor.Target = player.MapObject;
+            return true;
+        }
+    }
+
+    //
+    // P_NewChaseDir related LUT.
+    //
+    private static readonly DirectionType[] Opposite =
+    {
+        DirectionType.West, DirectionType.SouthWest, DirectionType.South, DirectionType.SouthEast,
+        DirectionType.East, DirectionType.NorthEast, DirectionType.North, DirectionType.NorthWest, DirectionType.NoDirection
+    };
+
+    private static readonly DirectionType[] Diagonals = 
+    {
+        DirectionType.NorthWest, DirectionType.NorthEast, 
+        DirectionType.SouthWest, DirectionType.SouthEast
+    };
+
+    public void P_NewChaseDir(MapObject actor)
+    {
+        if (actor.Target == null)
+        {
+            DoomGame.Error("P_NewChaseDir: called with no target");
+            return;
+        }
+
+        var oldDir = actor.MoveDir;
+        var turnAround = Opposite[(int)oldDir];
+
+        var deltaX = actor.Target.X - actor.X;
+        var deltaY = actor.Target.Y - actor.Y;
+
+        var directions = new DirectionType[3];
+        var fixed10 = Fixed.FromInt(10);
+        if (deltaX > fixed10)
+        {
+            directions[1] = DirectionType.East;
+        }
+        else if (deltaX < -fixed10)
+        {
+            directions[1] = DirectionType.West;
+        }
+        else
+        {
+            directions[1] = DirectionType.NoDirection;
+        }
+
+        if (deltaY < -fixed10) 
+        {
+            directions[2] = DirectionType.South;
+        }
+        else if (deltaY > fixed10)
+        {
+            directions[2] = DirectionType.North;
+        }
+        else
+        {
+            directions[2] = DirectionType.NoDirection;
+        }
+
+        // try direct route
+        if (directions[1] != DirectionType.NoDirection &&
+            directions[2] != DirectionType.NoDirection)
+        {
+            var di = ((deltaY < Fixed.Zero ? 1 : 0) << 1) + ((deltaX > Fixed.Zero) ? 1 : 0);
+            actor.MoveDir = Diagonals[di];
+            if (actor.MoveDir != turnAround && P_TryWalk(actor))
+            {
+                return;
+            }
+        }
+
+        // try other directions
+        if (DoomRandom.P_Random() > 200 || Fixed.Abs(deltaY) > Fixed.Abs(deltaX))
+        {
+            (directions[1], directions[2]) = (directions[2], directions[1]);
+        }
+
+        if (directions[1] == turnAround)
+        {
+            directions[1] = DirectionType.NoDirection;
+        }
+        if (directions[2] == turnAround)
+        {
+            directions[2] = DirectionType.NoDirection;
+        }
+
+        if (directions[1] != DirectionType.NoDirection)
+        {
+            actor.MoveDir = directions[1];
+            if (P_TryWalk(actor))
+            {
+                // either moved forward or attacked
+                return;
+            }
+        }
+
+        if (directions[2] != DirectionType.NoDirection)
+        {
+            actor.MoveDir = directions[2];
+            if (P_TryWalk(actor))
+            {
+                return;
+            }
+        }
+
+        // there is no direct path to the player,
+        // so pick another direction.
+        if (oldDir != DirectionType.NoDirection)
+        {
+            actor.MoveDir = oldDir;
+
+            if (P_TryWalk(actor))
+            {
+                return;
+            }
+        }
+
+        // randomly determine direction of search
+        if ((DoomRandom.P_Random() & 1) != 0)
+        {
+            for (var dir = DirectionType.East; dir < DirectionType.SouthEast; dir++)
+            {
+                if (dir != turnAround)
+                {
+                    actor.MoveDir = dir;
+                    if (P_TryWalk(actor))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (var dir = DirectionType.SouthEast; dir != DirectionType.East - 1; dir--)
+            {
+                if (dir != turnAround)
+                {
+                    actor.MoveDir = dir;
+                    if (P_TryWalk(actor))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (turnAround != DirectionType.NoDirection)
+        {
+            actor.MoveDir = turnAround;
+            if (P_TryWalk(actor))
+            {
+                return;
+            }
+        }
+
+        actor.MoveDir = DirectionType.NoDirection;	// can not move
+    }
+
+    /// <summary>
+    /// Attempts to move actor on
+    /// in its current (ob->moveangle) direction.
+    /// If blocked by either a wall or an actor
+    /// returns FALSE
+    /// If move is either clear or blocked only by a door,
+    /// returns TRUE and sets...
+    /// If a door is in the way,
+    /// an OpenDoor call is made to start it opening.
+    /// </summary>
+    public bool P_TryWalk(MapObject actor)
+    {
+        if (!P_Move(actor))
+        {
+            return false;
+        }
+
+        actor.MoveCount = DoomRandom.P_Random() & 15;
+        return true;
+    }
+
+    private static readonly Fixed[] XSpeed =
+    {
+        Fixed.Unit, new(47000), Fixed.Zero, new(-47000), -Fixed.Unit, new(-47000), Fixed.Zero, new(47000)
+    };
+
+    private static readonly Fixed[] YSpeed =
+    {
+        Fixed.Zero, new(47000), Fixed.Unit, new(47000), Fixed.Zero, new(-47000), -Fixed.Unit, new(-47000)
+    };
+
+    public bool P_Move(MapObject actor)
+    {
+        if (actor.MoveDir == DirectionType.NoDirection)
+        {
+            return false;
+        }
+
+        if ((uint)actor.MoveDir >= 8)
+        {
+            DoomGame.Error("Weird actor->movedir!");
+            return false;
+        }
+
+        var tryX = actor.X + actor.Info.Speed * XSpeed[(int)actor.MoveDir];
+        var tryY = actor.Y + actor.Info.Speed * YSpeed[(int)actor.MoveDir];
+
+        var tryOk = P_TryMove(actor, tryX, tryY);
+
+        if (!tryOk)
+        {
+            // open any specials
+            if ((actor.Flags & MapObjectFlag.MF_FLOAT) != 0 && _floatOk)
+            {
+                // must adjust height
+                if (actor.Z < _tmFloorZ)
+                {
+                    actor.Z += Constants.FloatSpeed;
+                }
+                else
+                {
+                    actor.Z -= Constants.FloatSpeed;
+                }
+
+                actor.Flags |= MapObjectFlag.MF_INFLOAT;
+                return true;
+            }
+
+            if (_numSpecHit == 0)
+            {
+                return false;
+            }
+
+            actor.MoveDir = DirectionType.NoDirection;
+            var good = false;
+            while (_numSpecHit-- != 0)
+            {
+                var ld = _specHit[_numSpecHit];
+                // if the special is not a door
+                // that can be opened,
+                // return false
+                if (P_UseSpecialLine(actor, ld, 0))
+                {
+                    good = true;
+                }
+            }
+
+            return good;
+        }
+     
+        actor.Flags &= ~MapObjectFlag.MF_INFLOAT;
+        if ((actor.Flags & MapObjectFlag.MF_FLOAT) == 0)
+        {
+            actor.Z = actor.FloorZ;
+        }
+
+        return true;
+    }
+
+    public bool P_CheckMeleeRange(MapObject actor)
+    {
+        if (actor.Target is null)
+        {
+            return false;
+        }
+
+        var player = actor.Target;
+        var dist = P_AproxDistance(player.X - actor.X, player.Y - actor.Y);
+
+        var meleeRange = Constants.MeleeRange - Fixed.FromInt(20);
+        if (dist >= meleeRange.AddRadius(player.Info.Radius))
+        {
+            return false;
+        }
+
+        if (!P_CheckSight(actor, actor.Target))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool P_CheckMissileRange(MapObject actor)
+    {
+        if (actor.Target is null)
+        {
+            return false;
+        }
+
+        if (!P_CheckSight(actor, actor.Target))
+        {
+            return false;
+        }
+
+        if ((actor.Flags & MapObjectFlag.MF_JUSTHIT) != 0)
+        {
+            // the target just hit the enemy,
+            // so fight back!
+            actor.Flags &= ~MapObjectFlag.MF_JUSTHIT;
+            return true;
+        }
+
+        if (actor.ReactionTime != 0)
+        {
+            return false;   // do not attack yet
+        }
+
+        // OPTIMIZE: get this from a global checksight
+        var dist = P_AproxDistance(actor.X - actor.Target.X,
+            actor.Y - actor.Target.Y) - Fixed.FromInt(64);
+
+        if (actor.Info.MeleeState == StateNum.S_NULL)
+        {
+            dist -= Fixed.FromInt(128); // no melee attack, so fire more
+        }
+
+        var distValue = dist.Value >> 16;
+
+        if (actor.Type == MapObjectType.MT_VILE)
+        {
+            if (distValue > 14 * 64)
+            {
+                return false;   // too far away
+            }
+        }
+
+        if (actor.Type == MapObjectType.MT_UNDEAD)
+        {
+            if (distValue < 196)
+            {
+                return false;   // close for fist attack
+            }
+            distValue >>= 1;
+        }
+
+
+        if (actor.Type is MapObjectType.MT_CYBORG 
+            or MapObjectType.MT_SPIDER 
+            or MapObjectType.MT_SKULL)
+        {
+            distValue >>= 1;
+        }
+
+        if (distValue > 200)
+        {
+            distValue = 200;
+        }
+
+        if (actor.Type == MapObjectType.MT_CYBORG && distValue > 160)
+        {
+            distValue = 160;
+        }
+
+        if (DoomRandom.P_Random() < distValue)
+        {
+            return false;
+        }
+
+        return true;
     }
 }

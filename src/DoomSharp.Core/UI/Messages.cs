@@ -108,6 +108,14 @@ public static class Messages
     public static string GotShotgun => IsEnglish ? "You got the shotgun!" : "";
     public static string GotShotgun2 => IsEnglish ? "You got the super shotgun!" : "";
 
+    public static string PD_BLUEO => IsEnglish ? "You need a blue key to activate this object" : "";
+    public static string PD_REDO => IsEnglish ? "You need a red key to activate this object" : "";
+    public static string PD_YELLOWO => IsEnglish ? "You need a yellow key to activate this object" : "";
+
+    public static string PD_BLUEK => IsEnglish ? "You need a blue key to open this door" : "";
+    public static string PD_REDK => IsEnglish ? "You need a red key to open this door" : "";
+    public static string PD_YELLOWK => IsEnglish ? "You need a yellow key to open this door" : "";
+
     public static IEnumerable<string> QuitMessages 
     {
         get
