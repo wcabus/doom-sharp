@@ -63,7 +63,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         if (player.PendingWeapon != WeaponType.NoChange || player.Health == 0)
         {
             // change weapon
-            //  (pending weapon should allready be validated)
+            //  (pending weapon should already be validated)
             var newState = WeaponInfo.GetByType(player.ReadyWeapon).DownState;
             game.P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
             return;
@@ -488,9 +488,11 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             actor.Target = target;
             if ((actor.Flags & MapObjectFlag.MF_AMBUSH) != 0)
             {
-                DoomGame.Instance.Game.P_CheckSight(actor, actor.Target);
-                SeeYou();
-                return;
+                if (DoomGame.Instance.Game.P_CheckSight(actor, actor.Target))
+                {
+                    SeeYou();
+                    return;
+                }
             }
 
             SeeYou();

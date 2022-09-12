@@ -2,7 +2,7 @@
 
 namespace DoomSharp.Core;
 
-public readonly struct Fixed
+public readonly struct Fixed : IComparable<Fixed>
 {
     private readonly int _value;
 
@@ -154,5 +154,10 @@ public readonly struct Fixed
     public override string ToString()
     {
         return ((double)_value / Constants.FracUnit).ToString(CultureInfo.InvariantCulture);
+    }
+
+    public int CompareTo(Fixed other)
+    {
+        return _value.CompareTo(other._value);
     }
 }

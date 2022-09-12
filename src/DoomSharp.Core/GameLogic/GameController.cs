@@ -1555,60 +1555,54 @@ public class GameController
         // TODO P_NoiseAlert(player->mo, player->mo);
     }
 
-    private void P_SpawnMapThing(MapThing mthing)
+    private void P_SpawnMapThing(MapThing mapThing)
     {
-        int i;
-        int bit;
-        Fixed x;
-        Fixed y;
-        Fixed z;
-
         // count deathmatch start positions
-        if (mthing.Type == 11)
+        if (mapThing.Type == 11)
         {
             if (_deathMatchStartIdx < 10)
             {
-                _deathMatchStarts[_deathMatchStartIdx++] = mthing;
+                _deathMatchStarts[_deathMatchStartIdx++] = mapThing;
             }
             return;
         }
 
         // check for players specially
-        if (mthing.Type <= 4)
+        if (mapThing.Type <= 4)
         {
             // save spots for respawning in network games
-            _playerStarts[mthing.Type - 1] = mthing;
+            _playerStarts[mapThing.Type - 1] = mapThing;
             if (!DeathMatch)
             {
-                P_SpawnPlayer(mthing);
+                P_SpawnPlayer(mapThing);
             }
 
             return;
         }
 
         // check for appropriate skill level
-        if (!NetGame && (mthing.Options & 16) != 0)
+        if (!NetGame && (mapThing.Options & 16) != 0)
         {
             return;
         }
 
-        bit = GameSkill switch
+        var bit = GameSkill switch
         {
             SkillLevel.Baby => 1,
             SkillLevel.Nightmare => 4,
             _ => 1 << ((int)GameSkill - 1)
         };
 
-        if ((mthing.Options & bit) == 0)
+        if ((mapThing.Options & bit) == 0)
         {
             return;
         }
 
         // find which type to spawn
-        var moInfo = MapObjectInfo.FindByDoomedNum(mthing.Type);
+        var moInfo = MapObjectInfo.FindByDoomedNum(mapThing.Type);
         if (moInfo is null)
         {
-            DoomGame.Error($"P_SpawnMapThing: Unknown type {mthing.Type} at ({mthing.X}, {mthing.Y})");
+            DoomGame.Error($"P_SpawnMapThing: Unknown type {mapThing.Type} at ({mapThing.X}, {mapThing.Y})");
             return;
         }
 
@@ -1618,7 +1612,7 @@ public class GameController
             return;
         }
 
-        //// don't spawn any monsters if -nomonsters
+        // don't spawn any monsters if -nomonsters
         //if (NoMonsters
         //    && (i == MT_SKULL
         //        || (mobjinfo[i].flags & MF_COUNTKILL)))
@@ -1627,39 +1621,37 @@ public class GameController
         //}
 
         // spawn it
-        x = new Fixed(mthing.X << Constants.FracBits);
-        y = new Fixed(mthing.Y << Constants.FracBits);
+        var x = Fixed.FromInt(mapThing.X);
+        var y = Fixed.FromInt(mapThing.Y);
+        var z = Constants.OnFloorZ;
 
         if ((moInfo.Value.Flags & MapObjectFlag.MF_SPAWNCEILING) != 0)
         {
             z = Constants.OnCeilingZ;
         }
-        else
-        {
-            z = Constants.OnFloorZ;
-        }
 
-        var mobj = P_SpawnMapObject(x, y, z, moInfo.Value.Type);
-        mobj.Spawnpoint = mthing;
+        var mapObject = P_SpawnMapObject(x, y, z, moInfo.Value.Type);
+        mapObject.Spawnpoint = mapThing;
 
-        if (mobj.Tics > 0)
+        if (mapObject.Tics > 0)
         {
-            mobj.Tics = 1 + (DoomRandom.P_Random() % mobj.Tics);
+            mapObject.Tics = 1 + (DoomRandom.P_Random() % mapObject.Tics);
         }
-        if ((mobj.Flags & MapObjectFlag.MF_COUNTKILL) != 0)
+        
+        if ((mapObject.Flags & MapObjectFlag.MF_COUNTKILL) != 0)
         {
             TotalKills++;
         }
 
-        if ((mobj.Flags & MapObjectFlag.MF_COUNTITEM) != 0)
+        if ((mapObject.Flags & MapObjectFlag.MF_COUNTITEM) != 0)
         {
             TotalItems++;
         }
 
-        mobj.Angle = new Angle(Angle.Angle45.Value * (uint)(mthing.Angle / 45));
-        if ((mthing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
+        mapObject.Angle = new Angle(Angle.Angle45.Value * (uint)(mapThing.Angle / 45));
+        if ((mapThing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
         {
-            mobj.Flags |= MapObjectFlag.MF_AMBUSH;
+            mapObject.Flags |= MapObjectFlag.MF_AMBUSH;
         }
     }
 
@@ -1874,7 +1866,7 @@ public class GameController
                 return false; // Explicitly blocking everything
             }
 
-            if (_tmThing.Player != null && (line.Flags & Constants.Line.BlockMonsters) != 0)
+            if (_tmThing.Player == null && (line.Flags & Constants.Line.BlockMonsters) != 0)
             {
                 return false; // block monsters only
             }
@@ -2102,8 +2094,8 @@ public class GameController
 
         _tmBoundingBox[BoundingBox.BoxTop] = y + _tmThing.Radius;
         _tmBoundingBox[BoundingBox.BoxBottom] = y - _tmThing.Radius;
-        _tmBoundingBox[BoundingBox.BoxLeft] = x + _tmThing.Radius;
-        _tmBoundingBox[BoundingBox.BoxRight] = x - _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxRight] = x + _tmThing.Radius;
+        _tmBoundingBox[BoundingBox.BoxLeft] = x - _tmThing.Radius;
 
         var newSubSector = DoomGame.Instance.Renderer.PointInSubSector(x, y);
         _ceilingLine = null;
@@ -5956,7 +5948,7 @@ public class GameController
 
     //
     // P_BulletSlope
-    // Sets a slope so a near miss is at aproximately
+    // Sets a slope so a near miss is at approximately
     // the height of the intended target
     //
     private Fixed _bulletSlope;
@@ -6249,13 +6241,16 @@ public class GameController
         return Fixed.Zero;
     }
 
+    /// <summary>
+    /// If damage == 0, it is just a test trace that will leave linetarget set
+    /// </summary>
     public void P_LineAttack(MapObject thing, Angle angle, Fixed distance, Fixed slope, int damage)
     {
         _shootThing = thing;
         _laDamage = damage;
 
-        var x2 = thing.X + (distance >> Constants.FracBits) * DoomMath.Cos(angle);
-        var y2 = thing.Y + (distance >> Constants.FracBits) * DoomMath.Sin(angle);
+        var x2 = thing.X + (distance.Value >> Constants.FracBits) * DoomMath.Cos(angle);
+        var y2 = thing.Y + (distance.Value >> Constants.FracBits) * DoomMath.Sin(angle);
         _shootZ = new Fixed(thing.Z.Value + (thing.Height.Value >> 1) + 8 * Constants.FracUnit);
         _attackRange = distance;
         _aimSlope = slope;
@@ -6349,9 +6344,8 @@ public class GameController
         }
 
         th.Angle = an;
-        // BUG May need to convert speed into a Fixed first to get FixedMul behavior
-        th.MomX = th.Info.Speed * DoomMath.Cos(an);
-        th.MomY = th.Info.Speed * DoomMath.Sin(an);
+        th.MomX = new Fixed(th.Info.Speed) * DoomMath.Cos(an);
+        th.MomY = new Fixed(th.Info.Speed) * DoomMath.Sin(an);
 
         var dist = P_AproxDistance(dest.X - source.X, dest.Y - source.Y);
         dist /= th.Info.Speed;
@@ -6420,11 +6414,11 @@ public class GameController
     private Fixed _topSlope;
     private Fixed _bottomSlope;        // slopes to top and bottom of target
 
-    private DividerLine _sTrace = new();           // from t1 to t2
+    private readonly DividerLine _sTrace = new();           // from t1 to t2
     private Fixed _t2x;
     private Fixed _t2y;
 
-    private int[] _sightCounts = { 0, 0 };
+    private readonly int[] _sightCounts = { 0, 0 };
 
     /// <summary>
     /// Returns side 0 (front), 1 (back), or 2 (on).
@@ -6448,7 +6442,7 @@ public class GameController
 
         if (node.Dy == Fixed.Zero)
         {
-            // WEC: This is what the original source has, but shouldn't this be "y == node.Y"?
+            // This is a known bug, let's keep it for accuracy
             if (x == node.Y)
             {
                 return 2;
@@ -6490,7 +6484,7 @@ public class GameController
         var sub = SubSectors[num];
 
         // check lines
-        var count = sub.NumLines;
+        var count = sub.FirstLine + sub.NumLines;
         for (var i = sub.FirstLine; i < count; i++)
         {
             var seg = Segments[i];
@@ -6704,7 +6698,6 @@ public class GameController
     /// </summary>
     public bool P_LookForPlayers(MapObject actor, bool allAround)
     {
-        var sector = actor.SubSector!.Sector!;
         var c = 0;
         var stop = (actor.LastLook - 1) & 3;
 
@@ -6734,8 +6727,9 @@ public class GameController
 
             if (!allAround)
             {
-                var angle = DoomGame.Instance.Renderer.PointToAngle2(actor.X, actor.Y,
-                    player.MapObject!.X, player.MapObject.Y) - actor.Angle;
+                var angle = DoomGame.Instance.Renderer.PointToAngle2
+                    (actor.X, actor.Y, player.MapObject!.X, player.MapObject.Y)
+                            - actor.Angle;
 
                 if (angle > Angle.Angle90 && angle < Angle.Angle270)
                 {
