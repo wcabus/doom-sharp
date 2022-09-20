@@ -546,7 +546,7 @@ public class Player
                 break;
 
             default:
-                DoomGame.Error("P_PlayerInSpecialSector: unknown special {sector.Special");
+                DoomGame.Error($"P_PlayerInSpecialSector: unknown special {sector.Special}");
                 break;
         }
     }
