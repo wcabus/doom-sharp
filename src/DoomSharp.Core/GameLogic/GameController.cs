@@ -126,6 +126,9 @@ public class GameController
     // Blockmap size.
     private int _blockMapWidth;
     private int _blockMapHeight; // size in map blocks
+
+    private ushort[] _blockMapOffsets = Array.Empty<ushort>();
+
     private short[] _blockMap = Array.Empty<short>(); // int for larger maps TODO ????
     // offsets in blockmap are from here
     private short[] _blockMapLump = Array.Empty<short>();
@@ -1022,6 +1025,7 @@ public class GameController
 
     private void RunThinkers()
     {
+        
         var thinkerNode = _thinkers.First;
 
         while (thinkerNode != null)
@@ -1036,7 +1040,7 @@ public class GameController
             }
             else
             {
-                thinker.Action(new ActionParams(thinker as MapObject));
+                thinker.Action(new ActionParams(thinker as MapObject, Thinker: thinker));
                 thinkerNode = thinkerNode.Next;
             }
         }
@@ -2016,8 +2020,8 @@ public class GameController
             return true;
         }
 
-        var offset = y * _blockMapWidth + x;
-        offset = _blockMap[offset];
+        var index = y * _blockMapWidth + x;
+        var offset = _blockMapOffsets[index];
 
         for (var i = offset; _blockMapLump[i] != -1; i++)
         {
@@ -3679,7 +3683,7 @@ public class GameController
             {
                 ld.SlopeType = SlopeType.Vertical;
             }
-            else if (ld.Dy != Fixed.Zero)
+            else if (ld.Dy == Fixed.Zero)
             {
                 ld.SlopeType = SlopeType.Horizontal;
             }
@@ -3751,6 +3755,7 @@ public class GameController
             _blockMapLump[i] = reader.ReadInt16();
         }
 
+        
         // blockmap = blockmaplump+4;
         _blockMap = new short[count - 4];
         for (var i = 4; i < _blockMapLump.Length; i++)
@@ -3758,10 +3763,16 @@ public class GameController
             _blockMap[i - 4] = _blockMapLump[i];
         }
 
-        _blockMapOriginX = new Fixed(_blockMapLump[0] << Constants.FracBits);
-        _blockMapOriginY = new Fixed(_blockMapLump[1] << Constants.FracBits);
+        _blockMapOriginX = Fixed.FromInt(_blockMapLump[0]);
+        _blockMapOriginY = Fixed.FromInt(_blockMapLump[1]);
         _blockMapWidth = _blockMapLump[2];
         _blockMapHeight = _blockMapLump[3];
+
+        _blockMapOffsets = new ushort[_blockMapWidth * _blockMapHeight];
+        for (var i = 4; i < _blockMapWidth * _blockMapHeight + 4; i++)
+        {
+            _blockMapOffsets[i - 4] = (ushort)_blockMapLump[i];
+        }
 
         // clear out mobj chains
         //count = _blockMapWidth * _blockMapHeight;
@@ -6450,10 +6461,10 @@ public class GameController
 
             if (y <= node.Y)
             {
-                return node.Dx > Fixed.Zero ? 1 : 0;
+                return node.Dx < Fixed.Zero ? 1 : 0;
             }
 
-            return node.Dx < Fixed.Zero ? 1 : 0;
+            return node.Dx > Fixed.Zero ? 1 : 0;
         }
 
         var dx = (x - node.X);
@@ -6481,11 +6492,12 @@ public class GameController
     /// </summary>
     private bool P_CrossSubSector(int num)
     {
-        var sub = SubSectors[num];
+        var sub = SubSectors[(ushort)num];
 
         // check lines
-        var count = sub.FirstLine + sub.NumLines;
-        for (var i = sub.FirstLine; i < count; i++)
+        var count = sub.NumLines;
+        var i = sub.FirstLine;
+        for (; count != 0; count--, i++)
         {
             var seg = Segments[i];
             var line = seg.LineDef;

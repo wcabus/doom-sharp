@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Extensions;
 using DoomSharp.Core.GameLogic;
