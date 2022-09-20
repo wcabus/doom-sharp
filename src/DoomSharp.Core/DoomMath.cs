@@ -10,11 +10,21 @@ public static class DoomMath
 
     public static Fixed Tan(Angle angle)
     {
-        return new Fixed(FineTangent[angle.Value >> AngleToFineShift]);
+        var idx = angle.Value >> AngleToFineShift;
+        if (idx > (FineAngleCount / 2))
+        {
+            idx -= FineAngleCount / 2;
+        }
+
+        return new Fixed(FineTangent[idx]);
     }
 
     public static Fixed Tan(int fineAngle)
     {
+        if (fineAngle > (FineAngleCount / 2))
+        {
+            fineAngle -= FineAngleCount / 2;
+        }
         return new Fixed(FineTangent[fineAngle]);
     }
 
