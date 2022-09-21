@@ -4648,7 +4648,7 @@ public class GameController
 
                 case 10:
                     // DOOR CLOSE IN 30 SECONDS
-                   // P_SpawnDoorCloseIn30(sector);
+                    Trigger.SpawnDoorCloseIn30(sector);
                     break;
 
                 case 12:
@@ -4663,7 +4663,7 @@ public class GameController
 
                 case 14:
                     // DOOR RAISE IN 5 MINUTES
-                   // P_SpawnDoorRaiseIn5Mins(sector, i);
+                    Trigger.SpawnDoorRaiseIn5Mins(sector);
                     break;
 
                 case 17:

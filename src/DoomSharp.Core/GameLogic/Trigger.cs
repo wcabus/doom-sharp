@@ -611,12 +611,11 @@ public static class Trigger
 
             // new door thinker
             rtn = true;
-            var door = new Door();
+            var door = new Door(sec);
             game.AddThinker(door);
             sec.SpecialData = door;
 
             door.Action = VerticalDoor;
-            door.Sector = sec;
             door.Type = type;
             door.TopWait = Door.Wait;
             door.Speed = Door.DefaultSpeed;
@@ -781,12 +780,11 @@ public static class Trigger
         }
 
         // new door thinker
-        var newDoor = new Door();
+        var newDoor = new Door(sec);
         DoomGame.Instance.Game.AddThinker(newDoor);
         sec.SpecialData = newDoor;
 
         newDoor.Action = VerticalDoor;
-        newDoor.Sector = sec;
         newDoor.Direction = 1;
         newDoor.TopWait = Door.Wait;
         newDoor.Speed = Door.DefaultSpeed;
@@ -822,6 +820,45 @@ public static class Trigger
         // find the top and bottom of the movement range
         newDoor.TopHeight = DoomGame.Instance.Game.P_FindLowestCeilingSurrounding(sec);
         newDoor.TopHeight -= Fixed.FromInt(4);
+    }
+
+    /// <summary>
+    /// Spawn a door that closes after 30 seconds
+    /// </summary>
+    public static void SpawnDoorCloseIn30(Sector sector)
+    {
+        var door = new Door(sector);
+        DoomGame.Instance.Game.AddThinker(door);
+
+        sector.SpecialData = door;
+        sector.Special = 0;
+
+        door.Action = VerticalDoor;
+        door.Direction = 0;
+        door.Type = DoorType.Normal;
+        door.Speed = Door.DefaultSpeed;
+        door.TopCountDown = 30 * 35;
+    }
+
+    /// <summary>
+    /// Spawn a door that opens after 5 minutes
+    /// </summary>
+    public static void SpawnDoorRaiseIn5Mins(Sector sector)
+    {
+        var door = new Door(sector);
+        DoomGame.Instance.Game.AddThinker(door);
+
+        sector.SpecialData = door;
+        sector.Special = 0;
+
+        door.Action = VerticalDoor;
+        door.Direction = 2;
+        door.Type = DoorType.RaiseIn5Mins;
+        door.Speed = Door.DefaultSpeed;
+        door.TopHeight = DoomGame.Instance.Game.P_FindLowestCeilingSurrounding(sector);
+        door.TopHeight -= Fixed.FromInt(4);
+        door.TopWait = Door.Wait;
+        door.TopCountDown = 5 * 60 * 35;
     }
 
     /// <summary>

@@ -860,7 +860,7 @@ public class RenderEngine
                     level = NumColorMaps - 1;
                 }
 
-                _scaleLight[i][j] = _colorMaps[level * 256];
+                _scaleLight[i][j] = level * 256;
             }
         }
     }
