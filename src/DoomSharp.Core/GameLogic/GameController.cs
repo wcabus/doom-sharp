@@ -4618,28 +4618,28 @@ public class GameController
             {
                 case 1:
                     // FLICKERING LIGHTS
-                    //P_SpawnLightFlash(sector);
+                    Trigger.SpawnLightFlash(sector);
                     break;
 
                 case 2:
                     // STROBE FAST
-                   // P_SpawnStrobeFlash(sector, FASTDARK, 0);
+                    Trigger.SpawnStrobeFlash(sector, StrobeFlash.FastDark, 0);
                     break;
 
                 case 3:
                     // STROBE SLOW
-                   // P_SpawnStrobeFlash(sector, SLOWDARK, 0);
+                    Trigger.SpawnStrobeFlash(sector, StrobeFlash.SlowDark, 0);
                     break;
 
                 case 4:
                     // STROBE FAST/DEATH SLIME
-                   // P_SpawnStrobeFlash(sector, FASTDARK, 0);
+                    Trigger.SpawnStrobeFlash(sector, StrobeFlash.FastDark, 0);
                     sector.Special = 4;
                     break;
 
                 case 8:
                     // GLOWING LIGHT
-                   // P_SpawnGlowingLight(sector);
+                    Trigger.SpawnGlowingLight(sector);
                     break;
                 case 9:
                     // SECRET SECTOR
@@ -4653,12 +4653,12 @@ public class GameController
 
                 case 12:
                     // SYNC STROBE SLOW
-                   // P_SpawnStrobeFlash(sector, SLOWDARK, 1);
+                    Trigger.SpawnStrobeFlash(sector, StrobeFlash.SlowDark, 1);
                     break;
 
                 case 13:
                     // SYNC STROBE FAST
-                   // P_SpawnStrobeFlash(sector, FASTDARK, 1);
+                    Trigger.SpawnStrobeFlash(sector, StrobeFlash.FastDark, 1);
                     break;
 
                 case 14:
@@ -4667,7 +4667,7 @@ public class GameController
                     break;
 
                 case 17:
-                   // P_SpawnFireFlicker(sector);
+                    Trigger.SpawnFireFlicker(sector);
                     break;
             }
         }
