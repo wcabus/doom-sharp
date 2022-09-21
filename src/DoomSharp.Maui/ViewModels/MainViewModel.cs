@@ -22,7 +22,7 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     private string _title = "DooM#";
 
     private byte[] _palette;
-    private SKBitmap _output;
+    private SKBitmap _output = new();
 
     private readonly Int32Rect _rectangle = new(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
     private readonly byte[] _screenBuffer;
@@ -62,7 +62,6 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     public void Initialize()
     {
-        Output = new();
     }
 
     public void UpdatePalette(byte[] palette)

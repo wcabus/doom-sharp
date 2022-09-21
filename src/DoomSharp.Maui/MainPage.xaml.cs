@@ -48,9 +48,9 @@ public partial class MainPage : ContentPage
     private async Task<(GameMode, string)> IdentifyVersion()
     {
         (GameMode, string) version = new();
-        
+
         // Commercial
-        var wadFile = "doom2.wad";
+        var wadFile = "DOOM2.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Commercial;
@@ -59,7 +59,7 @@ public partial class MainPage : ContentPage
         }
 
         // Retail
-        wadFile = "doomu.wad";
+        wadFile = "DOOMU.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Retail;
@@ -68,7 +68,7 @@ public partial class MainPage : ContentPage
         }
 
         // Registered
-        wadFile = "doom.wad";
+        wadFile = "DOOM.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Registered;
@@ -77,7 +77,7 @@ public partial class MainPage : ContentPage
         }
 
         // Shareware
-        wadFile = "doom1.wad";
+        wadFile = "DOOM1.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Shareware;

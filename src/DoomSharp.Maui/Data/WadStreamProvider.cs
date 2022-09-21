@@ -9,12 +9,12 @@ namespace DoomSharp.Maui.Data
     {
         public async Task<WadFile> LoadFromFile(string file)
         {
-            Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync("DOOM1.WAD");
+            Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(file);
             var binaryReader = new BinaryReader(fileStream, Encoding.ASCII, false);
 
             DoomGame.Console.WriteLine($" adding {file}");
 
-            if (string.Equals(Path.GetExtension(file), ".wad", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(Path.GetExtension(file), ".WAD", StringComparison.OrdinalIgnoreCase))
             {
                 // WAD file
                 return LoadWad(file, binaryReader);
