@@ -1,35 +1,32 @@
-﻿using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Text;
 
 namespace DoomSharp.Core.Data;
 
 public class WadFile : IDisposable
 {
-    [StructLayout(LayoutKind.Sequential)]
     public struct WadInfo
     {
         // Should be "IWAD" or "PWAD".
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 4)]
         public string Identification;
-
-        [MarshalAs(UnmanagedType.I4)]
         public int NumLumps;
-
-        [MarshalAs(UnmanagedType.I4)]
         public int InfoTableOfs;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
     public struct FileLump
     {
-        [MarshalAs(UnmanagedType.I4)]
         public int FilePos;
-
-        [MarshalAs(UnmanagedType.I4)]
         public int Size;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 8)]
         public string Name;
+
+        public static FileLump ReadFromWadData(BinaryReader reader)
+        {
+            return new FileLump
+            {
+                FilePos = reader.ReadInt32(),
+                Size = reader.ReadInt32(),
+                Name = Encoding.ASCII.GetString(reader.ReadBytes(8)).TrimEnd('\0')
+            };
+        }
     }
 
     public static WadFile? LoadFromFile(string file)
@@ -55,9 +52,16 @@ public class WadFile : IDisposable
 
     private static WadFile? LoadWad(string file, BinaryReader reader)
     {
+        var header = new WadInfo
+        {
+            Identification = Encoding.ASCII.GetString(reader.ReadBytes(4)).TrimEnd('\0'),
+            NumLumps = reader.ReadInt32(),
+            InfoTableOfs = reader.ReadInt32()
+        };
+
         var wadFile = new WadFile(reader)
         {
-            Header = reader.ReadStruct<WadInfo>()
+            Header = header
         };
 
         if (string.Equals(wadFile.Header.Identification, "IWAD", StringComparison.Ordinal) == false)
@@ -74,7 +78,7 @@ public class WadFile : IDisposable
         reader.BaseStream.Seek(wadFile.Header.InfoTableOfs, SeekOrigin.Begin);
         for (var i = 0; i < wadFile.LumpCount; i++)
         {
-            var lump = reader.ReadStruct<FileLump>();
+            var lump = FileLump.ReadFromWadData(reader);
             fileInfo.Add(new WadLump(wadFile, lump));
         }
 
