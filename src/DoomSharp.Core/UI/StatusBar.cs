@@ -1,9 +1,7 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
-using System;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
-using System.Runtime.CompilerServices;
 
 namespace DoomSharp.Core.UI;
 
@@ -176,7 +174,7 @@ public class StatusBar
     private bool _firstTime;
     private int _veryFirstTime = 1;
 
-    private string _palette = "PLAYPAL";
+    private const string Palette = "PLAYPAL";
     private int _paletteIdx = 0;
     private uint _clock;
     private int _messageCounter;
@@ -334,7 +332,7 @@ public class StatusBar
             return;
         }
 
-        DoomGame.Instance.Video.SetPalette(_palette, _paletteIdx);
+        DoomGame.Instance.Video.SetPalette(Palette, _paletteIdx);
         _stopped = true;
     }
 
@@ -347,7 +345,6 @@ public class StatusBar
 
     private void LoadData()
     {
-        _palette = "PLAYPAL";
         _paletteIdx = 0;
         LoadGraphics();
     }
@@ -383,7 +380,7 @@ public class StatusBar
         // arms ownership widgets
         for (var i = 0; i < 6; i++)
         {
-            name = $"STGNUM{i}";
+            name = $"STGNUM{i + 2}";
 
             // gray #
             _arms[i][0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
@@ -440,7 +437,6 @@ public class StatusBar
         //_cursorOn = false;
 
         _faceIndex = 0;
-        _palette = "";
         _paletteIdx = 0;
 
         _oldHealth = -1;
@@ -508,7 +504,7 @@ public class StatusBar
         if (palette != _paletteIdx)
         {
             _paletteIdx = palette;
-            DoomGame.Instance.Video.SetPalette(_palette, _paletteIdx);
+            DoomGame.Instance.Video.SetPalette(Palette, _paletteIdx);
         }
     }
 
@@ -581,11 +577,12 @@ public class StatusBar
         // weapons owned
         for (var i = 0; i < 6; i++)
         {
+            var weaponIdx = i;
             _armsWidgets[i] = new MultiIconWidget(
                 ST_ARMSX + (i % 3) * ST_ARMSXSPACE,
                 ST_ARMSY + (i / 3) * ST_ARMSYSPACE,
                 _arms[i]!,
-                () => _player.WeaponOwned[i + 1] ? 1 : 0,
+                () => _player.WeaponOwned[weaponIdx + 1] ? 1 : 0,
                 () => _armsOn);
         }
 
@@ -764,11 +761,6 @@ public class StatusBar
     private int _ufwPriority = 0;
     private void UpdateFaceWidget()
     {
-        var doevilgrin = false;
-        uint badguyangle;
-        uint diffang;
-        bool faceRight;
-
         if (_ufwPriority < 10)
         {
             // dead
@@ -785,17 +777,17 @@ public class StatusBar
             if (_player!.BonusCount != 0)
             {
                 // picking up bonus
-                doevilgrin = false;
+                var doEvilGrin = false;
 
                 for (var i = 0; i < (int)WeaponType.NumberOfWeapons; i++)
                 {
                     if (_oldWeaponsOwned[i] != _player.WeaponOwned[i])
                     {
-                        doevilgrin = true;
+                        doEvilGrin = true;
                         _oldWeaponsOwned[i] = _player.WeaponOwned[i];
                     }
                 }
-                if (doevilgrin)
+                if (doEvilGrin)
                 {
                     // evil grin if just picked up weapon
                     _ufwPriority = 8;
@@ -822,26 +814,28 @@ public class StatusBar
                 }
                 else
                 {
-                    badguyangle = DoomGame.Instance.Renderer.PointToAngle2(_player.MapObject!.X, _player.MapObject.Y, _player.Attacker.X, _player.Attacker.Y);
+                    var badGuyAngle = DoomGame.Instance.Renderer.PointToAngle2(_player.MapObject!.X, _player.MapObject.Y, _player.Attacker.X, _player.Attacker.Y);
 
-                    if (badguyangle > _player.MapObject.Angle)
+                    Angle diffAngle;
+                    bool faceRight;
+                    if (badGuyAngle > _player.MapObject.Angle)
                     {
                         // whether right or left
-                        diffang = badguyangle - _player.MapObject.Angle;
-                        faceRight = diffang > RenderEngine.Angle180;
+                        diffAngle = badGuyAngle - _player.MapObject.Angle;
+                        faceRight = diffAngle > Angle.Angle180;
                     }
                     else
                     {
                         // whether left or right
-                        diffang = _player.MapObject.Angle - badguyangle;
-                        faceRight = diffang <= RenderEngine.Angle180;
+                        diffAngle = _player.MapObject.Angle - badGuyAngle;
+                        faceRight = diffAngle <= Angle.Angle180;
                     } // confusing, aint it?
 
 
                     _faceCount = ST_TURNCOUNT;
                     _faceIndex = CalcPainOffset();
 
-                    if (diffang < RenderEngine.Angle45)
+                    if (diffAngle < Angle.Angle45)
                     {
                         // head-on    
                         _faceIndex += ST_RAMPAGEOFFSET;
@@ -906,7 +900,7 @@ public class StatusBar
         if (_ufwPriority < 5)
         {
             // invulnerability
-            if ((_player!.Cheats & CheatType.GodMode) != 0 || _player.Powers[(int)PowerUpType.Invulnerability] != 0)
+            if ((_player!.Cheats & Cheat.GodMode) != 0 || _player.Powers[(int)PowerUpType.Invulnerability] != 0)
             {
                 _ufwPriority = 4;
 
@@ -1241,5 +1235,38 @@ public class StatusBar
 
             OldValue = ValueFunc();
         }
+    }
+
+    public bool HandleEvent(InputEvent currentEvent)
+    {
+        //// Filter automap on/off.
+        //if (ev->type == ev_keyup
+        //    && ((ev->data1 & 0xffff0000) == AM_MSGHEADER))
+        //{
+        //    switch (ev->data1)
+        //    {
+        //        case AM_MSGENTERED:
+        //            st_gamestate = AutomapState;
+        //            st_firsttime = true;
+        //            break;
+
+        //        case AM_MSGEXITED:
+        //            //	fprintf(stderr, "AM exited\n");
+        //            st_gamestate = FirstPersonState;
+        //            break;
+        //    }
+        //}
+
+        //// if a user keypress...
+        // else if 
+        if (currentEvent.Type == EventType.KeyDown)
+        {
+            if (!DoomGame.Instance.Game.NetGame)
+            {
+                // cheats go here
+            }
+        }
+
+        return false;
     }
 }

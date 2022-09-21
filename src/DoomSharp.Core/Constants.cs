@@ -32,9 +32,9 @@ public static class Constants
     public const int FracBits = 16;
     public const int FracUnit = (1 << FracBits);
 
-    public const int FloatSpeed = FracUnit * 4;
+    public static readonly Fixed FloatSpeed = Fixed.FromInt(4);
     public const int MaxHealth = 100;
-    public const int ViewHeight = FracUnit * 41;
+    public static readonly Fixed ViewHeight = Fixed.FromInt(41);
 
     // LineDef attributes
 
@@ -98,25 +98,22 @@ public static class Constants
     // mapblocks are used to check movement
     // against lines and things
     public const int MapBlockunits = 128;
-    public const int MapBlockSize = (MapBlockunits * FracUnit);
+    public static readonly Fixed MapBlockSize = Fixed.FromInt(MapBlockunits);
     public const int MapBlockShift = (FracBits + 7);
-    public const int MapBlockMask = (MapBlockSize - 1);
+    // public const int MapBlockMask = (MapBlockSize - 1);
     public const int MapBlockToFrac = (MapBlockShift - FracBits);
-
-    // player radius for movement checking
-    public const int PlayerRadius = 16 * FracUnit;
 
     // MAXRADIUS is for precalculated sector block boxes
     // the spider demon is larger,
     // but we do not have any moving sectors nearby
-    public const int MaxRadius = 32 * FracUnit;
+    public static readonly Fixed MaxRadius = Fixed.FromInt(32);
 
-    public const int Gravity = FracUnit;
-    public const int MaxMove = (30 * FracUnit);
+    public static readonly Fixed Gravity = Fixed.Unit;
+    public static readonly Fixed MaxMove = Fixed.FromInt(30);
 
-    public const int UseRange = (64 * FracUnit);
-    public const int MeleeRange = (64 * FracUnit);
-    public const int MissileRange = (32 * 64 * FracUnit);
+    public static readonly Fixed UseRange = Fixed.FromInt(64);
+    public static readonly Fixed MeleeRange = Fixed.FromInt(64);
+    public static readonly Fixed MissileRange = Fixed.FromInt(32 * 64);
 
     // follow a player exclusively for 3 seconds
     public const int BaseThreshold = 100;
@@ -159,21 +156,8 @@ public static class Constants
     public const int MaxAnimations = 32;
     public const int MaxLineAnimations = 64;
 
-    public const int PlatWait = 3;
-    public const int PlatSpeed = FracUnit;
-    public const int MaxPlats = 30;
-
-    public const int VDoorSpeed = FracUnit * 2;
-    public const int VDoorWait = 150;
-
-    public const int CeilingSpeed = FracUnit;
-    public const int CeilingWait = 150;
-    public const int MaxCeilings = 30;
-
-    public const int FloorSpeed = FracUnit;
-
     public const int NodeLeafSubSector = 0x8000;
 
-    public const int OnFloorZ = int.MinValue;
-    public const int OnCeilingZ = int.MaxValue;
+    public static readonly Fixed OnFloorZ = Fixed.MinValue;
+    public static readonly Fixed OnCeilingZ = Fixed.MaxValue;
 }

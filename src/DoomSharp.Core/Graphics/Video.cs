@@ -185,7 +185,6 @@ public class Video
             sourceIdx += width;
             destIdx += Constants.ScreenWidth;
         }
-        
     }
 
     //
@@ -400,8 +399,8 @@ public class Video
 
         // makes this wipe faster (in theory)
         // to have stuff in column-major format
-        ShittyColorMajorTransform(_wipeScreenStart, width / 2, height);
-        ShittyColorMajorTransform(_wipeScreenEnd, width / 2, height);
+        ShittyColorMajorTransform(_wipeScreenStart, width, height);
+        ShittyColorMajorTransform(_wipeScreenEnd, width, height);
 
         // setup initial column positions
         // (y<0 => not ready to scroll yet)
@@ -426,7 +425,7 @@ public class Video
 
     private void ShittyColorMajorTransform(byte[] array, int width, int height)
     {
-        var dest = new byte[width * height * 2];
+        var dest = new byte[width * height];
 
         for (var y = 0; y < height; y++)
         {
@@ -448,8 +447,6 @@ public class Video
             DoomGame.Error("wipe_doMelt: y is not initialized!");
             return false;
         }
-
-        width /= 2;
 
         while (tics-- > 0)
         {
@@ -508,8 +505,8 @@ public class Video
 
     public void MarkRectangle(int x, int y, int width, int height)
     {
-        BoundingBox.AddToBox(_dirtyBox, x, y);
-        BoundingBox.AddToBox(_dirtyBox, x + width - 1, y + height - 1);
+        BoundingBox.AddToBox(_dirtyBox, Fixed.FromInt(x), Fixed.FromInt(y));
+        BoundingBox.AddToBox(_dirtyBox, Fixed.FromInt(x + width - 1), Fixed.FromInt(y + height - 1));
     }
 
     public void CopyRectangle(int srcX, int srcY, int srcScreen, int width, int height, int destX, int destY, int destScreen)

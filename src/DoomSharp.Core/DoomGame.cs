@@ -5,7 +5,6 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
 using System.Runtime.InteropServices;
 using DoomSharp.Core.GameLogic;
-using System;
 
 namespace DoomSharp.Core;
 
@@ -212,6 +211,8 @@ public class DoomGame : IDisposable
     public int StartMap { get; set; } = 1;
     public bool AutoStart { get; set; } = false;
 
+    public TicCommand[][] NetCommands => _netCommands;
+
     public int TicDup { get; private set; } = 1; // tic duplication // 1 = no duplication, 2-5 = dup for slow nets
 
     /// <summary>
@@ -331,7 +332,7 @@ public class DoomGame : IDisposable
 
         if (_game.GameState == GameState.Level && _game.GameTic != 0)
         {
-            DoomGame.Instance.Hud.Drawer();
+            Hud.Drawer();
         }
 
         // clean up border stuff
@@ -433,7 +434,7 @@ public class DoomGame : IDisposable
             {
                 _graphics.StartTic();
                 ProcessEvents();
-                //G_BuildTiccmd(&netcmds[consoleplayer][MakeTic % BACKUPTICS]);
+                _netCommands[Game.ConsolePlayer][MakeTic % Constants.BackupTics] = Game.BuildTicCommand();
                 if (_advancedemo)
                 {
                     DoAdvanceDemo();
@@ -444,6 +445,8 @@ public class DoomGame : IDisposable
 
                 _game.GameTic++;
                 MakeTic++;
+
+                Thread.Sleep(1000 / Constants.TicRate);
             }
             else
             {
@@ -479,7 +482,7 @@ public class DoomGame : IDisposable
 
         // send a bunch of packets for security
         var netBuffer = _network.DoomCom.Data;
-        netBuffer.Player = _game.ConsolePlayer;
+        netBuffer.Player = (byte)_game.ConsolePlayer;
         netBuffer.NumTics = 0;
         for (var i = 0; i < 4; i++)
         {
@@ -668,7 +671,7 @@ public class DoomGame : IDisposable
         }
 
         var netBuffer = _network.DoomCom.Data;
-        netBuffer.Player = _game.ConsolePlayer;
+        netBuffer.Player = (byte)_game.ConsolePlayer;
 
         // build new ticcmds for console player
         var gameTicDiv = _game.GameTic / TicDup;
@@ -676,13 +679,13 @@ public class DoomGame : IDisposable
         {
             _graphics.StartTic();
             ProcessEvents();
-            if (MakeTic - gameTicDiv >= (Constants.BackupTics / 2 - 1))
+            if (MakeTic - gameTicDiv >= ((Constants.BackupTics / 2) - 1))
             {
                 break;          // can't hold any more
             }
 
-            // TODO _game.BuildTicCommand(_localCommands[MakeTic & Constants.BackupTics]);
-            
+            _localCommands[MakeTic % Constants.BackupTics] = Game.BuildTicCommand();
+
             MakeTic++;
         }
 
@@ -699,9 +702,9 @@ public class DoomGame : IDisposable
                 continue;
             }
 
-            int realStart;
-            netBuffer.StartTic = realStart = _resendTo[i];
-            netBuffer.NumTics = MakeTic - realStart;
+            var realStart = _resendTo[i];
+            netBuffer.StartTic = (byte)_resendTo[i];
+            netBuffer.NumTics = (byte)(MakeTic - realStart);
             if (netBuffer.NumTics > Constants.BackupTics)
             {
                 Error("NetUpdate: netbuffer->numtics > BACKUPTICS");
@@ -716,7 +719,7 @@ public class DoomGame : IDisposable
 
             if (_remoteResend[i])
             {
-                netBuffer.RetransmitFrom = _netTics[i];
+                netBuffer.RetransmitFrom = (byte)_netTics[i];
                 HSendPacket(i, Constants.NetCommands.Retransmit);
             }
             else
@@ -732,12 +735,31 @@ public class DoomGame : IDisposable
 
     private int NetbufferSize()
     {
-        return Marshal.SizeOf<TicCommand>();
+        return 5 * 4 + Marshal.SizeOf<TicCommand>() * Constants.BackupTics;
     }
 
     private uint NetbufferChecksum()
     {
-        return 0;
+        uint c = 0x1234567;
+        var netbuffer = _network.DoomCom.Data;
+        var checksumOffset = 1;
+
+        c += (uint)(netbuffer.RetransmitFrom * (checksumOffset++));
+        c += (uint)(netbuffer.StartTic * (checksumOffset++));
+        c += (uint)(netbuffer.Player * (checksumOffset++));
+        c += (uint)(netbuffer.NumTics * (checksumOffset++));
+
+        foreach (var cmd in netbuffer.Commands)
+        {
+            c += (uint)(cmd.ForwardMove * (checksumOffset++));
+            c += (uint)(cmd.SideMove * (checksumOffset++));
+            c += (uint)(cmd.AngleTurn * (checksumOffset++));
+            c += (uint)(cmd.Consistency * (checksumOffset++));
+            c += (uint)(cmd.ChatChar * (checksumOffset++));
+            c += (uint)((int)cmd.Buttons * (checksumOffset++));
+        }
+
+        return c & Constants.NetCommands.CheckSum;
     }
 
     private int ExpandTics(int low)
@@ -809,9 +831,9 @@ public class DoomGame : IDisposable
     private bool HGetPacket()
     {
         var netBuffer = _network.DoomCom.Data;
-        if (_reboundPacket)
+        if (_reboundPacket && _reboundStore != null)
         {
-            netBuffer = _reboundStore;
+            _network.DoomCom.Data = _reboundStore;
             _network.DoomCom.RemoteNode = 0;
             _reboundPacket = false;
             return true;
@@ -1090,16 +1112,16 @@ public class DoomGame : IDisposable
                 CheckAbort();
                 for (i = 0; i < _network.DoomCom.NumNodes; i++)
                 {
-                    netBuffer.RetransmitFrom = (int)StartSkill;
+                    netBuffer.RetransmitFrom = (byte)StartSkill;
                     if (_game.DeathMatch)
                     {
-                        netBuffer.RetransmitFrom |= ((_game.DeathMatch ? 1 : 0) << 6);
+                        netBuffer.RetransmitFrom |= (byte)((_game.DeathMatch ? 1 : 0) << 6);
                     }
                     //if (nomonsters)
                     //    netbuffer->retransmitfrom |= 0x20;
                     //if (respawnparm)
                     //    netbuffer->retransmitfrom |= 0x10;
-                    netBuffer.StartTic = StartEpisode * 64 + StartMap;
+                    netBuffer.StartTic = (byte)(StartEpisode * 64 + StartMap);
                     netBuffer.Player = Version;
                     netBuffer.NumTics = 0;
                     HSendPacket(i, Constants.NetCommands.Setup);
@@ -1146,7 +1168,7 @@ public class DoomGame : IDisposable
                 continue;
             }
 
-            // _game.HandleEvent(currentEvent);
+            Game.HandleEvent(currentEvent);
         }
     }
 
@@ -1283,7 +1305,7 @@ public class DoomGame : IDisposable
 
     public void WaitVBL(int count)
     {
-        Thread.Sleep(count * (1000 / 70));
+        Thread.Sleep((int)(count * (1000 / 70.0)));
     }
 
     private void IdentifyVersion()
@@ -1329,7 +1351,7 @@ public class DoomGame : IDisposable
     public static void Error(string message)
     {
         _console.WriteLine("Error: " + message);
-        throw new DoomErrorException();
+        DoomGame.Instance.Quit();
     }
 
     public void Dispose()

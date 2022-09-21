@@ -48,5 +48,5 @@ public class DoomCommunication
     public short Drone { get; set; }
 
     // The packet data to be sent.
-    public DoomData Data { get; } = new();
+    public DoomData Data { get; set; } = new();
 }

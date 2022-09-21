@@ -14,6 +14,7 @@ public enum EventType
     Joystick
 }
 
+[Flags]
 public enum ButtonCode
 {
     /// <summary>

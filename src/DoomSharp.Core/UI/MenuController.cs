@@ -234,7 +234,7 @@ public class MenuController
     public bool InHelpScreens { get; private set; } = false;
 
     public bool ShowMessages { get; private set; } = true;
-    public bool DetailLevel { get; private set; } = false;
+    public bool DetailLevel { get; private set; } = true; // High detail by default, we have modern PC's now :D
     public int MouseSensitivity { get; private set; } = 5;
     public int ScreenSize { get; private set; }
     public int ScreenBlocks { get; private set; } = 10;
@@ -704,7 +704,7 @@ public class MenuController
         return false;
     }
 
-    private void StartControlPanel()
+    public void StartControlPanel()
     {
         if (IsActive)
         {

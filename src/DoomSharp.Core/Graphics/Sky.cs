@@ -7,10 +7,10 @@ public class Sky
 
     public int FlatNum { get; set; }
     public int Texture { get; set; }
-    public int TextureMid { get; set; }
+    public Fixed TextureMid { get; set; }
 
     public void InitSkyMap()
     {
-        TextureMid = 100 * Constants.FracUnit;
+        TextureMid = Fixed.FromInt(100);
     }
 }

@@ -23,29 +23,37 @@ namespace DoomSharp.Windows
             InitializeComponent();
         }
 
-        protected async override void OnInitialized(EventArgs e)
+        protected override async void OnInitialized(EventArgs e)
         {
             base.OnInitialized(e);
 
             var consoleOutputWindow = new ConsoleOutput();
             consoleOutputWindow.Show();
 
-            RenderOptions.SetBitmapScalingMode(RenderTarget, BitmapScalingMode.NearestNeighbor);
+            // RenderOptions.SetBitmapScalingMode(RenderTarget, BitmapScalingMode.NearestNeighbor);
+            RenderOptions.SetBitmapScalingMode(RenderTarget, BitmapScalingMode.Linear); // Linear looks somewhat blurry but still OK
             RenderOptions.SetEdgeMode(RenderTarget, EdgeMode.Aliased);
 
-            await Task.Run(async () =>
-            {
-                await DoomGame.Instance.RunAsync();
-            });
+            await Task.Run(() => DoomGame.Instance.Run());
         }
 
         private void HandleKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.IsRepeat)
+            {
+                return;
+            }
+
             MainViewModel.Instance.AddEvent(new InputEvent(EventType.KeyDown, TranslateKey(e), 0, 0));
         }
 
         private void HandleKeyUp(object sender, KeyEventArgs e)
         {
+            if (e.IsRepeat)
+            {
+                return;
+            }
+
             MainViewModel.Instance.AddEvent(new InputEvent(EventType.KeyUp, TranslateKey(e), 0, 0));
         }
 
@@ -90,14 +98,14 @@ namespace DoomSharp.Windows
         {
             switch (e.Key)
             {
-                case Key.Right:
-                    return (int)Keys.RightArrow;
                 case Key.Left:
                     return (int)Keys.LeftArrow;
-                case Key.Up:
-                    return (int)Keys.UpArrow;
+                case Key.Right:
+                    return (int)Keys.RightArrow;
                 case Key.Down:
                     return (int)Keys.DownArrow;
+                case Key.Up:
+                    return (int)Keys.UpArrow;
                 case Key.Escape:
                     return (int)Keys.Escape;
                 case Key.Enter:
@@ -131,32 +139,44 @@ namespace DoomSharp.Windows
                     return (int)Keys.F12;
 
                 case Key.Back:
+                case Key.Delete:
                     return (int)Keys.Backspace;
+                
                 case Key.Pause:
                     return (int)Keys.Pause;
 
                 case Key.OemPlus:
                     return (int)Keys.Equals;
+
                 case Key.OemMinus:
                     return (int)Keys.Minus;
 
+                case Key.LeftShift:
                 case Key.RightShift:
                     return (int)Keys.RShift;
+
+                case Key.LeftCtrl:
                 case Key.RightCtrl:
                     return (int)Keys.RCtrl;
+                
                 case Key.RightAlt:
-                    return (int)Keys.RAlt;
                 case Key.LeftAlt:
-                    return (int)Keys.LAlt;
+                    return (int)Keys.RAlt; 
 
-                case Key.Space:
-                    return 32;
+                case >= Key.D0 and <= Key.D9:
+                    return '0' + (e.Key - Key.D0);
+
+                case >= Key.NumPad0 and <= Key.NumPad9:
+                    return '0' + (e.Key - Key.NumPad0);
 
                 case >= Key.A and <= Key.Z:
-                    return 'a' + (e.Key - Key.A);
+                    return 'A' + (e.Key - Key.A);
+
+                case Key.Space:
+                    return ' ';
 
                 default:
-                    return (int)e.Key;
+                    return 0;
             }
         }
     }

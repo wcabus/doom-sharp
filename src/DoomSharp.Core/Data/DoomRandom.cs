@@ -28,6 +28,8 @@ public static class DoomRandom
     private static int _randomIndex = 0;
     private static int _pRandomIndex = 0;
 
+    public static int RandomIndex => _randomIndex;
+
     public static int P_Random()
     {
         _pRandomIndex = (_pRandomIndex + 1) & 0xFF;

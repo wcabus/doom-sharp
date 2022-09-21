@@ -4,6 +4,10 @@ namespace DoomSharp.Core.GameLogic;
 
 public class Platform : Thinker
 {
+    public const int DefaultWait = 3;
+    public static readonly Fixed DefaultSpeed = Fixed.Unit;
+    public const int MaxPlats = 30;
+
     public Sector? Sector { get; set; }
 
     public Fixed Speed { get; set; }

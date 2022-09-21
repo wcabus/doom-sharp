@@ -1,7 +1,6 @@
-﻿using DoomSharp.Core.Graphics;
+﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.Input;
-using System;
-using System.Numerics;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -17,6 +16,11 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     public static State GetSpawnState(StateNum stateNum)
     {
         return _states[(int)stateNum];
+    }
+
+    public static StateNum GetStateNum(State state)
+    {
+        return (StateNum)_states.IndexOf(state);
     }
 
     private static void ActionLight0(ActionParams actionParams)
@@ -46,7 +50,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         if (player.MapObject!.State == _states[(int)StateNum.S_PLAY_ATK1] || player.MapObject.State == _states[(int)StateNum.S_PLAY_ATK2])
         {
-            game.P_SetMapObjectState(player.MapObject, StateNum.S_PLAY);
+            player.MapObject.SetState(StateNum.S_PLAY);
         }
 
         if (player.ReadyWeapon == WeaponType.Chainsaw && psp.State == _states[(int)StateNum.S_SAW])
@@ -59,7 +63,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         if (player.PendingWeapon != WeaponType.NoChange || player.Health == 0)
         {
             // change weapon
-            //  (pending weapon should allready be validated)
+            //  (pending weapon should already be validated)
             var newState = WeaponInfo.GetByType(player.ReadyWeapon).DownState;
             game.P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
             return;
@@ -84,10 +88,10 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
 
         // bob the weapon based on movement speed
-        var angle = (128 * game.LevelTime) & RenderEngine.FineMask;
-        psp.SX = Constants.FracUnit + (player.Bob * RenderEngine.FineCosine[angle]);
-        angle &= RenderEngine.FineAngles / 2 - 1;
-        psp.SY = WeaponInfo.WeaponTop + (player.Bob * RenderEngine.FineSine[angle]);
+        var angle = (128 * game.LevelTime) & DoomMath.FineMask;
+        psp.SX = Fixed.Unit + (player.Bob * DoomMath.Cos(angle));
+        angle &= DoomMath.FineAngleCount / 2 - 1;
+        psp.SY = WeaponInfo.WeaponTop + (player.Bob * DoomMath.Sin(angle));
     }
 
     // Lowers current weapon,
@@ -148,34 +152,900 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         DoomGame.Instance.Game.P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
     }
 
-    private static void ActionPunch(ActionParams actionParams) { }
-    private static void ActionReFire(ActionParams actionParams) { }
-    private static void ActionFirePistol(ActionParams actionParams) { }
-    private static void ActionFireShotgun(ActionParams actionParams) { }
-    private static void ActionFireShotgun2(ActionParams actionParams) { }
-    private static void ActionCheckReload(ActionParams actionParams) { }
+    private static void ActionPunch(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+
+        var damage = (DoomRandom.P_Random() % 10 + 1) << 1;
+        if (player.Powers[(int)PowerUpType.Strength] != 0)
+        {
+            damage *= 10;
+        }
+
+        var angle = player.MapObject!.Angle;
+        angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+        var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, Constants.MeleeRange);
+        DoomGame.Instance.Game.P_LineAttack(player.MapObject, angle, Constants.MeleeRange, slope, damage);
+
+        // turn to face target
+        var lineTarget = DoomGame.Instance.Game.LineTarget;
+        if (lineTarget != null)
+        {
+            //S_StartSound(player->mo, sfx_punch);
+            player.MapObject.Angle = DoomGame.Instance.Renderer.PointToAngle2(
+                    player.MapObject.X,
+                    player.MapObject.Y,
+                    lineTarget.X,
+                    lineTarget.Y);
+        }
+    }
+
+    /// <summary>
+    /// The player can re-fire the weapon
+    /// without lowering it entirely.
+    /// </summary>
+    private static void ActionReFire(ActionParams actionParams)
+    {
+        // check for fire
+        //  (if a weaponchange is pending, let it go through instead)
+        var player = actionParams.Player!;
+        if ((player.Command.Buttons & ButtonCode.Attack) != 0 &&
+            player.PendingWeapon == WeaponType.NoChange &&
+            player.Health != 0)
+        {
+            player.Refire++;
+            DoomGame.Instance.Game.P_FireWeapon(player);
+        }
+        else
+        {
+            player.Refire = 0;
+            DoomGame.Instance.Game.P_CheckAmmo(player);
+        }
+    }
+
+    private static void ActionFirePistol(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+        //S_StartSound(player->mo, sfx_pistol);
+
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
+        player.Ammo[(int)weapon.Ammo]--;
+
+        var game = DoomGame.Instance.Game;
+        game.P_SetPlayerSprite(player, PlayerSpriteType.Flash, weapon.FlashState);
+
+        game.P_BulletSlope(player.MapObject);
+        game.P_GunShot(player.MapObject, player.Refire == 0);
+    }
+
+    private static void ActionFireShotgun(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+        //S_StartSound(player->mo, sfx_shotgn);
+
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
+        player.Ammo[(int)weapon.Ammo]--;
+
+        var game = DoomGame.Instance.Game;
+        game.P_SetPlayerSprite(player, PlayerSpriteType.Flash, weapon.FlashState);
+
+        game.P_BulletSlope(player.MapObject);
+        for (var i = 0; i < 7; i++)
+        {
+            game.P_GunShot(player.MapObject, false);
+        }
+    }
+
+    private static void ActionFireShotgun2(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+        //S_StartSound(player->mo, sfx_dshtgn);
+
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
+        player.Ammo[(int)weapon.Ammo] -= 2;
+
+        var game = DoomGame.Instance.Game;
+        game.P_SetPlayerSprite(player, PlayerSpriteType.Flash, weapon.FlashState);
+
+        game.P_BulletSlope(player.MapObject);
+        for (var i = 0; i < 20; i++)
+        {
+            var damage = 5 * (DoomRandom.P_Random() % 3 + 1);
+            var angle = player.MapObject.Angle;
+            angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 19);
+
+            game.P_LineAttack(
+                player.MapObject, 
+                angle, 
+                Constants.MissileRange, 
+                game.BulletSlope + new Fixed((DoomRandom.P_Random() - DoomRandom.P_Random()) << 5), 
+                damage);
+        }
+    }
+
+    private static void ActionCheckReload(ActionParams actionParams)
+    {
+        DoomGame.Instance.Game.P_CheckAmmo(actionParams.Player!);
+    }
+
     private static void ActionOpenShotgun2(ActionParams actionParams) { }
     private static void ActionLoadShotgun2(ActionParams actionParams) { }
     private static void ActionCloseShotgun2(ActionParams actionParams) { }
-    private static void ActionFireCGun(ActionParams actionParams) { }
-    private static void ActionGunFlash(ActionParams actionParams) { }
-    private static void ActionFireMissile(ActionParams actionParams) { }
-    private static void ActionSaw(ActionParams actionParams) { }
-    private static void ActionFirePlasma(ActionParams actionParams) { }
-    private static void ActionBFGsound(ActionParams actionParams) { }
-    private static void ActionFireBFG(ActionParams actionParams) { }
-    private static void ActionBFGSpray(ActionParams actionParams) { }
-    private static void ActionExplode(ActionParams actionParams) { }
-    private static void ActionPain(ActionParams actionParams) { }
-    private static void ActionPlayerScream(ActionParams actionParams) { }
-    private static void ActionFall(ActionParams actionParams) { }
-    private static void ActionXScream(ActionParams actionParams) { }
-    private static void ActionLook(ActionParams actionParams) { }
-    private static void ActionChase(ActionParams actionParams) { }
-    private static void ActionFaceTarget(ActionParams actionParams) { }
-    private static void ActionPosAttack(ActionParams actionParams) { }
-    private static void ActionScream(ActionParams actionParams) { }
-    private static void ActionSPosAttack(ActionParams actionParams) { }
+
+    private static void ActionFireCGun(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var psp = actionParams.PlayerSprite!;
+
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+        //S_StartSound(player->mo, sfx_pistol);
+
+        if (player.Ammo[(int)weapon.Ammo] == 0)
+        {
+            return;
+        }
+
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
+        player.Ammo[(int)weapon.Ammo]--;
+
+        var game = DoomGame.Instance.Game;
+        var stateNum = State.GetStateNum(psp.State!);
+        game.P_SetPlayerSprite(player, PlayerSpriteType.Flash, (StateNum)(weapon.FlashState + (int)stateNum - StateNum.S_CHAIN1));
+
+        game.P_BulletSlope(player.MapObject);
+        game.P_GunShot(player.MapObject, player.Refire == 0);
+    }
+
+    private static void ActionGunFlash(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+
+        player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
+        DoomGame.Instance.Game.P_SetPlayerSprite(player, PlayerSpriteType.Flash,
+            WeaponInfo.GetByType(player.ReadyWeapon).FlashState);
+    }
+
+    private static void ActionFireMissile(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+
+        player.Ammo[(int)weapon.Ammo]--;
+
+        var game = DoomGame.Instance.Game;
+        game.P_SpawnPlayerMissile(player.MapObject!, MapObjectType.MT_ROCKET);
+    }
+
+    private static void ActionSaw(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+
+        var damage = 2 * (DoomRandom.P_Random() % 10 + 1);
+        var angle = player.MapObject!.Angle;
+        angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 18);
+        
+        // use meleerange + 1 so the puff doesn't skip the flash
+        var slope = DoomGame.Instance.Game.P_AimLineAttack(player.MapObject, angle, new Fixed(Constants.MeleeRange.Value + 1));
+        DoomGame.Instance.Game.P_LineAttack(player.MapObject, angle, new Fixed(Constants.MeleeRange.Value + 1), slope, damage);
+
+        // turn to face target
+        var lineTarget = DoomGame.Instance.Game.LineTarget;
+        if (lineTarget == null)
+        {
+            //S_StartSound(player->mo, sfx_sawful);
+            return;
+        }
+
+        //S_StartSound(player->mo, sfx_sawhit);
+
+        // turn to face target
+        player.MapObject.Angle = DoomGame.Instance.Renderer.PointToAngle2(
+                player.MapObject.X,
+                player.MapObject.Y,
+                lineTarget.X,
+                lineTarget.Y);
+
+        if (angle - player.MapObject.Angle > Angle.Angle180)
+        {
+            if (angle - player.MapObject.Angle < -Angle.Angle90 / 20)
+                player.MapObject.Angle = angle + Angle.Angle90 / 21;
+            else
+                player.MapObject.Angle -= Angle.Angle90 / 20;
+        }
+        else
+        {
+            if (angle - player.MapObject.Angle > Angle.Angle90 / 20)
+                player.MapObject.Angle = angle - Angle.Angle90 / 21;
+            else
+                player.MapObject.Angle += Angle.Angle90 / 20;
+        }
+        player.MapObject.Flags |= MapObjectFlag.MF_JUSTATTACKED;
+    }
+
+    private static void ActionFirePlasma(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+
+        player.Ammo[(int)weapon.Ammo]--;
+
+        var game = DoomGame.Instance.Game;
+        
+        game.P_SetPlayerSprite(player, PlayerSpriteType.Flash, weapon.FlashState + (DoomRandom.P_Random() & 1));
+        game.P_SpawnPlayerMissile(player.MapObject!, MapObjectType.MT_PLASMA);
+    }
+
+    private static void ActionBFGsound(ActionParams actionParams)
+    {
+        // S_StartSound(player->mo, sfx_bfg);
+    }
+
+    private static void ActionFireBFG(ActionParams actionParams)
+    {
+        var player = actionParams.Player!;
+        var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
+
+        player.Ammo[(int)weapon.Ammo] -= WeaponInfo.BFGCells;
+
+        var game = DoomGame.Instance.Game;
+        game.P_SpawnPlayerMissile(player.MapObject!, MapObjectType.MT_BFG);
+    }
+
+    private static void ActionBFGSpray(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        for (var i = 0; i < 40; i++)
+        {
+            var an = new Angle((uint)(mo.Angle.Value - Angle.Angle90.Value / 2 + Angle.Angle90.Value / 40 * i));
+
+            // mo->target is the originator (player) of the missile
+            game.P_AimLineAttack(mo.Target!, an, Fixed.FromInt(16 * 64));
+
+            if (game.LineTarget == null)
+            {
+                continue;
+            }
+
+            game.P_SpawnMapObject(
+                game.LineTarget.X,
+                game.LineTarget.Y,
+                game.LineTarget.Z + (game.LineTarget.Height >> 2),
+                MapObjectType.MT_EXTRABFG);
+
+            var damage = 0;
+            for (var j = 0; j < 15; j++)
+            {
+                damage += (DoomRandom.P_Random() & 7) + 1;
+            }
+
+            MapObject.DamageMapObject(game.LineTarget, mo.Target, mo.Target, damage);
+        }
+    }
+
+    private static void ActionExplode(ActionParams actionParams)
+    {
+        var thingy = actionParams.MapObject!;
+        DoomGame.Instance.Game.P_RadiusAttack(thingy, thingy.Target!, 128);
+    }
+
+    private static void ActionPain(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Info.PainSound != SoundType.sfx_None)
+        {
+            //S_StartSound(actor, actor.Info.PainSound);
+        }
+    }
+
+    private static void ActionPlayerScream(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+
+        // Default death sound.
+        var sound = SoundType.sfx_pldeth;
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial && mo.Health < -50)
+        {
+            // IF THE PLAYER DIES
+            // LESS THAN -50% WITHOUT GIBBING
+            sound = SoundType.sfx_pdiehi;
+        }
+
+        // S_StartSound(mo, sound);
+    }
+
+    private static void ActionFall(ActionParams actionParams)
+    {
+        // actor is on the ground, it can be walked over
+        actionParams.MapObject!.Flags &= ~MapObjectFlag.MF_SOLID;
+
+        // So change this if corpse objects
+        // are meant to be obstacles.
+    }
+
+    private static void ActionXScream(ActionParams actionParams)
+    {
+        // S_StartSound(actor, sfx_slop);
+    }
+
+    /// <summary>
+    /// Stay in state until a player is sighted.
+    /// </summary>
+    private static void ActionLook(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+
+        actor.Threshold = 0; // any shot will wake up
+        var target = actor.SubSector?.Sector?.SoundTarget;
+
+        if (target != null && (target.Flags & MapObjectFlag.MF_SHOOTABLE) != 0)
+        {
+            actor.Target = target;
+            if ((actor.Flags & MapObjectFlag.MF_AMBUSH) != 0)
+            {
+                if (DoomGame.Instance.Game.P_CheckSight(actor, actor.Target))
+                {
+                    SeeYou();
+                    return;
+                }
+            }
+
+            SeeYou();
+            return;
+        }
+
+        if (!DoomGame.Instance.Game.P_LookForPlayers(actor, false))
+        {
+            return;
+        }
+
+        SeeYou();
+
+        // go into chase state
+        void SeeYou()
+        {
+            if (actor.Info.SeeSound != SoundType.sfx_None)
+            {
+                //int sound;
+
+                //switch (actor->info->seesound)
+                //{
+                //    case sfx_posit1:
+                //    case sfx_posit2:
+                //    case sfx_posit3:
+                //        sound = sfx_posit1 + P_Random() % 3;
+                //        break;
+
+                //    case sfx_bgsit1:
+                //    case sfx_bgsit2:
+                //        sound = sfx_bgsit1 + P_Random() % 2;
+                //        break;
+
+                //    default:
+                //        sound = actor->info->seesound;
+                //        break;
+                //}
+
+                //if (actor->type == MT_SPIDER
+                //    || actor->type == MT_CYBORG)
+                //{
+                //    // full volume
+                //    S_StartSound(NULL, sound);
+                //}
+                //else
+                //    S_StartSound(actor, sound);
+            }
+
+            actor.SetState(actor.Info.SeeState);
+        }
+    }
+
+    /// <summary>
+    /// Actor has a melee attack, so it tries to close as fast as possible
+    /// </summary>
+    private static void ActionChase(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.ReactionTime != 0)
+        {
+            actor.ReactionTime--;
+        }
+
+        // modify target threshold
+        if (actor.Threshold != 0)
+        {
+            if (actor.Target is not { Health: > 0 })
+            {
+                actor.Threshold = 0;
+            }
+            else
+            {
+                actor.Threshold--;
+            }
+        }
+
+        // turn towards movement direction if not there yet
+        if ((int)actor.MoveDir < 8)
+        {
+            actor.Angle = new Angle((uint)(actor.Angle.Value & (7 << 29)));
+            var delta = (int)(actor.Angle.Value - ((int)actor.MoveDir << 29));
+
+            if (delta > 0)
+            {
+                actor.Angle -= Angle.Angle90 / 2;
+            }
+            else if (delta < 0)
+            {
+                actor.Angle += Angle.Angle90 / 2;
+            }
+        }
+
+        if (actor.Target == null || (actor.Target.Flags & MapObjectFlag.MF_SHOOTABLE) == 0)
+        {
+            // look for a new target
+            if (game.P_LookForPlayers(actor, true))
+            {
+                return; // got a new target
+            }
+
+            actor.SetState(actor.Info.SpawnState);
+        }
+
+        // do not attack twice in a row
+        if ((actor.Flags & MapObjectFlag.MF_JUSTATTACKED) != 0)
+        {
+            actor.Flags &= ~MapObjectFlag.MF_JUSTATTACKED;
+            if (game.GameSkill != SkillLevel.Nightmare /* && !fastparm */)
+            {
+                game.P_NewChaseDir(actor);
+            }
+
+            return;
+        }
+
+        // check for melee attack
+        if (actor.Info.MeleeState != StateNum.S_NULL && game.P_CheckMeleeRange(actor))
+        {
+            if (actor.Info.AttackSound != SoundType.sfx_None)
+            {
+                // S_StartSound (actor, actor->info->attacksound);
+            }
+
+            actor.SetState(actor.Info.MeleeState);
+            return;
+        }
+
+        // check for missile attack
+        if (actor.Info.MissileState != StateNum.S_NULL)
+        {
+            if (game.GameSkill < SkillLevel.Nightmare && actor.MoveCount != 0 /* && !fastparm */)
+            {
+                NoMissile();
+                return;
+            }
+
+            if (!game.P_CheckMissileRange(actor))
+            {
+                NoMissile();
+                return;
+            }
+
+            actor.SetState(actor.Info.MissileState);
+            actor.Flags |= MapObjectFlag.MF_JUSTATTACKED;
+            return;
+        }
+
+        NoMissile();
+
+        void NoMissile()
+        {
+            // possibly choose another target
+            if (game.NetGame && actor.Threshold == 0 && !game.P_CheckSight(actor, actor.Target!))
+            {
+                if (game.P_LookForPlayers(actor, true))
+                {
+                    return; // got a new target
+                }
+            }
+
+            // chase towards player
+            if (--actor.MoveCount < 0 || !game.P_Move(actor))
+            {
+                game.P_NewChaseDir(actor);
+            }
+
+            // make active sound
+            if (actor.Info.ActiveSound != SoundType.sfx_None && DoomRandom.P_Random() < 3)
+            {
+                // S_StartSound (actor, actor->info->activesound);
+            }
+        }
+    }
+
+    private static void ActionFaceTarget(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        actor.Flags &= ~MapObjectFlag.MF_AMBUSH;
+        actor.Angle = DoomGame.Instance.Renderer.PointToAngle2(actor.X, actor.Y, actor.Target.X, actor.Target.Y);
+
+        if ((actor.Target.Flags & MapObjectFlag.MF_SHADOW) != 0)
+        {
+            actor.Angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 21);
+        }
+    }
+
+    private static void ActionPosAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        var game = DoomGame.Instance.Game;
+        
+        ActionFaceTarget(actionParams);
+        
+        var angle = actor.Angle;
+        var slope = game.P_AimLineAttack(actor, angle, Constants.MissileRange);
+
+        // S_StartSound (actor, sfx_pistol);
+        angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 20);
+        var damage = ((DoomRandom.P_Random() % 5) + 1) * 3;
+        game.P_LineAttack(actor, angle, Constants.MissileRange, slope, damage);
+    }
+
+    private static void ActionScream(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        int sound;
+
+        switch (actor.Info.DeathSound)
+        {
+            case 0:
+                return;
+
+            case SoundType.sfx_podth1:
+            case SoundType.sfx_podth2:
+            case SoundType.sfx_podth3:
+                sound = (int)SoundType.sfx_podth1 + DoomRandom.P_Random() % 3;
+                break;
+
+            case SoundType.sfx_bgdth1:
+            case SoundType.sfx_bgdth2:
+                sound = (int)SoundType.sfx_bgdth1 + DoomRandom.P_Random() % 2;
+                break;
+
+            default:
+                sound = (int)actor.Info.DeathSound;
+                break;
+        }
+
+        // Check for bosses.
+        if (actor.Type is MapObjectType.MT_SPIDER or MapObjectType.MT_CYBORG)
+        {
+            // full volume
+            // S_StartSound(NULL, sound);
+        }
+        else
+        {
+            // S_StartSound(actor, sound);
+        }
+    }
+
+    private static void ActionSPosAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        var game = DoomGame.Instance.Game;
+        // S_StartSound(actor, sfx_shotgn);
+        ActionFaceTarget(actionParams);
+        var bangle = actor.Angle;
+        var slope = game.P_AimLineAttack(actor, bangle, Constants.MissileRange);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var angle = bangle + new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 20);
+            var damage = ((DoomRandom.P_Random() % 5) + 1) * 3;
+            game.P_LineAttack(actor, angle, Constants.MissileRange, slope, damage);
+        }
+    }
+
+    private static void ActionCPosAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        var game = DoomGame.Instance.Game;
+        // S_StartSound(actor, sfx_shotgn);
+        ActionFaceTarget(actionParams);
+        var bangle = actor.Angle;
+        var slope = game.P_AimLineAttack(actor, bangle, Constants.MissileRange);
+
+        var angle = bangle + new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 20);
+        var damage = ((DoomRandom.P_Random() % 5) + 1) * 3;
+        game.P_LineAttack(actor, angle, Constants.MissileRange, slope, damage);
+    }
+
+    private static void ActionCPosRefire(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        // keep firing unless target got out of sight
+        ActionFaceTarget(actionParams);
+
+        if (DoomRandom.P_Random() < 40)
+        {
+            return;
+        }
+
+        if (actor.Target is null
+            || actor.Target.Health <= 0
+            || !game.P_CheckSight(actor, actor.Target))
+        {
+            actor.SetState(actor.Info.SeeState);
+        }
+    }
+
+    private static void ActionSpidRefire(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        // keep firing unless target got out of sight
+        ActionFaceTarget(actionParams);
+
+        if (DoomRandom.P_Random() < 10)
+        {
+            return;
+        }
+
+        if (actor.Target is null
+            || actor.Target.Health <= 0
+            || !game.P_CheckSight(actor, actor.Target))
+        {
+            actor.SetState(actor.Info.SeeState);
+        }
+    }
+
+    private static void ActionBspiAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+
+        // launch a missile
+        game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_ARACHPLAZ);
+    }
+
+    private static void ActionTroopAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        if (game.P_CheckMeleeRange(actor))
+        {
+            // S_StartSound(actor, sfx_claw);
+            var damage = (DoomRandom.P_Random() % 8 + 1) * 3;
+            MapObject.DamageMapObject(actor.Target, actor, actor, damage);
+            return;
+        }
+
+        // launch a missile
+        game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_TROOPSHOT);
+    }
+
+    private static void ActionSargAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        if (game.P_CheckMeleeRange(actor))
+        {
+            var damage = ((DoomRandom.P_Random() % 10) + 1) * 4;
+            MapObject.DamageMapObject(actor.Target, actor, actor, damage);
+        }
+    }
+
+    private static void ActionHeadAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        if (game.P_CheckMeleeRange(actor))
+        {
+            var damage = (DoomRandom.P_Random() % 6 + 1) * 10;
+            MapObject.DamageMapObject(actor.Target, actor, actor, damage);
+            return;
+        }
+
+        // launch a missile
+        game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_HEADSHOT);
+    }
+
+    private static void ActionCyberAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_ROCKET);
+    }
+
+    private static void ActionBruisAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        if (game.P_CheckMeleeRange(actor))
+        {
+            // S_StartSound(actor, sfx_claw);
+            var damage = (DoomRandom.P_Random() % 8 + 1) * 10;
+            MapObject.DamageMapObject(actor.Target, actor, actor, damage);
+            return;
+        }
+
+        // launch a missile
+        game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_BRUISERSHOT);
+    }
+
+    private static void ActionSkelMissile(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+        {
+            return;
+        }
+
+        ActionFaceTarget(actionParams);
+        actor.Z += Fixed.FromInt(16); // so missile spawns higher
+        var mo = game.P_SpawnMissile(actor, actor.Target, MapObjectType.MT_TRACER);
+        actor.Z -= Fixed.FromInt(16); // back to normal
+
+        mo.X += mo.MomX;
+        mo.Y += mo.MomY;
+        mo.Tracer = actor.Target;
+    }
+
+    private static void ActionTracer(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if ((game.GameTic & 3) != 0)
+        {
+            return;
+        }
+
+        // spawn a puff of smoke behind the rocket		
+        game.P_SpawnPuff(actor.X, actor.Y, actor.Z);
+
+        var th = game.P_SpawnMapObject(actor.X - actor.MomX,
+            actor.Y - actor.MomY,
+            actor.Z, MapObjectType.MT_SMOKE);
+
+        th.MomZ = Fixed.Unit;
+        th.Tics -= DoomRandom.P_Random() & 3;
+        if (th.Tics < 1)
+        {
+            th.Tics = 1;
+        }
+
+        // adjust direction
+        var dest = actor.Tracer;
+
+        if (dest is not { Health: > 0 })
+        {
+            return;
+        }
+
+        // change angle
+        var exact = DoomGame.Instance.Renderer.PointToAngle2(actor.X, actor.Y, dest.X, dest.Y);
+
+        if (exact != actor.Angle)
+        {
+            if (exact - actor.Angle > Angle.Angle180)
+            {
+                actor.Angle -= Angle.TraceAngle;
+                if (exact - actor.Angle < Angle.Angle180)
+                {
+                    actor.Angle = exact;
+                }
+            }
+            else
+            {
+                actor.Angle += Angle.TraceAngle;
+                if (exact - actor.Angle > Angle.Angle180)
+                {
+                    actor.Angle = exact;
+                }
+            }
+        }
+
+        // BUG May need to convert speed into a Fixed first to get FixedMul behavior
+        actor.MomX = actor.Info.Speed * DoomMath.Cos(exact);
+        actor.MomY = actor.Info.Speed * DoomMath.Sin(exact);
+
+        // change slope
+        var dist = game.P_AproxDistance(dest.X - actor.X, dest.Y - actor.Y).Value;
+
+        dist /= actor.Info.Speed;
+
+        if (dist < 1)
+        {
+            dist = 1;
+        }
+
+        var slope = (dest.Z + Fixed.FromInt(40) - actor.Z) / dist;
+
+        var fracOver8 = Fixed.Unit / 8;
+        if (slope < actor.MomZ)
+        {
+            actor.MomZ -= fracOver8;
+        }
+        else
+        {
+            actor.MomZ += fracOver8;
+        }
+    }
+
     private static void ActionVileChase(ActionParams actionParams) { }
     private static void ActionVileStart(ActionParams actionParams) { }
     private static void ActionVileTarget(ActionParams actionParams) { }
@@ -183,28 +1053,18 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     private static void ActionStartFire(ActionParams actionParams) { }
     private static void ActionFire(ActionParams actionParams) { }
     private static void ActionFireCrackle(ActionParams actionParams) { }
-    private static void ActionTracer(ActionParams actionParams) { }
+    
     private static void ActionSkelWhoosh(ActionParams actionParams) { }
     private static void ActionSkelFist(ActionParams actionParams) { }
-    private static void ActionSkelMissile(ActionParams actionParams) { }
     private static void ActionFatRaise(ActionParams actionParams) { }
     private static void ActionFatAttack1(ActionParams actionParams) { }
     private static void ActionFatAttack2(ActionParams actionParams) { }
     private static void ActionFatAttack3(ActionParams actionParams) { }
     private static void ActionBossDeath(ActionParams actionParams) { }
-    private static void ActionCPosAttack(ActionParams actionParams) { }
-    private static void ActionCPosRefire(ActionParams actionParams) { }
-    private static void ActionTroopAttack(ActionParams actionParams) { }
-    private static void ActionSargAttack(ActionParams actionParams) { }
-    private static void ActionHeadAttack(ActionParams actionParams) { }
-    private static void ActionBruisAttack(ActionParams actionParams) { }
     private static void ActionSkullAttack(ActionParams actionParams) { }
     private static void ActionMetal(ActionParams actionParams) { }
-    private static void ActionSpidRefire(ActionParams actionParams) { }
     private static void ActionBabyMetal(ActionParams actionParams) { }
-    private static void ActionBspiAttack(ActionParams actionParams)    { }
     private static void ActionHoof(ActionParams actionParams) { }
-    private static void ActionCyberAttack(ActionParams actionParams) { }
     private static void ActionPainAttack(ActionParams actionParams) { }
     private static void ActionPainDie(ActionParams actionParams) { }
     private static void ActionKeenDie(ActionParams actionParams) { }

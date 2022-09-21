@@ -2,11 +2,11 @@
 
 public record WeaponInfo(AmmoType Ammo, StateNum UpState, StateNum DownState, StateNum ReadyState, StateNum AttackState, StateNum FlashState)
 {
-    public const int LowerSpeed = Constants.FracUnit * 6;
-    public const int RaiseSpeed = Constants.FracUnit * 6;
+    public static readonly Fixed LowerSpeed = Fixed.FromInt(6);
+    public static readonly Fixed RaiseSpeed = Fixed.FromInt(6);
 
-    public const int WeaponBottom = Constants.FracUnit * 128;
-    public const int WeaponTop = Constants.FracUnit * 32;
+    public static readonly Fixed WeaponBottom = Fixed.FromInt(128);
+    public static readonly Fixed WeaponTop = Fixed.FromInt(32);
 
     public const int BFGCells = 40;
 

@@ -55,11 +55,16 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
     public int LineCount { get; set; }
     
     public Line[] Lines { get; set; } = Array.Empty<Line>();
+    
+    public short FloorPic { get; set; } = FloorPic;
+    public Fixed FloorHeight { get; set; } = FloorHeight;
+    public Fixed CeilingHeight { get; set; } = CeilingHeight;
+    public short LightLevel { get; set; } = LightLevel;
 
     public static Sector ReadFromWadData(BinaryReader reader)
     {
-        var floorHeight = new Fixed(reader.ReadInt16() << Constants.FracBits);
-        var ceilingHeight = new Fixed(reader.ReadInt16() << Constants.FracBits);
+        var floorHeight = Fixed.FromInt(reader.ReadInt16());
+        var ceilingHeight = Fixed.FromInt(reader.ReadInt16());
         var floorPic = Encoding.ASCII.GetString(reader.ReadBytes(8)).TrimEnd('\0');
         var ceilingPic = Encoding.ASCII.GetString(reader.ReadBytes(8)).TrimEnd('\0');
         var lightLevel = reader.ReadInt16();
@@ -81,11 +86,13 @@ public record Sector(Fixed FloorHeight, Fixed CeilingHeight, short FloorPic, sho
 
 public record SideDef(Fixed TextureOffset, Fixed RowOffset, Sector Sector)
 {
+    public Fixed TextureOffset { get; set; } = TextureOffset;
+
     public int TopTexture { get; set; }
     public int BottomTexture { get; set; }
     public int MidTexture { get; set; }
 
-    public static SideDef ReadFromWadData(BinaryReader reader, Sector[] sectors)
+    public static SideDef ReadFromWadData(BinaryReader reader, List<Sector> sectors)
     {
         var textureOffset = reader.ReadInt16();
         var rowOffset = reader.ReadInt16();
@@ -95,8 +102,8 @@ public record SideDef(Fixed TextureOffset, Fixed RowOffset, Sector Sector)
         var sector = reader.ReadInt16();
 
         return new SideDef(
-            new Fixed(textureOffset << Constants.FracBits),
-            new Fixed(rowOffset << Constants.FracBits),
+            Fixed.FromInt(textureOffset),
+            Fixed.FromInt(rowOffset),
             sectors[sector]
         )
         {
@@ -181,6 +188,19 @@ public class Line
             }
         };
     }
+
+    /// <summary>
+    /// Returns the sector next to the current one, or <c>null</c> if not two-sided line.
+    /// </summary>
+    public Sector? GetNextSector(Sector sector)
+    {
+        if ((Flags & Constants.Line.TwoSided) == 0)
+        {
+            return null;
+        }
+
+        return FrontSector == sector ? BackSector : FrontSector;
+    }
 }
 
 /// <summary>
@@ -203,19 +223,19 @@ public record SubSector(short NumLines, short FirstLine)
 /// <summary>
 /// The LineSeg
 /// </summary>
-public record Segment(Vertex V1, Vertex V2, Fixed Offset, uint Angle, SideDef SideDef, Line LineDef, Sector FrontSector, Sector? BackSector)
+public record Segment(Vertex V1, Vertex V2, Fixed Offset, Angle Angle, SideDef SideDef, Line LineDef, Sector FrontSector, Sector? BackSector)
 {
     public static Segment ReadFromWadData(BinaryReader reader, Vertex[] vertices, SideDef[] sides, Line[] lines)
     {
         var v1 = vertices[reader.ReadInt16()];
         var v2 = vertices[reader.ReadInt16()];
 
-        var angle = (uint)(reader.ReadInt16() << Constants.FracBits);
+        var angle = reader.ReadInt16() << 16;
         var lineDef = lines[reader.ReadInt16()];
 
         var side = reader.ReadInt16();
         var sideDef = sides[lineDef.SideNum[side]];
-        var offset = new Fixed(reader.ReadInt16() << Constants.FracBits);
+        var offset = Fixed.FromInt(reader.ReadInt16());
 
         var frontSector = sideDef.Sector;
         Sector? backSector = null;
@@ -224,14 +244,14 @@ public record Segment(Vertex V1, Vertex V2, Fixed Offset, uint Angle, SideDef Si
             backSector = sides[lineDef.SideNum[side ^ 1]].Sector;
         }
 
-        return new Segment(v1, v2, offset, angle, sideDef, lineDef, frontSector, backSector);
+        return new Segment(v1, v2, offset, new Angle(angle), sideDef, lineDef, frontSector, backSector);
     }
 }
 
 /// <summary>
 /// BSP Node
 /// </summary>
-public class Node
+public class Node : DividerLine
 {
     public Node(Fixed x, Fixed y, Fixed dx, Fixed dy)
     {
@@ -247,11 +267,6 @@ public class Node
         }
     }
 
-    public Fixed X { get; set; }
-    public Fixed Y { get; set; }
-    public Fixed Dx { get; set; }
-    public Fixed Dy { get; set; }
-
     /// <summary>
     /// Bounding box for each child.
     /// </summary>
@@ -264,18 +279,18 @@ public class Node
 
     public static Node ReadFromWadData(BinaryReader reader)
     {
-        var x = new Fixed(reader.ReadInt16() << Constants.FracBits);
-        var y = new Fixed(reader.ReadInt16() << Constants.FracBits);
-        var dx = new Fixed(reader.ReadInt16() << Constants.FracBits);
-        var dy = new Fixed(reader.ReadInt16() << Constants.FracBits);
+        var x = Fixed.FromInt(reader.ReadInt16());
+        var y = Fixed.FromInt(reader.ReadInt16());
+        var dx = Fixed.FromInt(reader.ReadInt16());
+        var dy = Fixed.FromInt(reader.ReadInt16());
 
         var node = new Node(x, y, dx, dy);
-        // TODO Might need to swap the order around here (if the two-dimensional array is stored differently in the WAD lump)
+
         for (var i = 0; i < 2; i++)
         {
             for (var j = 0; j < 4; j++)
             {
-                node.BoundingBox[i][j] = new Fixed(reader.ReadInt16() << Constants.FracBits);
+                node.BoundingBox[i][j] = Fixed.FromInt(reader.ReadInt16());
             }
         }
 

@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using DoomSharp.Core;
 using DoomSharp.Windows.Annotations;
@@ -37,6 +39,12 @@ public class ConsoleViewModel : IConsole, INotifyPropertyChanged
 
     public void Write(string message)
     {
+#if DEBUG
+        if (Debugger.IsAttached)
+        {
+            Debug.WriteLine(message.TrimEnd('\r', '\n'));
+        }
+#endif
         ConsoleOutput += message;
     }
 
@@ -48,10 +56,14 @@ public class ConsoleViewModel : IConsole, INotifyPropertyChanged
 
     public void Shutdown()
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        try
         {
-            Application.Current.Shutdown();
-        });
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                Application.Current?.Shutdown();
+            });
+        }
+        catch (TaskCanceledException) { }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -40,7 +40,7 @@ public class VisPlane
         return i switch
         {
             < 0 => Pad1,
-            >= 320 => Pad2,
+            >= Constants.ScreenWidth => Pad2,
             _ => Top[i]
         };
     }
@@ -52,7 +52,7 @@ public class VisPlane
             case < 0:
                 Pad1 = value;
                 break;
-            case >= 320:
+            case >= Constants.ScreenWidth:
                 Pad2 = value;
                 break;
             default:
@@ -66,7 +66,7 @@ public class VisPlane
         return i switch
         {
             < 0 => Pad3,
-            >= 320 => Pad4,
+            >= Constants.ScreenWidth => Pad4,
             _ => Bottom[i]
         };
     }
@@ -78,7 +78,7 @@ public class VisPlane
             case < 0:
                 Pad3 = value;
                 break;
-            case >= 320:
+            case >= Constants.ScreenWidth:
                 Pad4 = value;
                 break;
             default:
@@ -89,10 +89,8 @@ public class VisPlane
 
     private void FillTop(byte value)
     {
-        // Top[0] = value;
-        for (var i = 0; i < Top.Length; i++)
-        {
-            Top[i] = value;
-        }
+        Pad1 = value;
+        Pad2 = value;
+        Array.Fill(Top, value);
     }
 }

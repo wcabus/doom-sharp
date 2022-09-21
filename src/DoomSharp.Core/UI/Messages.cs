@@ -66,6 +66,56 @@ public static class Messages
             ? "Low detail"
             : "GRAPHISMES MINIMUM";
 
+    public static string GotArmor => IsEnglish ? "Picked up the armor." : "";
+    public static string GotMega => IsEnglish ? "Picked up the MegaArmor!" : "";
+    public static string GotHealthBonus => IsEnglish ? "Picked up a health bonus." : "";
+    public static string GotArmorBonus => IsEnglish ? "Picked up an armor bonus." : "";
+    public static string GotStim => IsEnglish ? "Picked up a stimpack." : "";
+    public static string GotMedikitAndItWasNeeded => IsEnglish ? "Picked up a medikit that you REALLY need!" : "";
+    public static string GotMedikit => IsEnglish ? "Picked up a medikit." : "";
+    public static string GotSuper => IsEnglish ? "Supercharge!" : "";
+
+    public static string GotBlueCard => IsEnglish ? "Picked up the blue keycard" : "";
+    public static string GotYellowCard => IsEnglish ? "Picked up the yellow keycard" : "";
+    public static string GotRedCard => IsEnglish ? "Picked up the red keycard" : "";
+    public static string GotBlueSkull => IsEnglish ? "Picked up the blue skull key" : "";
+    public static string GotYellowSkull => IsEnglish ? "Picked up the yellow skull key" : "";
+    public static string GotRedSkull => IsEnglish ? "Picked up the red skull key" : "";
+
+    public static string GotInvulnerability => IsEnglish ? "Invulnerability!" : "";
+    public static string GotBerserk => IsEnglish ? "Berserk!" : "";
+    public static string GotInvisibility => IsEnglish ? "Partial invisibility" : "";
+    public static string GotSuit => IsEnglish ? "Radiation Shielding Suit" : "";
+    public static string GotMap => IsEnglish ? "Computer Area Map" : "";
+    public static string GotVisor => IsEnglish ? "Light Amplification Visor" : "";
+    public static string GotMegaSphere => IsEnglish ? "MegaSphere!" : "";
+
+    public static string GotClip => IsEnglish ? "Picked up a clip." : "";
+    public static string GotClipBox => IsEnglish ? "Picked up a box of bullets." : "";
+    public static string GotRocket => IsEnglish ? "Picked up a rocket." : "";
+    public static string GotRocketBox => IsEnglish ? "Picked up a box of rockets." : "";
+    public static string GotCell => IsEnglish ? "Picked up an energy cell." : "";
+    public static string GotCellBox => IsEnglish ? "Picked up an energy cell pack." : "";
+    public static string GotShells => IsEnglish ? "Picked up 4 shotgun shells." : "";
+    public static string GotShellBox => IsEnglish ? "Picked up a box of shotgun shells." : "";
+    public static string GotBackpack  => IsEnglish ? "Picked up a backpack full of ammo!" : "";
+
+    public static string GotBfg9000 => IsEnglish ? "You got the BFG9000! Oh, yes." : "";
+    public static string GotChaingun => IsEnglish ? "You got the chaingun!" : "";
+    public static string GotChainsaw => IsEnglish ? "A chainsaw! Find some meat!" : "";
+    public static string GotRocketLauncher => IsEnglish ? "You got the rocket launcher!" : "";
+    public static string GotPlasmaRifle => IsEnglish ? "You got the plasma rifle!" : "";
+    public static string GotShotgun => IsEnglish ? "You got the shotgun!" : "";
+    public static string GotShotgun2 => IsEnglish ? "You got the super shotgun!" : "";
+
+    public static string PD_BLUEO => IsEnglish ? "You need a blue key to activate this object" : "";
+    public static string PD_REDO => IsEnglish ? "You need a red key to activate this object" : "";
+    public static string PD_YELLOWO => IsEnglish ? "You need a yellow key to activate this object" : "";
+
+    public static string PD_BLUEK => IsEnglish ? "You need a blue key to open this door" : "";
+    public static string PD_REDK => IsEnglish ? "You need a red key to open this door" : "";
+    public static string PD_YELLOWK => IsEnglish ? "You need a yellow key to open this door" : "";
+
     public static IEnumerable<string> QuitMessages 
     {
         get

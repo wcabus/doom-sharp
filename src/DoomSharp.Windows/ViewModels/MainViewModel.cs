@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -79,10 +80,9 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             colors.Add(Color.FromRgb(palette[i], palette[i + 1], palette[i + 2]));
         }
         
-        var bitmapPalette = new BitmapPalette(colors);
-
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher?.Invoke(() =>
         {
+            var bitmapPalette = new BitmapPalette(colors);
             _newPaletteOutput = new WriteableBitmap(Constants.ScreenWidth, Constants.ScreenHeight, 96, 96, PixelFormats.Indexed8, bitmapPalette);
         });
     }
@@ -91,29 +91,32 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     {
         Array.Copy(output, 0, _screenBuffer, 0, output.Length);
         
-        Application.Current?.Dispatcher?.Invoke(() =>
+        var bitmap = _output;
+        var switchOutput = false;
+        if (_newPaletteOutput is not null)
         {
-            var bitmap = _output;
-            var switchOutput = false;
+            bitmap = _newPaletteOutput;
+            _newPaletteOutput = null;
+            switchOutput = true;
+        }
 
-            if (_newPaletteOutput is not null)
-            {
-                bitmap = _newPaletteOutput;
-                _newPaletteOutput = null;
-                switchOutput = true;
-            }
+        if (bitmap is null)
+        {
+            return;
+        }
 
-            if (bitmap is null)
+        try
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
             {
-                return;
-            }
-
-            bitmap.WritePixels(_rectangle, _screenBuffer, _stride, 0);
-            if (switchOutput)
-            {
-                Output = bitmap;
-            }
-        });
+                bitmap.WritePixels(_rectangle, _screenBuffer, _stride, 0);
+                if (switchOutput)
+                {
+                    Output = bitmap;
+                }
+            });
+        }
+        catch (TaskCanceledException) {}
     }
 
     public void StartTic()
