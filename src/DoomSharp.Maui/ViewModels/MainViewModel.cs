@@ -74,15 +74,30 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     {
         Array.Copy(output, 0, _screenBuffer, 0, output.Length);
 
+        var switchOutput = false;
+
+        byte[] palette = null;
+        if (_palette is not null)
+        {
+            palette = _palette;
+            _palette = null;
+            switchOutput = true;
+        }
+
+        if (!switchOutput)
+        {
+            return;
+        }
+
         SKBitmap bitmap = new(new SKImageInfo(Constants.ScreenWidth, Constants.ScreenHeight));
         for (var x = 0; x < Constants.ScreenWidth; x++)
         {
             for (var y = 0; y < Constants.ScreenHeight; y++)
             {
                 var pixelIdx = y * Constants.ScreenWidth + x;
-                byte r = _palette[_screenBuffer[pixelIdx] * 3];
-                byte g = _palette[_screenBuffer[pixelIdx] * 3 + 1];
-                byte b = _palette[_screenBuffer[pixelIdx] * 3 + 2];
+                byte r = palette[_screenBuffer[pixelIdx] * 3];
+                byte g = palette[_screenBuffer[pixelIdx] * 3 + 1];
+                byte b = palette[_screenBuffer[pixelIdx] * 3 + 2];
 
                 bitmap.SetPixel(x, y, new SKColor(r, g, b));
             }
