@@ -1,7 +1,6 @@
 ﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.UI;
-using System.Runtime.InteropServices;
 
 namespace DoomSharp.Core.GameLogic;
 

@@ -318,13 +318,13 @@ public class GameController
                     DoPlayDemo();
                     break;
                 case GameAction.Completed:
-                    // G_DoCompleted();
+                    DoCompleted();
                     break;
                 case GameAction.Victory:
                     // F_StartFinale();
                     break;
                 case GameAction.WorldDone:
-                    // G_DoWorldDone();
+                    DoWorldDone();
                     break;
                 case GameAction.Screenshot:
                     // M_ScreenShot();
@@ -433,7 +433,7 @@ public class GameController
                 break;
 
             case GameState.Intermission:
-                // WI_Ticker();
+                DoomGame.Instance.Intermission.Ticker();
                 break;
 
             case GameState.Finale:
@@ -458,6 +458,22 @@ public class GameController
 
         // clear everything else to defaults 
         PlayerReborn(player);
+    }
+
+    /// <summary>
+    /// Can when a player completes a level.
+    /// </summary>
+    public void PlayerFinishLevel(int player)
+    {
+        var p = Players[player];
+
+        Array.Clear(p.Powers);
+        Array.Clear(p.Cards);
+        p.MapObject!.Flags &= ~MapObjectFlag.MF_SHADOW; // cancel invisibility
+        p.ExtraLight = 0; // cancel gun flashes
+        p.FixedColorMap = 0; // cancel IR goggles
+        p.DamageCount = 0; // no palette changes
+        p.BonusCount = 0;
     }
 
     /// <summary>
@@ -5922,6 +5938,24 @@ public class GameController
         return cmd;
     }
 
+    // DOOM Par Times
+    private static readonly int[][] ParTimes =
+    {
+        new[] { 0 },
+        new[] { 0, 30, 75, 120, 90, 165, 180, 180, 30, 165 },
+        new[] { 0, 90, 90, 90, 120, 90, 360, 240, 30, 170 },
+        new[] { 0, 90, 45, 90, 150, 90, 90, 165, 30, 135 }
+    };
+
+    // DOOM II Par Times
+    private static readonly int[] CommercialParTimes =
+    {
+        30, 90, 120, 120, 90, 150, 120, 120, 270, 90, //  1-10
+        210, 150, 150, 150, 210, 150, 420, 150, 210, 150, // 11-20
+        240, 150, 180, 150, 150, 300, 330, 420, 300, 180, // 21-30
+        120, 30 // 31-32
+    };
+
     public void ExitLevel()
     {
         _secretExit = false;
@@ -5942,6 +5976,182 @@ public class GameController
         }
 
         GameAction = GameAction.Completed;
+    }
+
+    public void DoCompleted()
+    {
+        GameAction = GameAction.Nothing;
+
+        for (var i = 0; i < Constants.MaxPlayers; i++)
+        {
+            if (PlayerInGame[i])
+            {
+                PlayerFinishLevel(i);
+            }
+        }
+
+        if (AutomapActive)
+        {
+            // AM_Stop();
+        }
+
+        if (DoomGame.Instance.GameMode != GameMode.Commercial)
+        {
+            switch (GameMap)
+            {
+                case 8:
+                    GameAction = GameAction.Victory;
+                    return;
+                case 9:
+                    for (var i = 0; i < Constants.MaxPlayers; i++)
+                    {
+                        Players[i].DidSecret = true;
+                    }
+
+                    break;
+            }
+        }
+
+        _wmInfo.DidSecret = Players[ConsolePlayer].DidSecret;
+        _wmInfo.Episode = GameEpisode - 1;
+        _wmInfo.Last = GameMap - 1;
+
+        // wminfo.next is 0 based, unlike gamemap
+        if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            if (_secretExit)
+            {
+                switch (GameMap)
+                {
+                    case 15:
+                        _wmInfo.Next = 30;
+                        break;
+                    case 31:
+                        _wmInfo.Next = 31;
+                        break;
+                }
+            }
+            else
+            {
+                switch (GameMap)
+                {
+                    case 31:
+                    case 32:
+                        _wmInfo.Next = 15;
+                        break;
+                    default:
+                        _wmInfo.Next = GameMap;
+                        break;
+                }
+            }
+        }
+        else
+        {
+            if (_secretExit)
+            {
+                _wmInfo.Next = 9; // go to secret level
+            }
+            else if (GameMap == 9)
+            {
+                // returning from secret level
+                switch (GameEpisode)
+                {
+                    case 1:
+                        _wmInfo.Next = 3;
+                        break;
+                    case 2:
+                        _wmInfo.Next = 5;
+                        break;
+                    case 3:
+                        _wmInfo.Next = 6;
+                        break;
+                    case 4:
+                        _wmInfo.Next = 2;
+                        break;
+                }
+            }
+            else
+            {
+                _wmInfo.Next = GameMap; // go to next level
+            }
+        }
+
+        _wmInfo.MaxKills = TotalKills;
+        _wmInfo.MaxItems = TotalItems;
+        _wmInfo.MaxSecret = TotalSecrets;
+        _wmInfo.MaxFrags = 0;
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            _wmInfo.ParTime = 35 * CommercialParTimes[GameMap - 1];
+        }
+        else
+        {
+            _wmInfo.ParTime = 35 * ParTimes[GameEpisode][GameMap];
+        }
+
+        _wmInfo.PlayerNum = ConsolePlayer;
+
+        for (var i = 0; i < Constants.MaxPlayers; i++)
+        {
+            _wmInfo.Players[i].In = PlayerInGame[i];
+            _wmInfo.Players[i].Kills = Players[i].KillCount;
+            _wmInfo.Players[i].Items = Players[i].ItemCount;
+            _wmInfo.Players[i].Secret = Players[i].SecretCount;
+            _wmInfo.Players[i].Time = LevelTime;
+
+            Array.Copy(Players[i].Frags, 0, _wmInfo.Players[i].Frags, 0, _wmInfo.Players[i].Frags.Length);
+        }
+
+        GameState = GameState.Intermission;
+        ViewActive = false;
+        AutomapActive = false;
+
+        //if (statcopy != null)
+        //{
+        //    // copy wminfo to statcopy 
+        //}
+
+        DoomGame.Instance.Intermission.Start(_wmInfo);
+    }
+
+    public void WorldDone()
+    {
+        GameAction = GameAction.WorldDone;
+
+        if (_secretExit)
+        {
+            Players[ConsolePlayer].DidSecret = true;
+        }
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            switch (GameMap)
+            {
+                case 15 or 31:
+                    if (!_secretExit)
+                    {
+                        break;
+                    }
+                    // F_StartFinale();
+                    break;
+                case 6:
+                case 11:
+                case 20:
+                case 30:
+                    // F_StartFinale();
+                    break;
+            }
+        }
+    }
+
+    public void DoWorldDone()
+    {
+        GameState = GameState.Level;
+        GameMap = _wmInfo.Next + 1;
+        DoLoadLevel();
+        GameAction = GameAction.Nothing;
+        ViewActive = true;
     }
 
     public int GetPlayerIndex(Player player)
