@@ -49,8 +49,17 @@ public partial class MainPage : ContentPage
     {
         (GameMode, string) version = new();
 
+        // Shareware
+        var wadFile = "DOOM1.WAD";
+        if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
+        {
+            version.Item1 = GameMode.Shareware;
+            version.Item2 = wadFile;
+            return version;
+        }
+        
         // Commercial
-        var wadFile = "DOOM2.WAD";
+        wadFile = "DOOM2.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Commercial;
@@ -72,15 +81,6 @@ public partial class MainPage : ContentPage
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
         {
             version.Item1 = GameMode.Registered;
-            version.Item2 = wadFile;
-            return version;
-        }
-
-        // Shareware
-        wadFile = "DOOM1.WAD";
-        if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
-        {
-            version.Item1 = GameMode.Shareware;
             version.Item2 = wadFile;
             return version;
         }

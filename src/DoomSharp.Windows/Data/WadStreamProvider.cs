@@ -34,7 +34,17 @@ namespace DoomSharp.Windows.Data
 
         private static WadFile? LoadWad(string file, BinaryReader reader)
         {
-            var wadFile = new WadFile(reader);
+            var header = new WadFile.WadInfo
+            {
+                Identification = Encoding.ASCII.GetString(reader.ReadBytes(4)).TrimEnd('\0'),
+                NumLumps = reader.ReadInt32(),
+                InfoTableOfs = reader.ReadInt32()
+            };
+
+            var wadFile = new WadFile(reader)
+            {
+                Header = header
+            };
 
             if (string.Equals(wadFile.Header.Identification, "IWAD", StringComparison.Ordinal) == false)
             {
@@ -50,7 +60,7 @@ namespace DoomSharp.Windows.Data
             reader.BaseStream.Seek(wadFile.Header.InfoTableOfs, SeekOrigin.Begin);
             for (var i = 0; i < wadFile.LumpCount; i++)
             {
-                var lump = reader.ReadStruct<WadFile.FileLump>();
+                var lump = WadFile.FileLump.ReadFromWadData(reader);
                 fileInfo.Add(new WadLump(wadFile, lump));
             }
 

@@ -92,10 +92,9 @@ public class WadFile : IDisposable
     public WadFile(BinaryReader reader)
     {
         _reader = reader;
-        Header = reader.ReadStruct<WadInfo>();
     }
 
-    public WadInfo Header { get; private init; }
+    public WadInfo Header { get; init; }
     public ICollection<WadLump> Lumps { get; set; } = Array.Empty<WadLump>();
     public int LumpCount => Header.NumLumps;
 
