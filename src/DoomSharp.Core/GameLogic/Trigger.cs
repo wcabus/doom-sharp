@@ -1,6 +1,7 @@
 ﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.UI;
+using System.Runtime.InteropServices;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -610,12 +611,11 @@ public static class Trigger
 
             // new door thinker
             rtn = true;
-            var door = new Door();
+            var door = new Door(sec);
             game.AddThinker(door);
             sec.SpecialData = door;
 
             door.Action = VerticalDoor;
-            door.Sector = sec;
             door.Type = type;
             door.TopWait = Door.Wait;
             door.Speed = Door.DefaultSpeed;
@@ -780,12 +780,11 @@ public static class Trigger
         }
 
         // new door thinker
-        var newDoor = new Door();
+        var newDoor = new Door(sec);
         DoomGame.Instance.Game.AddThinker(newDoor);
         sec.SpecialData = newDoor;
 
         newDoor.Action = VerticalDoor;
-        newDoor.Sector = sec;
         newDoor.Direction = 1;
         newDoor.TopWait = Door.Wait;
         newDoor.Speed = Door.DefaultSpeed;
@@ -821,6 +820,45 @@ public static class Trigger
         // find the top and bottom of the movement range
         newDoor.TopHeight = DoomGame.Instance.Game.P_FindLowestCeilingSurrounding(sec);
         newDoor.TopHeight -= Fixed.FromInt(4);
+    }
+
+    /// <summary>
+    /// Spawn a door that closes after 30 seconds
+    /// </summary>
+    public static void SpawnDoorCloseIn30(Sector sector)
+    {
+        var door = new Door(sector);
+        DoomGame.Instance.Game.AddThinker(door);
+
+        sector.SpecialData = door;
+        sector.Special = 0;
+
+        door.Action = VerticalDoor;
+        door.Direction = 0;
+        door.Type = DoorType.Normal;
+        door.Speed = Door.DefaultSpeed;
+        door.TopCountDown = 30 * 35;
+    }
+
+    /// <summary>
+    /// Spawn a door that opens after 5 minutes
+    /// </summary>
+    public static void SpawnDoorRaiseIn5Mins(Sector sector)
+    {
+        var door = new Door(sector);
+        DoomGame.Instance.Game.AddThinker(door);
+
+        sector.SpecialData = door;
+        sector.Special = 0;
+
+        door.Action = VerticalDoor;
+        door.Direction = 2;
+        door.Type = DoorType.RaiseIn5Mins;
+        door.Speed = Door.DefaultSpeed;
+        door.TopHeight = DoomGame.Instance.Game.P_FindLowestCeilingSurrounding(sector);
+        door.TopHeight -= Fixed.FromInt(4);
+        door.TopWait = Door.Wait;
+        door.TopCountDown = 5 * 60 * 35;
     }
 
     /// <summary>
@@ -1925,7 +1963,7 @@ public static class Trigger
         }
     }
 
-    public static void PerformStrobeFlash(ActionParams actionParams)
+    private static void PerformStrobeFlash(ActionParams actionParams)
     {
         if (actionParams.Thinker is not StrobeFlash flash)
         {
@@ -1947,6 +1985,136 @@ public static class Trigger
             flash.Sector.LightLevel = (short)flash.MinLight;
             flash.Count = flash.DarkTime;
         }
+    }
+
+    /// <summary>
+    /// After the map has been loaded, scan each sector
+    /// for specials that spawn thinkers
+    /// </summary>
+    public static void SpawnLightFlash(Sector sector)
+    {
+        // nothing special about it during gameplay
+        sector.Special = 0;
+
+        var flash = new LightFlash(sector);
+        DoomGame.Instance.Game.AddThinker(flash);
+
+        flash.Action = PerformLightFlash;
+        flash.MaxLight = sector.LightLevel;
+        flash.MinLight = DoomGame.Instance.Game.P_FindMinSurroundingLight(sector, sector.LightLevel);
+        flash.MaxTime = 64;
+        flash.MinTime = 7;
+        flash.Count = (DoomRandom.P_Random() & flash.MaxTime) + 1;
+    }
+
+    // <summary>
+    /// Do flashing lights
+    /// </summary>
+    private static void PerformLightFlash(ActionParams actionParams)
+    {
+        if (actionParams.Thinker is not LightFlash flash)
+        {
+            return;
+        }
+
+        if (--flash.Count != 0)
+        {
+            return;
+        }
+
+        if (flash.Sector.LightLevel == flash.MaxLight)
+        {
+            flash.Sector.LightLevel = (short)flash.MinLight;
+            flash.Count = (DoomRandom.P_Random() & flash.MinTime) + 1;
+            return;
+        }
+
+        flash.Sector.LightLevel = (short)flash.MaxLight;
+        flash.Count = (DoomRandom.P_Random() & flash.MaxTime) + 1;
+    }
+
+    public static void SpawnGlowingLight(Sector sector)
+    {
+        var glow = new GlowingLight(sector);
+        DoomGame.Instance.Game.AddThinker(glow);
+
+        glow.MinLight = DoomGame.Instance.Game.P_FindMinSurroundingLight(sector, sector.LightLevel);
+        glow.MaxLight = sector.LightLevel;
+        glow.Action = PerformGlowingLight;
+        glow.Direction = -1;
+
+        sector.Special = 0;
+    }
+
+    private static void PerformGlowingLight(ActionParams actionParams)
+    {
+        if (actionParams.Thinker is not GlowingLight glow)
+        {
+            return;
+        }
+
+        switch (glow.Direction)
+        {
+            case -1:
+                // DOWN
+                glow.Sector.LightLevel -= GlowingLight.Speed;
+                if (glow.Sector.LightLevel <= glow.MinLight)
+                {
+                    glow.Sector.LightLevel += GlowingLight.Speed;
+                    glow.Direction = 1;
+                }
+                break;
+
+            case 1:
+                // UP
+                glow.Sector.LightLevel += GlowingLight.Speed;
+                if (glow.Sector.LightLevel >= glow.MaxLight)
+                {
+                    glow.Sector.LightLevel -= GlowingLight.Speed;
+                    glow.Direction = -1;
+                }
+                break;
+        }
+    }
+
+    public static void SpawnFireFlicker(Sector sector)
+    {
+        // Note that we are resetting sector attributes.
+        // Nothing special about it during gameplay.
+        sector.Special = 0;
+
+        var flicker = new FireFlicker(sector);
+        DoomGame.Instance.Game.AddThinker(flicker);
+
+        flicker.Action = PerformFireFlicker;
+        flicker.MaxLight = sector.LightLevel;
+        flicker.MinLight = DoomGame.Instance.Game.P_FindMinSurroundingLight(sector, sector.LightLevel) + 16;
+        flicker.Count = 4;
+    }
+
+    private static void PerformFireFlicker(ActionParams actionParams)
+    {
+        if (actionParams.Thinker is not FireFlicker flicker)
+        {
+            return;
+        }
+
+        if (--flicker.Count != 0)
+        {
+            return;
+        }
+
+        var amount = (DoomRandom.P_Random() & 3) * 16;
+        if (flicker.Sector.LightLevel - amount < flicker.MinLight)
+        {
+            flicker.Sector.LightLevel = (short)flicker.MinLight;
+        }
+        else
+        {
+            flicker.Sector.LightLevel = (short)(flicker.MaxLight - amount);
+        }
+
+        flicker.Count = 4;
     }
 
     public static bool TwoSided(int sectorIdx, int lineIdx)

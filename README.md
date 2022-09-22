@@ -32,4 +32,5 @@ This should give you a file called `launchSettings.json` which looks like this:
 ## Progress
 Loading the original WAD files should work, although I've only tested the shareware WAD for now. 
 
-The demo games are not running as they should yet, the commands seem to be out of sync somehow. You can start your own game, although it currently crashes somewhere at the end of E1M1 because some special sector types haven't been implemented yet (like strobing light areas).
+The demo games are not running as they should yet, the commands seem to be out of sync somehow. 
+You can start your own game, although it currently stops at the end of E1M1 because the intermission game state hasn't been implemented yet.

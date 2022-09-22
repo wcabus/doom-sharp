@@ -7,8 +7,13 @@ public class Door : Thinker
     public static readonly Fixed DefaultSpeed = Fixed.FromInt(2);
     public const int Wait = 150;
 
+    public Door(Sector sector)
+    {
+        Sector = sector;
+    }
+
+    public Sector Sector { get; }
     public DoorType Type { get; set; }
-    public Sector? Sector { get; set; }
     public Fixed TopHeight { get; set; }
     public Fixed Speed { get; set; }
 
