@@ -1,16 +1,12 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
 using DoomSharp.Core.Graphics;
-using System.Numerics;
 using DoomSharp.Core.Input;
 
 namespace DoomSharp.Core.UI;
 
 public class IntermissionController
 {
-    // https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/wi_stuff.h
-    // https://github.com/id-Software/DOOM/blob/77735c3ff0772609e9c8d29e3ce2ab42ff54d20b/linuxdoom-1.10/wi_stuff.c
-
     // used to accelerate or skip a stage
     private bool _accelerateStage;
 
@@ -69,7 +65,91 @@ public class IntermissionController
     private Patch? _bstar;
     private readonly Patch?[] _p = new Patch[Constants.MaxPlayers];
     private readonly Patch?[] _bp = new Patch[Constants.MaxPlayers];
-    
+
+
+    private enum AnimationType
+    {
+        Always,
+        Random,
+        Level
+    }
+
+    private record Point(int X, int Y);
+
+    private record Animation(AnimationType Type, int Period, int FrameCount, Point Location, int Data1 = 0)
+    {
+        // ALWAYS: n/a,
+        // RANDOM: period deviation (<256),
+        // LEVEL: level
+        public int Data1 { get; set; } = Data1;
+
+        // ALWAYS: n/a,
+        // RANDOM: random base period,
+        // LEVEL: n/a
+        public int Data2 { get; set; }
+
+        // actual graphics for frames of animations
+        public Patch[] Patches { get; set; } = Array.Empty<Patch>();
+
+        // following must be initialized to zero before use!
+
+        // next value of bcnt (used in conjunction with period)
+        public int NextTic { get; set; }
+
+        // last drawn animation frame
+        public int LastDrawn { get; set; }
+
+        // next frame number to animate
+        public int Counter { get; set; }
+
+        // used by RANDOM and LEVEL when animating
+        public int State { get; set; }
+    }
+
+    private static readonly Point[][] LevelNodes =
+    {
+        // Episode 0 World Map
+        new[]
+        {
+            new Point(185, 164), // location of level 0 (CJ)
+            new Point(148, 143), // location of level 1 (CJ)
+            new Point(69, 122), // location of level 2 (CJ)
+            new Point(209, 102), // location of level 3 (CJ)
+            new Point(116, 89), // location of level 4 (CJ)
+            new Point(166, 55), // location of level 5 (CJ)
+            new Point(71, 56), // location of level 6 (CJ)
+            new Point(135, 29), // location of level 7 (CJ)
+            new Point(71, 24) // location of level 8 (CJ)
+        },
+
+        // Episode 1 World Map should go here
+        new[]
+        {
+            new Point(254, 25), // location of level 0 (CJ)
+            new Point(97, 50), // location of level 1 (CJ)
+            new Point(188, 64), // location of level 2 (CJ)
+            new Point(128, 78), // location of level 3 (CJ)
+            new Point(214, 92), // location of level 4 (CJ)
+            new Point(133, 130), // location of level 5 (CJ)
+            new Point(208, 136), // location of level 6 (CJ)
+            new Point(148, 140), // location of level 7 (CJ)
+            new Point(235, 158) // location of level 8 (CJ)
+        },
+
+        // Episode 2 World Map should go here
+        new[]
+        {
+            new Point(156, 168), // location of level 0 (CJ)
+            new Point(48, 154), // location of level 1 (CJ)
+            new Point(174, 95), // location of level 2 (CJ)
+            new Point(265, 75), // location of level 3 (CJ)
+            new Point(130, 48), // location of level 4 (CJ)
+            new Point(279, 23), // location of level 5 (CJ)
+            new Point(198, 48), // location of level 6 (CJ)
+            new Point(140, 25), // location of level 7 (CJ)
+            new Point(281, 136) // location of level 8 (CJ)
+        }
+    };
 
     // Data needed to add patches to full screen intermission pics.
     // Patches are statistics messages, and animations.
@@ -115,7 +195,59 @@ public class IntermissionController
     private const int DM_VICTIMSX = 5;
     private const int DM_VICTIMSY = 50;
 
-    // foreground
+    //
+    // Animation locations for episode 0 (1).
+    // Using patches saves a lot of space,
+    //  as they replace 320x200 full screen frames.
+    //
+    private static readonly Animation[] Episode0AnimInfo =
+    {
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(224, 104)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(184, 160)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(112, 136)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(72, 112)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(88, 96)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(64, 48)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(192, 40)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(136, 16)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(80, 16)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(64, 24))
+    };
+
+    private static readonly Animation[] Episode1AnimInfo =
+    {
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 1),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 2),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 3),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 4),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 5),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 6),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 7),
+        new(AnimationType.Level, Constants.TicRate / 3, 3, new Point(192, 144), 8),
+        new(AnimationType.Level, Constants.TicRate / 3, 1, new Point(128, 136), 8)
+    };
+
+    private static readonly Animation[] Episode2AnimInfo =
+    {
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(104, 168)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(40, 136)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(160, 96)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(104, 80)),
+        new(AnimationType.Always, Constants.TicRate / 3, 3, new Point(120, 32)),
+        new(AnimationType.Always, Constants.TicRate / 4, 3, new Point(40, 0))
+    };
+
+    private static readonly int[] NumberOfAnimations = { 10, 9, 6 };
+
+    private static readonly Animation[][] Animations = {
+        Episode0AnimInfo,
+        Episode1AnimInfo,
+        Episode2AnimInfo
+    };
+
+    //
+    // Locally used stuff.
+    //
     private const int FB = 0;
 
     // States for single-player
@@ -123,6 +255,7 @@ public class IntermissionController
     private const int SP_ITEMS = 2;
     private const int SP_SECRET = 4;
     private const int SP_FRAGS = 6;
+
     private const int SP_TIME = 8;
     // private const int SP_PAR = ST_TIME; ???
 
@@ -318,28 +451,29 @@ public class IntermissionController
             // splat
             _splat = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISPLAT", PurgeTag.Static)!);
 
-            //if (_wbs.Episode < 3)
-            //{
-            //    for (var j = 0; j < NumAnims[_wbs.Episode]; j++)
-            //    {
-            //        var a = &anims[_wbs.Episode][j];
-            //        for (var i = 0; i < a->nanims; i++)
-            //        {
-            //            // MONDO HACK!
-            //            if (_wbs.Episode != 1 || j != 8)
-            //            {
-            //                // animations
-            //                sprintf(name, "WIA%d%.2d%.2d", _wbs.Episode, j, i);
-            //                a->p[i] = W_CacheLumpName(name, PU_STATIC);
-            //            }
-            //            else
-            //            {
-            //                // HACK ALERT!
-            //                a->p[i] = anims[1][4].p[i];
-            //            }
-            //        }
-            //    }
-            //}
+            if (_wbs.Episode < 3)
+            {
+                for (var j = 0; j < NumberOfAnimations[_wbs.Episode]; j++)
+                {
+                    var a = Animations[_wbs.Episode][j];
+                    a.Patches = new Patch[a.FrameCount];
+
+                    for (var i = 0; i < a.FrameCount; i++)
+                    {
+                        // MONDO HACK!
+                        if (_wbs.Episode != 1 || j != 8)
+                        {
+                            // animations
+                            a.Patches[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WIA{_wbs.Episode}{j:00}{i:00}", PurgeTag.Static)!);
+                        }
+                        else
+                        {
+                            // HACK ALERT!
+                            a.Patches[i] = Animations[1][4].Patches[i];
+                        }
+                    }
+                }
+            }
         }
 
         // More hacks on minus sign.
@@ -457,21 +591,29 @@ public class IntermissionController
             return;
         }
 
-        //for (i = 0; i < NUMANIMS[wbs->epsd]; i++)
-        //{
-        //    a = &anims[wbs->epsd][i];
+        for (var i = 0; i < NumberOfAnimations[_wbs.Episode]; i++)
+        {
+            var a = Animations[_wbs.Episode][i];
 
-        //    // init variables
-        //    a->ctr = -1;
+            // init variables
+            a.Counter = -1;
 
-        //    // specify the next time to draw it
-        //    if (a->type == ANIM_ALWAYS)
-        //        a->nexttic = bcnt + 1 + (M_Random() % a->period);
-        //    else if (a->type == ANIM_RANDOM)
-        //        a->nexttic = bcnt + 1 + a->data2 + (M_Random() % a->data1);
-        //    else if (a->type == ANIM_LEVEL)
-        //        a->nexttic = bcnt + 1;
-        //}
+            // specify the next time to draw it
+            switch (a.Type)
+            {
+                case AnimationType.Always:
+                    a.NextTic = _bcnt + 1 + (DoomRandom.M_Random() % a.Period);
+                    break;
+
+                case AnimationType.Random:
+                    a.NextTic = _bcnt + 1 + a.Data2 + (DoomRandom.M_Random() % a.Data1);
+                    break;
+
+                case AnimationType.Level:
+                    a.NextTic = _bcnt + 1;
+                    break;
+            }
+        }
     }
 
     private void UpdateAnimatedBack()
@@ -484,6 +626,59 @@ public class IntermissionController
         if (_wbs.Episode > 2)
         {
             return;
+        }
+
+        for (var i = 0; i < NumberOfAnimations[_wbs.Episode]; i++)
+        {
+            var a = Animations[_wbs.Episode][i];
+
+            if (_bcnt != a.NextTic)
+            {
+                continue;
+            }
+
+            switch (a.Type)
+            {
+                case AnimationType.Always:
+                    if (++a.Counter >= a.FrameCount)
+                    {
+                        a.Counter = 0;
+                    }
+
+                    a.NextTic = _bcnt + a.Period;
+                    break;
+
+                case AnimationType.Random:
+                    a.Counter++;
+
+                    if (a.Counter == a.FrameCount)
+                    {
+                        a.Counter = -1;
+                        a.NextTic = _bcnt + a.Data2 + (DoomRandom.M_Random() % a.Data1);
+                    }
+                    else
+                    {
+                        a.NextTic = _bcnt + a.Period;
+                    }
+
+                    break;
+
+                case AnimationType.Level:
+                    // gawd-awful hack for level anims
+                    if (!(_state == IntermissionState.StatCounting && i == 7)
+                        && _wbs.Next == a.Data1)
+                    {
+                        a.Counter++;
+                        
+                        if (a.Counter == a.FrameCount)
+                        {
+                            a.Counter--;
+                        }
+
+                        a.NextTic = _bcnt + a.Period;
+                    }
+                    break;
+            }
         }
     }
 
@@ -675,7 +870,7 @@ public class IntermissionController
         // unload data
     }
 
-    private bool _pointerOn = false;
+    private bool _pointerOn;
 
     private void InitShowNextLocation()
     {
@@ -759,13 +954,15 @@ public class IntermissionController
             return;
         }
 
-        //for (i = 0; i < NUMANIMS[wbs->epsd]; i++)
-        //{
-        //    a = &anims[wbs->epsd][i];
+        for (var i = 0; i < NumberOfAnimations[_wbs.Episode]; i++)
+        {
+            var a = Animations[_wbs.Episode][i];
 
-        //    if (a->ctr >= 0)
-        //        V_DrawPatch(a->loc.x, a->loc.y, FB, a->p[a->ctr]);
-        //}
+            if (a.Counter >= 0)
+            {
+                DoomGame.Instance.Video.DrawPatch(a.Location.X, a.Location.Y, FB, a.Patches[a.Counter]);
+            }
+        }
     }
 
     /// <summary>
@@ -780,8 +977,61 @@ public class IntermissionController
 
         // draw Finished!
         y += 5 * _levelNames[_wbs.Last].Height / 4;
-
         DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _finished!.Width) / 2, y, FB, _finished);
+    }
+
+    /// <summary>
+    /// Draws "Entering LEVELNAME"
+    /// </summary>
+    private void DrawEnteringLevel()
+    {
+        var y = WI_TITLEY;
+
+        // draw "Entering"
+        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _entering!.Width) / 2, y, FB, _entering);
+
+        // draw level name
+        y += 5 * _levelNames[_wbs.Next].Height / 4;
+        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _levelNames[_wbs.Next].Width) / 2, y, FB, _levelNames[_wbs.Next]);
+    }
+
+    private void DrawOnLevelNode(int level, IList<Patch> patches)
+    {
+        var i = 0;
+        var fits = false;
+
+        do
+        {
+            var left = LevelNodes[_wbs.Episode][level].X - patches[i].LeftOffset;
+            var top = LevelNodes[_wbs.Episode][level].Y - patches[i].TopOffset;
+            var right = left + patches[i].Width;
+            var bottom = top + patches[i].Height;
+
+            if (left >= 0
+                && right < Constants.ScreenWidth
+                && top >= 0
+                && bottom < Constants.ScreenHeight)
+            {
+                fits = true;
+            }
+            else
+            {
+                i++;
+            }
+        } while (!fits && i != 2);
+
+        if (fits && i < 2)
+        {
+            DoomGame.Instance.Video.DrawPatch(
+                LevelNodes[_wbs.Episode][level].X,
+                LevelNodes[_wbs.Episode][level].Y,
+                FB,
+                patches[i]);
+        }
+        else
+        {
+            DoomGame.Console.WriteLine($"Could not place patch on level {level + 1}");
+        }
     }
 
     private void DrawPercent(int x, int y, int p)
@@ -893,11 +1143,51 @@ public class IntermissionController
 
     private void DrawShowNextLocation()
     {
+        SlamBackground();
 
+        // draw animated background
+        DrawAnimatedBackground();
+
+        if (DoomGame.Instance.GameMode != GameMode.Commercial)
+        {
+            if (_wbs.Episode > 2)
+            {
+                DrawEnteringLevel();
+                return;
+            }
+
+            var splats = new[] { _splat! };
+            var last = _wbs.Last == 8 ? _wbs.Next - 1 : _wbs.Last;
+
+            // draw a splat on taken cities.
+            for (var i = 0; i <= last; i++)
+            {
+                DrawOnLevelNode(i, splats);
+            }
+            
+            // splat the secret level?
+            if (_wbs.DidSecret)
+            {
+                DrawOnLevelNode(8, splats);
+            }
+
+            // draw flashing pointer
+            if (_pointerOn)
+            {
+                DrawOnLevelNode(_wbs.Next, _yah!);
+            }
+        }
+
+        // draws which level you are entering..
+        if (DoomGame.Instance.GameMode != GameMode.Commercial || _wbs.Next != 30)
+        {
+            DrawEnteringLevel();
+        }
     }
 
     private void DrawNoState()
     {
-
+        _pointerOn = true;
+        DrawShowNextLocation();
     }
 }
