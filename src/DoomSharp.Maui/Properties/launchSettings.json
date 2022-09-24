@@ -4,7 +4,7 @@
       "commandName": "MsixPackage",
       "nativeDebugging": false,
       "environmentVariables": {
-        "DOOMWADDIR": "C:\\Projects\\Doom\\wad"
+        "DOOMWADDIR": "c:\\git\\doom-sharp\\wads\\Shareware"
       }
     }
   }

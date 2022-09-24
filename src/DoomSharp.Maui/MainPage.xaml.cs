@@ -2,11 +2,14 @@
 using System.ComponentModel;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
+using DoomSharp.Maui.ViewModels;
 
 namespace DoomSharp.Maui;
 
 public partial class MainPage : ContentPage
 {
+    private SKBitmap? _lastOutput;
+
     public MainPage()
     {
         InitializeComponent();
@@ -20,29 +23,42 @@ public partial class MainPage : ContentPage
             (GameMode, string) doomVersion = await IdentifyVersion();
             await DoomGame.Instance.RunAsync(doomVersion.Item1, doomVersion.Item2);
         });
-        App.Locator.MainViewModel.PropertyChanged += Output_PropertyChanged;
+        
+        App.Locator.MainViewModel.BitmapRendered += OnBitmapRendered;
     }
 
-    private void Output_PropertyChanged(object sender, PropertyChangedEventArgs e)
+    private void OnBitmapRendered(object sender, BitmapRenderedEventArgs e)
     {
-        if (e.PropertyName == nameof(App.Locator.MainViewModel.Output))
-        {
-            GameSurface.InvalidateSurface();
-        }
+        _lastOutput = e.Bitmap;
+        GameSurface.InvalidateSurface();
     }
 
     private void SKCanvasView_OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
     {
-        if (App.Locator.MainViewModel.Output.ByteCount == 0)
+        try
         {
-            return;
+            if (_lastOutput is null)
+            {
+                return;
+            }
+
+            var info = e.Info;
+            var surface = e.Surface;
+            var canvas = surface.Canvas;
+            canvas.Clear();
+
+            var scale = Math.Min((float)info.Width / _lastOutput.Width, (float)info.Height / _lastOutput.Height);
+            var x = (info.Width - scale * _lastOutput.Width) / 2;
+            var y = (info.Height - scale * _lastOutput.Height) / 2;
+            var dest = new SKRect(x, y, x + scale * _lastOutput.Width, y + scale * _lastOutput.Height);
+
+            e.Surface.Canvas.DrawBitmap(_lastOutput, dest);
         }
-        
-        SKImageInfo resizeInfo = new SKImageInfo((int)GameSurface.Width, (int)GameSurface.Height);
-        SKBitmap resizedBitmap = new(resizeInfo);
-        App.Locator.MainViewModel.Output.ScalePixels(resizedBitmap, SKFilterQuality.High);
-        
-        e.Surface.Canvas.DrawBitmap(resizedBitmap, 0, 0);
+        finally
+        {
+            _lastOutput?.Dispose();
+            _lastOutput = null;
+        }
     }
     
     private async Task<(GameMode, string)> IdentifyVersion()

@@ -21,8 +21,7 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     private string _title = "DooM#";
 
-    private byte[] _palette;
-    private SKBitmap _output = new();
+    private SKColor[] _palette = new SKColor[256];
 
     private readonly Int32Rect _rectangle = new(0, 0, Constants.ScreenWidth, Constants.ScreenHeight);
     private readonly byte[] _screenBuffer;
@@ -38,22 +37,8 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
         }
     }
 
-    public SKBitmap Output
-    {
-        get => _output;
-        set
-        {
-            if (value is null)
-            {
-                return;
-            }
-
-            _output = value;
-            OnPropertyChanged();
-        }
-    }
-
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event BitmapRenderedEventHandler BitmapRendered;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
@@ -66,45 +51,35 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     public void UpdatePalette(byte[] palette)
     {
-        _palette = palette;
+        for (var i = 0; i < 256; i++)
+        {
+            _palette[i] = new SKColor(palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]);
+        }
     }
 
     public void ScreenReady(byte[] output)
     {
         Array.Copy(output, 0, _screenBuffer, 0, output.Length);
 
-        var switchOutput = false;
+        var bitmap = new SKBitmap(Constants.ScreenWidth, Constants.ScreenHeight);
+        var pixelsPtr = bitmap.GetPixels();
 
-        byte[] palette = null;
-        if (_palette is not null)
+        unsafe
         {
-            palette = _palette;
-            _palette = null;
-            switchOutput = true;
-        }
-
-        if (!switchOutput)
-        {
-            return;
-        }
-
-        SKBitmap bitmap = new(new SKImageInfo(Constants.ScreenWidth, Constants.ScreenHeight));
-        for (var x = 0; x < Constants.ScreenWidth; x++)
-        {
-            for (var y = 0; y < Constants.ScreenHeight; y++)
+            uint* ptr = (uint*)pixelsPtr.ToPointer();
+            for (var x = 0; x < Constants.ScreenWidth; x++)
             {
-                var pixelIdx = y * Constants.ScreenWidth + x;
-                byte r = palette[_screenBuffer[pixelIdx] * 3];
-                byte g = palette[_screenBuffer[pixelIdx] * 3 + 1];
-                byte b = palette[_screenBuffer[pixelIdx] * 3 + 2];
-
-                bitmap.SetPixel(x, y, new SKColor(r, g, b));
+                for (var y = 0; y < Constants.ScreenHeight; y++)
+                {
+                    var pixelIdx = x * Constants.ScreenHeight + y;
+                    *ptr++ = (uint)_palette[_screenBuffer[pixelIdx]];
+                }
             }
         }
 
         App.Current.Dispatcher.Dispatch(() =>
         {
-            Output = bitmap;
+            BitmapRendered?.Invoke(this, new BitmapRenderedEventArgs(bitmap));
         });
     }
 
