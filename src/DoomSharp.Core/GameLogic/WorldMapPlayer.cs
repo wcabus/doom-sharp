@@ -8,7 +8,7 @@ public class WorldMapPlayer
     public bool In { get; set; }
 
     // player stats, kills, collected items etc.
-    public int Skills { get; set; }
+    public int Kills { get; set; }
     public int Items { get; set; }
     public int Secret { get; set; }
     public int Time { get; set; }

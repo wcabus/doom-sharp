@@ -28,6 +28,7 @@ public class DoomGame : IDisposable
     private MenuController? _menu;
     private HudController? _hud;
     private readonly StatusBar _statusBar = new();
+    private readonly IntermissionController _intermission = new();
 
     private bool _singleTics = false; // debug flag to cancel adaptiveness
 
@@ -233,6 +234,7 @@ public class DoomGame : IDisposable
     public WadFileCollection WadData => _wadFiles!;
     public MenuController Menu => _menu!;
     public StatusBar StatusBar => _statusBar;
+    public IntermissionController Intermission => _intermission;
 
     public static void SetConsole(IConsole console)
     {
@@ -311,7 +313,7 @@ public class DoomGame : IDisposable
                 break;
 
             case GameState.Intermission:
-                // WI_Drawer();
+                Intermission.Drawer();
                 break;
             case GameState.Finale:
                 // F_Drawer();
