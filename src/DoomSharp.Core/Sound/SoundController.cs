@@ -10,7 +10,7 @@ public class SoundController
 	private ISoundDriver _driver;
 
     // the set of channels available
-    private int _numChannels;
+    private int _numChannels = 8;
     private SoundChannel[] _channels = Array.Empty<SoundChannel>();
 
     // These are not used, but should be (menu).
@@ -48,7 +48,7 @@ public class SoundController
 
 	public const int NormalPitch = 128;
 	public const int NormalPriority = 64;
-	public const int NORM_SEP = 128;
+	public const int NormalStereoSeparation = 128;
 
 	public const int S_PITCH_PERTURB = 1;
 	public static readonly Fixed S_STEREO_SWING = new Fixed(96 * 0x10000);
@@ -284,9 +284,12 @@ public class SoundController
 		_channels = new SoundChannel[_numChannels];
 
 		// Free all channels for user
-		foreach (var channel in _channels)
-		{
-			channel.SfxInfo = null;
+        for (var i = 0; i < _channels.Length; i++)
+        {
+            _channels[i] = new SoundChannel
+            {
+                SfxInfo = null
+            };
         }
 
 		// No sounds are playing, and they are not mus_paused
@@ -295,7 +298,7 @@ public class SoundController
 		// Note that sounds have not been cached (yet).
 		for (var i = 0; i < (int)SoundType.NUMSFX; i++)
 		{
-			/*Sfx[i].LumpNum = */Sfx[i].Usefulness = -1;
+			Sfx[i].LumpNum = Sfx[i].Usefulness = -1;
         }
 	}
 
@@ -404,7 +407,7 @@ public class SoundController
 			
 			if (origin.X == playerOrigin!.X && origin.Y == playerOrigin.Y)
 			{
-				sep = NORM_SEP;
+				sep = NormalStereoSeparation;
 			}
 
 			if (!rc)
@@ -414,7 +417,7 @@ public class SoundController
 		}
 		else
 		{
-            sep = NORM_SEP;
+            sep = NormalStereoSeparation;
         }
 
         // hacks to vary the sfx pitches
@@ -466,8 +469,11 @@ public class SoundController
 		if (sfx.LumpNum < 0)
 		{
 			sfx.LumpNum = DoomGame.Instance.WadData.GetNumForName($"DS{sfx.Name}");
+            if (sfx.LumpNum == -1)
+            {
+                sfx.LumpNum = DoomGame.Instance.WadData.GetNumForName("DSPISTOL"); // fix for loading sounds that don't exist
+            }
 			sfx.Data = DoomGame.Instance.WadData.GetLumpNum(sfx.LumpNum, PurgeTag.Sound)!;
-
         }
 
 		// increase the usefulness
@@ -507,6 +513,60 @@ public class SoundController
         {
             _driver.ResumeSong(_musicPlaying.Handle);
             _musicPaused = false;
+        }
+    }
+
+	/// <summary>
+	/// Updates music & sounds
+	/// </summary>
+    public void UpdateSounds(MapObject listener)
+    {
+        foreach (var channel in _channels.Where(x => x.SfxInfo != null))
+        {
+            var sfx = channel.SfxInfo!;
+            if (_driver.SoundIsPlaying(channel.Handle))
+            {
+				// initialize parameters
+                var volume = _sfxVolume;
+                var pitch = NormalPitch;
+                var sep = NormalStereoSeparation;
+
+                if (sfx.Link != null)
+                {
+                    pitch = sfx.Pitch;
+                    volume += sfx.Volume;
+                    if (volume < 1)
+                    {
+						StopChannel(channel);
+						continue;
+                    }
+					
+                    if (volume > _sfxVolume)
+                    {
+                        volume = _sfxVolume;
+                    }
+                }
+
+				// check non-local sounds for distance clipping
+				// or modify their params
+                if (channel.Origin != null && listener != channel.Origin)
+                {
+                    var audible = AdjustSoundParams(listener, channel.Origin, ref volume, ref sep);
+                    if (!audible)
+                    {
+						StopChannel(channel);
+                    }
+                    else
+                    {
+                        _driver.UpdateSoundParams(channel.Handle, volume, sep, pitch);
+                    }
+                }
+            }
+            else
+            {
+				// if channel is allocated but sound has stopped, free it
+				StopChannel(channel);
+            }
         }
     }
 
@@ -616,6 +676,11 @@ public class SoundController
 			channel.SfxInfo.Usefulness--;
 			channel.SfxInfo = null;
 		}
+    }
+
+    public void Submit()
+    {
+		_driver.SubmitSound();
     }
 
 	/// <summary>

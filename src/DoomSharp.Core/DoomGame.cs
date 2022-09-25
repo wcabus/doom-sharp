@@ -448,20 +448,12 @@ public class DoomGame : IDisposable
                 TryRunTics(); // will run at least one tic
             }
 
-            //S_UpdateSounds(players[consoleplayer].mo);// move positional sounds
+            Sound.UpdateSounds(Game.Players[Game.ConsolePlayer].MapObject!); // move positional sounds
 
             // Update display, next frame, with current state.
             Display();
 
-            //# ifndef SNDSERV
-            //            // Sound mixing for the buffer is snychronous.
-            //            I_UpdateSound();
-            //#endif
-            //            // Synchronous sound output is explicitly called.
-            //# ifndef SNDINTR
-            //            // Update sound output.
-            //            I_SubmitSound();
-            //#endif
+            Sound.Submit();
         }
     }
 
@@ -1221,14 +1213,7 @@ public class DoomGame : IDisposable
                 }
                 _game.GameState = GameState.DemoScreen;
                 _demoPageName = "TITLEPIC";
-                if (GameMode == GameMode.Commercial)
-                {
-                    // S_StartMusic(mus_dm2ttl);
-                }
-                else
-                {
-                    // S_StartMusic(mus_intro);
-                }
+                Sound.StartMusic(GameMode == GameMode.Commercial ? MusicType.mus_dm2ttl : MusicType.mus_intro);
                 break;
             case 1:
                 _game.DeferedPlayDemo("demo1");
@@ -1247,7 +1232,7 @@ public class DoomGame : IDisposable
                 {
                     _demoPageTic = 35 * 11;
                     _demoPageName = "TITLEPIC";
-                    // S_StartMusic(mus_dm2ttl);
+                    Sound.StartMusic(MusicType.mus_dm2ttl);
                 }
                 else
                 {
