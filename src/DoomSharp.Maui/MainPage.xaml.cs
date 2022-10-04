@@ -3,7 +3,6 @@ using System.ComponentModel;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
 using DoomSharp.Maui.ViewModels;
-
 namespace DoomSharp.Maui;
 
 public partial class MainPage : ContentPage
@@ -23,7 +22,7 @@ public partial class MainPage : ContentPage
             (GameMode, string) doomVersion = await IdentifyVersion();
             await DoomGame.Instance.RunAsync(doomVersion.Item1, doomVersion.Item2);
         });
-        
+
         App.Locator.MainViewModel.BitmapRendered += OnBitmapRendered;
     }
 
@@ -60,7 +59,7 @@ public partial class MainPage : ContentPage
             _lastOutput = null;
         }
     }
-    
+
     private async Task<(GameMode, string)> IdentifyVersion()
     {
         (GameMode, string) version = new();
@@ -73,7 +72,7 @@ public partial class MainPage : ContentPage
             version.Item2 = wadFile;
             return version;
         }
-        
+
         // Commercial
         wadFile = "DOOM2.WAD";
         if (await FileSystem.Current.AppPackageFileExistsAsync(wadFile))
@@ -102,5 +101,10 @@ public partial class MainPage : ContentPage
         }
 
         return version;
+    }
+
+    private void Button_OnClicked(object? sender, EventArgs e)
+    {
+        throw new NotImplementedException();
     }
 }
