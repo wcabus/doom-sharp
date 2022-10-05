@@ -107,7 +107,10 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
 
     private void OnVirtualKeyDown(string key)
     {
-        AddEvent(new InputEvent(EventType.KeyDown, TranslateKey(key), 0, 0));
+        int translatedKey = TranslateKey(key);
+        AddEvent(new InputEvent(EventType.KeyDown, translatedKey, 0, 0));
+        Task.Delay(300).Wait();
+        AddEvent(new InputEvent(EventType.KeyUp, translatedKey, 0, 0));
     }
 
     private int TranslateKey(string keyIndex)
