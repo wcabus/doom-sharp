@@ -31,23 +31,8 @@ public partial class MainPage : ContentPage
             if (view is GameControl control)
             {
 #if WINDOWS
-                handler.PlatformView.PointerPressed += (s, e) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
-                handler.PlatformView.PointerReleased += (s, e) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
-                
-
-                handler.PlatformView.Holding += (sender, args) =>
-             {
-                 switch (args.HoldingState)
-                 {
-                     case HoldingState.Started:
-                         MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
-                         break;
-                     case HoldingState.Completed:
-                         MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
-                         break;
-                 }
-             };
-
+                handler.PlatformView.PointerPressed += (_, _) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
+                handler.PlatformView.PointerReleased += (_, _) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
 #endif
 #if ANDROID
                 handler.PlatformView.Touch += (sender, args) =>
