@@ -1,8 +1,17 @@
-﻿using DoomSharp.Core;
-using System.ComponentModel;
+﻿#if ANDROID
+using Android.Views;
+#endif
+#if WINDOWS
+using Microsoft.UI.Input;
+#endif
+using DoomSharp.Core;
+using DoomSharp.Core.Input;
+using DoomSharp.Maui.Controls;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
 using DoomSharp.Maui.ViewModels;
+
+
 namespace DoomSharp.Maui;
 
 public partial class MainPage : ContentPage
@@ -17,6 +26,52 @@ public partial class MainPage : ContentPage
 
     protected override void OnAppearing()
     {
+        Microsoft.Maui.Handlers.ImageHandler.Mapper.AppendToMapping("MyCustomization", (handler, view) =>
+        {
+            if (view is GameControl control)
+            {
+#if WINDOWS
+                handler.PlatformView.PointerPressed += (s, e) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
+                handler.PlatformView.PointerReleased += (s, e) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
+                
+
+                handler.PlatformView.Holding += (sender, args) =>
+             {
+                 switch (args.HoldingState)
+                 {
+                     case HoldingState.Started:
+                         MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
+                         break;
+                     case HoldingState.Completed:
+                         MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
+                         break;
+                 }
+             };
+
+#endif
+#if ANDROID
+                handler.PlatformView.Touch += (sender, args) =>
+                {
+                    switch (args.Event?.ActionMasked)
+                    {
+                        case MotionEventActions.Down:
+                            MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
+                            break;
+                        case MotionEventActions.Up:
+                            MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
+                            break;
+                    }
+                };
+
+#endif
+#if IOS
+
+             //handler.PlatformView.UserInteractionEnabled = true;
+             //handler.PlatformView.AddGestureRecognizer(new UILongPressGestureRecognizer(HandleLongClick));
+#endif
+            }
+        });
+
         _ = Task.Run(async () =>
         {
             (GameMode, string) doomVersion = await IdentifyVersion();
@@ -25,7 +80,7 @@ public partial class MainPage : ContentPage
 
         App.Locator.MainViewModel.BitmapRendered += OnBitmapRendered;
     }
-
+    
     private void OnBitmapRendered(object sender, BitmapRenderedEventArgs e)
     {
         _lastOutput = e.Bitmap;

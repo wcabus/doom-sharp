@@ -3,90 +3,66 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
-             xmlns:controls2="clr-namespace:DoomSharp.Maui.Controls"
+             xmlns:gameControls="clr-namespace:DoomSharp.Maui.Controls"
              Title="{Binding Title}">
 
-    <!--<controls2:ExtendedGrid RowDefinitions="*, auto">
+    <Grid ColumnDefinitions="200,* , 120">
         <controls:SKCanvasView x:Name="GameSurface"
+                               Grid.Column="1"
                                HorizontalOptions="Fill"
                                PaintSurface="SKCanvasView_OnPaintSurface"
                                VerticalOptions="Fill" />
 
-        <Grid Grid.Row="1">
-            <Button Command="{Binding VirtualKeyDownCommand}"
-                    CommandParameter="18"
-                    Text="Spatie" />
-        </Grid>
-    </controls2:ExtendedGrid>-->
-
-    <Grid ColumnDefinitions="200,* , 120" RowDefinitions="*, 200">
-        <controls:SKCanvasView x:Name="GameSurface"
-                               Grid.ColumnSpan="3"
-                               HorizontalOptions="Fill"
-                               PaintSurface="SKCanvasView_OnPaintSurface"
-                               VerticalOptions="Fill" />
-
-        <Grid Grid.Row="1"
-              ColumnDefinitions="1*, 1*"
+        <Grid ColumnDefinitions="1*, 1*"
               ColumnSpacing="5"
               HeightRequest="200"
               HorizontalOptions="Start"
               RowDefinitions="1*, 1*"
               RowSpacing="5"
+              VerticalOptions="End"
               WidthRequest="200">
-            <Image Grid.ColumnSpan="2"
-                   HorizontalOptions="Center"
-                   Source="up.png">
-                <Image.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="24" />
-                </Image.GestureRecognizers>
-            </Image>
-            <Image Grid.Row="1"
-                   Grid.ColumnSpan="2"
-                   HorizontalOptions="Center"
-                   Source="down.png">
-                <Image.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="26" />
-                </Image.GestureRecognizers>
-            </Image>
-            <Image Grid.RowSpan="2"
-                   Source="left.png"
-                   VerticalOptions="Center">
-                <Image.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="23" />
-                </Image.GestureRecognizers>
-            </Image>
-            <Image Grid.RowSpan="2"
-                   Grid.Column="1"
-                   Source="right.png"
-                   VerticalOptions="Center">
-                <Image.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="25" />
-                </Image.GestureRecognizers>
-            </Image>
-            <!--<Button Command="{Binding VirtualKeyDownCommand}"
-                    CommandParameter="18"
-                    Text="Spatie" />-->
+            <gameControls:GameControl Key="24"
+                                      Grid.ColumnSpan="2"
+                                      HorizontalOptions="Center"
+                                      Source="up.png" />
+
+            <gameControls:GameControl Key="26"
+                                      Grid.Row="1"
+                                      Grid.ColumnSpan="2"
+                                      HorizontalOptions="Center"
+                                      Source="down.png" />
+
+            <gameControls:GameControl Key="23"
+                                      Grid.RowSpan="2"
+                                      Source="left.png"
+                                      VerticalOptions="Center" />
+
+            <gameControls:GameControl Key="25"
+                                      Grid.RowSpan="2"
+                                      Grid.Column="1"
+                                      Source="right.png"
+                                      VerticalOptions="Center" />
         </Grid>
 
-        <Image Grid.Row="1"
-               Grid.Column="1"
-               Margin="0,0,12,0"
-               Aspect="AspectFit"
-               Source="start.png">
-            <Image.GestureRecognizers>
-                <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="Return" />
-            </Image.GestureRecognizers>
-        </Image>
+        <StackLayout Grid.Column="2"
+                     Padding="0,0,0,16"
+                     Spacing="16"
+                     VerticalOptions="End">
+            <gameControls:GameControl Key="Return"
+                                      Margin="0,0,12,0"
+                                      Aspect="AspectFit"
+                                      Source="start.png" />
 
-        <Image Grid.Row="1"
-               Grid.Column="2"
-               Margin="0,0,12,0"
-               Aspect="AspectFit"
-               Source="action.png">
-            <Image.GestureRecognizers>
-                <TapGestureRecognizer Command="{Binding VirtualKeyDownCommand}" CommandParameter="18" />
-            </Image.GestureRecognizers>
-        </Image>
+            <gameControls:GameControl Key="13"
+                                      Margin="0,0,12,0"
+                                      Aspect="AspectFit"
+                                      Source="use.png" />
+
+            <gameControls:GameControl Key="18"
+                                      Margin="0,0,12,0"
+                                      Aspect="AspectFit"
+                                      Source="action.png" />
+        </StackLayout>
+
     </Grid>
 </ContentPage>

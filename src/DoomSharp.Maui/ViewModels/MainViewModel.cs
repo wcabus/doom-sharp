@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Input;
 using DoomSharp.Core;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
@@ -18,8 +17,6 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
     {
         var stride = (_rectangle.Width * 8 /* bpp */ + 7) / 8;
         _screenBuffer = new byte[_rectangle.Height * stride];
-
-        VirtualKeyDownCommand = new Command<string>(OnVirtualKeyDown);
     }
 
     private string _title = "DooM#";
@@ -39,8 +36,6 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             OnPropertyChanged();
         }
     }
-
-    public Command<string> VirtualKeyDownCommand { get; private set; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event BitmapRenderedEventHandler BitmapRendered;
@@ -105,12 +100,10 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
         _events.Enqueue(ev);
     }
 
-    private void OnVirtualKeyDown(string key)
+    public void OnKeyAction(string key, EventType actionType)
     {
         int translatedKey = TranslateKey(key);
-        AddEvent(new InputEvent(EventType.KeyDown, translatedKey, 0, 0));
-        Task.Delay(300).Wait();
-        AddEvent(new InputEvent(EventType.KeyUp, translatedKey, 0, 0));
+        AddEvent(new InputEvent(actionType, translatedKey, 0, 0));
     }
 
     private int TranslateKey(string keyIndex)

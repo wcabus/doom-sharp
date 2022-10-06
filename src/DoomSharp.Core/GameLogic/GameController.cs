@@ -33,11 +33,11 @@ public class GameController
     // 
     // controls (have defaults) 
     // 
-    private int _keyRight = 'E';
-    private int _keyLeft = 'Q';
+    private int _keyRight = (int)Keys.RightArrow;
+    private int _keyLeft = (int)Keys.LeftArrow;
 
-    private int _keyUp = 'W';
-    private int _keyDown = 'S';
+    private int _keyUp = (int)Keys.UpArrow;
+    private int _keyDown = (int)Keys.DownArrow;
     private int _keyStrafeLeft = 'A';
     private int _keyStrafeRight = 'D';
     private int _keyFire = ' ';
