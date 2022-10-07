@@ -186,7 +186,7 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             //    return '0' + (keyIndex - (int)Key.NumPad0);
 
             case >= Key.A and <= Key.Z:
-                return 'A' + (keyIndex - (int)Key.A);
+                return 'A' + (int.Parse(keyIndex) - (int)Key.A);
 
             case Key.Space:
                 return ' ';
