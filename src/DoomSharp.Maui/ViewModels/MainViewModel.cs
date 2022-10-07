@@ -169,11 +169,13 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             case Key.RightShift:
                 return (int)Keys.RShift;
 
+            case Key.Control:
             case Key.LeftCtrl:
             case Key.RightCtrl:
                 return (int)Keys.RCtrl;
 
             case Key.RightAlt:
+            case Key.Menu:
             case Key.LeftAlt:
                 return (int)Keys.RAlt;
 
@@ -183,8 +185,8 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             //case >= Key.NumPad0 and <= Key.NumPad9:
             //    return '0' + (keyIndex - (int)Key.NumPad0);
 
-            //case >= Key.A and <= Key.Z:
-            //    return 'A' + (keyIndex - (int)Key.A);
+            case >= Key.A and <= Key.Z:
+                return 'A' + (keyIndex - (int)Key.A);
 
             case Key.Space:
                 return ' ';

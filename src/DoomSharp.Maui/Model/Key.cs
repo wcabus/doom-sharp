@@ -635,10 +635,20 @@ public enum Key
     LeftCtrl,
 
     /// <summary>
+    ///     The Control key for WinUI.
+    /// </summary>
+    Control,
+
+    /// <summary>
     ///     The right CTRL key.
     /// </summary>
     RightCtrl,
 
+    /// <summary>
+    ///     The ALT key for WinUI (for some reason it's called Menu...).
+    /// </summary>
+    Menu,
+    
     /// <summary>
     ///     The left ALT key.
     /// </summary>

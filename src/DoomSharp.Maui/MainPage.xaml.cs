@@ -1,12 +1,11 @@
 ﻿#if ANDROID
 using Android.Views;
 #endif
-#if WINDOWS
-using Microsoft.UI.Input;
-#endif
 using DoomSharp.Core;
 using DoomSharp.Core.Input;
+using DoomSharp.Maui.Behaviors;
 using DoomSharp.Maui.Controls;
+using DoomSharp.Maui.Model;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
 using DoomSharp.Maui.ViewModels;
@@ -26,11 +25,17 @@ public partial class MainPage : ContentPage
 
     protected override void OnAppearing()
     {
-        Microsoft.Maui.Handlers.ImageHandler.Mapper.AppendToMapping("MyCustomization", (handler, view) =>
+        Microsoft.Maui.Handlers.ImageHandler.Mapper.AppendToMapping("TouchUpDownSupport", (handler, view) =>
         {
             if (view is GameControl control)
             {
 #if WINDOWS
+                var behavior = new KeyboardBehavior();
+                behavior.KeyUp += KeyboardBehavior_OnKeyUp;
+                behavior.KeyDown += KeyboardBehavior_OnKeyDown;
+                
+                Behaviors.Add(behavior);
+
                 handler.PlatformView.PointerPressed += (_, _) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyDown);
                 handler.PlatformView.PointerReleased += (_, _) => MainViewModel.Instance.OnKeyAction(control.Key, EventType.KeyUp);
 #endif
@@ -65,7 +70,7 @@ public partial class MainPage : ContentPage
 
         App.Locator.MainViewModel.BitmapRendered += OnBitmapRendered;
     }
-    
+
     private void OnBitmapRendered(object sender, BitmapRenderedEventArgs e)
     {
         _lastOutput = e.Bitmap;
@@ -146,5 +151,15 @@ public partial class MainPage : ContentPage
     private void Button_OnClicked(object? sender, EventArgs e)
     {
         throw new NotImplementedException();
+    }
+
+    private void KeyboardBehavior_OnKeyDown(object? sender, KeyDownEventArgs e)
+    {
+        MainViewModel.Instance.OnKeyAction(e.Key, EventType.KeyDown);
+    }
+
+    private void KeyboardBehavior_OnKeyUp(object? sender, KeyDownEventArgs e)
+    {
+        MainViewModel.Instance.OnKeyAction(e.Key, EventType.KeyUp);
     }
 }

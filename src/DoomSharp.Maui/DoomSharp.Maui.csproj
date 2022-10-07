@@ -67,14 +67,6 @@
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <Compile Remove="Handlers\ExtendedGridHandler.Android.cs" />
-	</ItemGroup>
-	
-	<ItemGroup>
-	  <None Include="Handlers\ExtendedGridHandler.Android.cs" />
-	</ItemGroup>
 
 	<ItemGroup>
 	  <PackageReference Include="SkiaSharp" Version="2.88.1" />
