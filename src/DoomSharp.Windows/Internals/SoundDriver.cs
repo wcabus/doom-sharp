@@ -13,9 +13,14 @@ internal class SoundDriver : ISoundDriver, IDisposable
 {
     private FMOD.System _fmodSystem;
     private bool _fmodInitialized = false;
-    private ChannelGroup _channelGroup;
+
+    private ChannelGroup _soundFxChannelGroup;
+    private ChannelGroup _musicChannelGroup;
 
     private readonly Dictionary<SoundType, Sound> _sounds = new();
+    private Sound? _currentMusic = null;
+    private Channel? _currentMusicChannel = null;
+
     private readonly Dictionary<SoundType, int> _soundChannelMap = new();
     private readonly Dictionary<int, SoundType> _channelSoundMap = new();
 
@@ -59,17 +64,70 @@ internal class SoundDriver : ISoundDriver, IDisposable
     public void SetChannels()
     {
         _fmodSystem.createChannelGroup("SoundFX", out var channelGroup);
-        _channelGroup = channelGroup;
+        _soundFxChannelGroup = channelGroup;
+
+        _fmodSystem.createChannelGroup("Music", out var channelGroup2);
+        _musicChannelGroup = channelGroup2;
     }
 
-    public int RegisterSong(byte[] data) => 1;
-    public void PlaySong(int handle, bool looping) { }
-    public void PauseSong(int handle) { }
-    public void ResumeSong(int handle) { }
-    public void StopSong(int handle) { }
-    public void UnregisterSong(int handle) { }
+    public int RegisterSong(byte[] data)
+    {
+        var soundInfo = new CREATESOUNDEXINFO
+        {
+            cbsize = MarshalHelper.SizeOf(typeof(CREATESOUNDEXINFO)),
+            format = SOUND_FORMAT.PCM16,
+            numchannels = 2,
+            defaultfrequency = 44100,
+            length = (uint)data.Length,
+            suggestedsoundtype = SOUND_TYPE.MIDI
+        };
 
-    public void SetMusicVolume(int volume) { }
+        var result = _fmodSystem.createSound(data, MODE.OPENRAW | MODE.CREATESAMPLE | MODE.OPENMEMORY, ref soundInfo, out var music);
+        _currentMusic = music;
+        
+        return 1;
+    }
+
+    public void PlaySong(int handle, bool looping)
+    {
+        if (_currentMusic is null)
+        {
+            return;
+        }
+
+        _currentMusic.Value.setLoopCount(looping ? -1 : 0);
+        var result = _fmodSystem.playSound(_currentMusic.Value, _musicChannelGroup, false, out var channel);
+        _currentMusicChannel = channel;
+    }
+
+    public void PauseSong(int handle)
+    {
+        _currentMusicChannel?.setPaused(true);
+    }
+
+    public void ResumeSong(int handle)
+    {
+        _currentMusicChannel?.setPaused(false);
+    }
+
+    public void StopSong(int handle)
+    {
+        _currentMusicChannel?.stop();
+    }
+
+    public void UnregisterSong(int handle)
+    {
+        _currentMusicChannel?.stop();
+        _currentMusic?.release();
+
+        _currentMusicChannel = null;
+        _currentMusic = null;
+    }
+
+    public void SetMusicVolume(int volume)
+    {
+        _currentMusicChannel?.setVolume(volume < 0 ? 1 : (volume / 128f));
+    }
 
     public bool SoundIsPlaying(int handle)
     {
@@ -107,10 +165,9 @@ internal class SoundDriver : ISoundDriver, IDisposable
 
             var _ = reader.ReadUInt16();
             var sampleRate = reader.ReadUInt16();
-            var sampleCount = reader.ReadUInt32() - 32; // padded with 16 bytes pre and post sample
+            var sampleCount = reader.ReadUInt32();
 
-            ms.Seek(16, SeekOrigin.Current); // skip the 16 byte padding
-
+            // Read the sample including the pre/post 16 byte padding
             var sampleData = reader.ReadBytes((int)sampleCount);
 
             var soundInfo = new CREATESOUNDEXINFO
@@ -126,7 +183,7 @@ internal class SoundDriver : ISoundDriver, IDisposable
             _sounds.Add(soundType, sound);
         }
 
-        _fmodSystem.playSound(sound, _channelGroup, false, out var channel);
+        _fmodSystem.playSound(sound, _soundFxChannelGroup, false, out var channel);
 
         channel.getIndex(out var handle);
         // _soundChannelMap.Add(soundType, handle);

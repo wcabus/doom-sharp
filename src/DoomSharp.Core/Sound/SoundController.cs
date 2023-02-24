@@ -2,6 +2,7 @@
 using DoomSharp.Core.GameLogic;
 using System;
 using System.Reflection.Metadata;
+using System.Text;
 
 namespace DoomSharp.Core.Sound;
 
@@ -626,8 +627,10 @@ public class SoundController
 		}
 
 		// load & register it
-		music.Data = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!;
-		music.Handle = _driver.RegisterSong(music.Data);
+		var musicLumpData = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!;
+        music.Data = ConvertMusToMidi(musicLumpData);
+		// File.WriteAllBytes("C:\\temp\\out.mid", music.Data);
+        music.Handle = _driver.RegisterSong(music.Data);
 
 		// play it
 		_driver.PlaySong(music.Handle, looping);
@@ -794,4 +797,314 @@ public class SoundController
 
 		return c;
 	}
+
+    private byte[] ConvertMusToMidi(byte[] data)
+    {
+        if (data.Length < 3)
+        {
+            return data;
+        }
+
+        if (data[0] != 'M' && data[1] != 'U' && data[2] != 'S')
+        {
+            return data;
+        }
+
+        using var ms = new MemoryStream(data);
+        using var br = new BinaryReader(ms, Encoding.ASCII, false);
+
+        var magic = br.ReadInt32();
+        var songLength = br.ReadUInt16();
+        var songStart = br.ReadUInt16();
+        var numberOfChannels = br.ReadUInt16();
+        var numberOfSecondaryChannels = br.ReadUInt16();
+        var numberOfInstruments = br.ReadUInt16();
+        var pad = br.ReadUInt16();
+
+        if (numberOfChannels > 15)
+        {
+            return data;
+        }
+
+		using var outputMs = new MemoryStream();
+        using var midiOutput = new BinaryWriter(outputMs, Encoding.ASCII, true);
+
+        midiOutput.Write('M');
+        midiOutput.Write('T');
+        midiOutput.Write('h');
+        midiOutput.Write('d');
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)6);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)1);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)70);
+        midiOutput.Write('M');
+        midiOutput.Write('T');
+        midiOutput.Write('r');
+        midiOutput.Write('k');
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)0);
+        midiOutput.Write((byte)255);
+        midiOutput.Write((byte)81);
+        midiOutput.Write((byte)3);
+        midiOutput.Write((byte)0x07);
+        midiOutput.Write((byte)0xA1);
+        midiOutput.Write((byte)0x20);
+
+        outputMs.Seek(songStart, SeekOrigin.Begin);
+
+        var lastVel = new byte[16];
+        Array.Fill<byte>(lastVel, 100);
+
+        var chanUsed = new bool[16];
+
+        byte musevent = 0;
+        var deltaTime = 0;
+        byte status = 0;
+        byte midStatus = 0;
+        byte midArgs = 0;
+        byte mid1 = 0;
+        byte mid2 = 0;
+        bool noop = false;
+
+        var pos = 0;
+        while (pos < songLength && ((musevent & 0x70) != MusEvents.ScoreEnd))
+        {
+            var channel = 0;
+            byte t = 0;
+            musevent = br.ReadByte();
+            pos++;
+
+            if ((musevent & 0x70) != MusEvents.ScoreEnd)
+            {
+				t = br.ReadByte();
+                pos++;
+            }
+
+            channel = musevent & 15;
+            if (channel == 15)
+            {
+                channel = 9;
+            }
+			else if (channel >= 9)
+            {
+                channel++;
+            }
+
+            if (!chanUsed[channel])
+            {
+                // This is the first time this channel has been used,
+                // so sets its volume to 127.
+                chanUsed[channel] = true;
+				midiOutput.Write((byte)0);
+                midiOutput.Write((byte)(0xB0 | channel));
+                midiOutput.Write((byte)7);
+                midiOutput.Write((byte)127);
+            }
+
+            midStatus = (byte)channel;
+            midArgs = 0;// Most events have two args (0 means 2, 1 means 1)
+            noop = false;
+
+            switch (musevent & 0x70)
+            {
+				case MusEvents.NoteOff:
+                    midStatus |= MidiEvents.NoteOff;
+                    mid1 = (byte)(t & 127);
+                    mid2 = 64;
+                    break;
+
+                case MusEvents.NoteOn:
+                    midStatus |= MidiEvents.NoteOn;
+                    mid1 = (byte)(t & 127);
+                    if ((t & 128) != 0)
+                    {
+                        lastVel[channel] = (byte)(br.ReadByte() & 127);
+                        pos++;
+                    }
+                    mid2 = lastVel[channel];
+                    break;
+
+				case MusEvents.PitchBend:
+					midStatus |= MidiEvents.PitchBend;
+                    mid1 = (byte)((t & 1) << 6);
+                    mid2 = (byte)((t >> 1) & 127);
+                    break;
+
+				case MusEvents.SysEvent:
+                    if (t is < 10 or > 14)
+                    {
+                        noop = true;
+                    }
+                    else
+                    {
+                        midStatus |= MidiEvents.CtrlChange;
+                        mid1 = CtrlTranslate[t];
+                        mid2 = (byte)(t == 12 ? numberOfChannels : 0);
+                    }
+                    break;
+
+				case MusEvents.CtrlChange:
+                    if (t == 0)
+                    {
+						// program change
+                        midArgs = 1;
+                        midStatus |= MidiEvents.ProgramChange;
+                        mid1 = (byte)(br.ReadByte() & 127);
+                        pos++;
+                        mid2 = 0;
+                    }
+					else if (t is > 0 and < 10)
+                    {
+                        midStatus |= MidiEvents.CtrlChange;
+                        mid1 = CtrlTranslate[t];
+                        mid2 = br.ReadByte();
+                        pos++;
+                    }
+                    else
+                    {
+                        noop = true;
+                    }
+                    break;
+
+				case MusEvents.ScoreEnd:
+                    midStatus = MidiEvents.Meta;
+                    mid1 = MidiEvents.MetaEOT;
+                    mid2 = 0;
+                    break;
+            }
+
+            if (noop)
+            {
+				// a system-specific event with no data is a no-op.
+                midStatus = MidiEvents.Meta;
+				mid1 = MidiEvents.MetaSSPEC;
+                mid2 = 0;
+            }
+
+            WriteVarLen(midiOutput, deltaTime);
+
+            if (midStatus != status)
+            {
+				status = midStatus;
+                midiOutput.Write(status);
+            }
+			midiOutput.Write(mid1);
+            if (midArgs == 0)
+            {
+                midiOutput.Write(mid2);
+            }
+
+            if ((musevent & 128) != 0)
+            {
+                var skip = ReadVarLen(br, out deltaTime);
+                pos += skip;
+            }
+            else
+            {
+                deltaTime = 0;
+            }
+        }
+
+        // fill in track length
+		midiOutput.Flush();
+
+        var output = outputMs.ToArray();
+        var trackLen = output.Length - 22;
+        
+        output[18] = (byte)((trackLen >> 24) & 0xFF);
+        output[19] = (byte)((trackLen >> 16) & 0xFF);
+        output[20] = (byte)((trackLen >> 8) & 0xFF);
+        output[21] = (byte)(trackLen & 0xFF);
+
+        return output;
+    }
+
+    private int ReadVarLen(BinaryReader br, out int time)
+    {
+        var ofs = 0;
+        time = 0;
+        byte t;
+
+        do
+        {
+            t = br.ReadByte();
+            ofs++;
+            time = (time << 7) | (t & 127);
+        } while ((t & 128) != 0);
+
+        return ofs;
+    }
+
+    private void WriteVarLen(BinaryWriter bw, int time)
+    {
+        long buffer = time & 0x7F;
+        while ((time >>= 7) > 0)
+        {
+            buffer = (buffer << 8) | 0x80 | (time & 0x7F);
+        }
+
+        while (true)
+        {
+			bw.Write((byte)(buffer & 0xFF));
+            if ((buffer & 0x80) != 0)
+            {
+                buffer >>= 8;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    private static readonly byte[] CtrlTranslate =
+    {
+		0, // program change
+		0, // bank select
+		1, // modulation pot
+		7, // volume
+		10, // pan pot
+		11, // expression pot
+		91, // reverb depth
+		93, // chorus depth
+		64, // sustain pedal
+		67, // soft pedal
+		120, // all sounds off
+		123, // all notes off
+		126, // mono
+		127, // poly
+		121 // reset all controllers
+    };
+
+    private static class MusEvents
+    {
+        public const int NoteOff = 0x00;
+        public const int NoteOn = 0x10;
+        public const int PitchBend = 0x20;
+        public const int SysEvent = 0x30;
+        public const int CtrlChange = 0x40;
+        public const int ScoreEnd = 0x60;
+    }
+
+    private static class MidiEvents
+    {
+        public const int NoteOff = 0x80;
+        public const int NoteOn = 0x90;
+        public const int CtrlChange = 0xB0;
+        public const int ProgramChange = 0xC0;
+        public const int PitchBend = 0xE0;
+
+        public const int Meta = 0xFF;
+        public const int MetaEOT = 0x2F; // end of track
+        public const int MetaSSPEC = 0x7F; // system-specific event
+    }
 }
