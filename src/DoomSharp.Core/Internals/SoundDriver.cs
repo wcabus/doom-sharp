@@ -9,7 +9,7 @@ using Channel = FMOD.Channel;
 
 namespace DoomSharp.Windows.Internals;
 
-internal class SoundDriver : ISoundDriver, IDisposable
+public class SoundDriver : ISoundDriver, IDisposable
 {
     private FMOD.System _fmodSystem;
     private bool _fmodInitialized = false;

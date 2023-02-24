@@ -1,4 +1,6 @@
-﻿using Microsoft.Maui.LifecycleEvents;
+﻿using DoomSharp.Core;
+using DoomSharp.Windows.Internals;
+using Microsoft.Maui.LifecycleEvents;
 using Microsoft.UI.Xaml;
 using Window = Microsoft.UI.Xaml.Window;
 
@@ -28,6 +30,12 @@ namespace DoomSharp.Maui.WinUI
             Current = this;
         }
 
-        protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+        protected override MauiApp CreateMauiApp()
+        {
+            var mauiApp = MauiProgram.CreateMauiApp();
+            DoomGame.SetSoundDriver(new SoundDriver());
+
+            return mauiApp;
+        }
     }
 }
