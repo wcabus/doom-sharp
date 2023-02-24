@@ -684,8 +684,10 @@ public class Player
             }
 
             PendingWeapon = weapon;
-            //if (player == &players[consoleplayer])
-            //    S_StartSound(NULL, sfx_wpnup);
+            if (this == DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer])
+            {
+                DoomGame.Instance.Sound.StartSound(null, Sound.SoundType.sfx_wpnup);
+            }
 
             return false;
         }

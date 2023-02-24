@@ -1,5 +1,6 @@
 ﻿using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Data;
+using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
 
 namespace DoomSharp.Core.GameLogic;
@@ -437,20 +438,17 @@ public static class Trigger
                     {
                         case DoorType.BlazeRaise:
                             door.Direction = -1; // time to go back down
-                            //S_StartSound((mobj_t*)&door->sector->soundorg,
-                            //    sfx_bdcls);
+                            DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_bdcls);
                             break;
 
                         case DoorType.Normal:
                             door.Direction = -1; // time to go back down
-                            //S_StartSound((mobj_t*)&door->sector->soundorg,
-                            //    sfx_dorcls);
+                            DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_dorcls);
                             break;
 
                         case DoorType.Close30ThenOpen:
                             door.Direction = 1;
-                            //S_StartSound((mobj_t*)&door->sector->soundorg,
-                            //    sfx_doropn);
+                            DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_doropn);
                             break;
                     }
                 }
@@ -465,8 +463,7 @@ public static class Trigger
                     {
                         door.Direction = 1;
                         door.Type = DoorType.Normal;
-                        //S_StartSound((mobj_t*)&door->sector->soundorg,
-                        //    sfx_doropn);
+                        DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_doropn);
                     }
                 }
 
@@ -483,8 +480,7 @@ public static class Trigger
                         case DoorType.BlazeClose:
                             door.Sector.SpecialData = null;
                             DoomGame.Instance.Game.RemoveThinker(door); // unlink and free
-                            //S_StartSound((mobj_t*)&door->sector->soundorg,
-                            //    sfx_bdcls);
+                            DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_bdcls);
                             break;
 
                         case DoorType.Normal:
@@ -510,8 +506,7 @@ public static class Trigger
 
                         default:
                             door.Direction = 1;
-                            //S_StartSound((mobj_t*)&door->sector->soundorg,
-                            //    sfx_doropn);
+                            DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_doropn);
                             break;
                     }
                 }
@@ -559,7 +554,7 @@ public static class Trigger
                     !player.Cards[(int)KeyCardType.BlueSkull])
                 {
                     player.Message = Messages.PD_BLUEO;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return false;
                 }
 
@@ -571,7 +566,7 @@ public static class Trigger
                     !player.Cards[(int)KeyCardType.RedSkull])
                 {
                     player.Message = Messages.PD_REDO;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return false;
                 }
 
@@ -583,7 +578,7 @@ public static class Trigger
                     !player.Cards[(int)KeyCardType.YellowSkull])
                 {
                     player.Message = Messages.PD_YELLOWO;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return false;
                 }
 
@@ -626,23 +621,20 @@ public static class Trigger
                     door.TopHeight -= Fixed.FromInt(4);
                     door.Direction = -1;
                     door.Speed = Door.DefaultSpeed * 4;
-                    //S_StartSound((mobj_t*)&door->sector->soundorg,
-                    //    sfx_bdcls);
+                    DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_bdcls);
                     break;
 
                 case DoorType.Close:
                     door.TopHeight = game.P_FindLowestCeilingSurrounding(sec);
                     door.TopHeight -= Fixed.FromInt(4);
                     door.Direction = -1;
-                    //S_StartSound((mobj_t*)&door->sector->soundorg,
-                    //    sfx_dorcls);
+                    DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_dorcls);
                     break;
 
                 case DoorType.Close30ThenOpen:
                     door.TopHeight = sec.CeilingHeight;
                     door.Direction = -1;
-                    //S_StartSound((mobj_t*)&door->sector->soundorg,
-                    //    sfx_dorcls);
+                    DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_dorcls);
                     break;
 
                 case DoorType.BlazeRaise:
@@ -653,8 +645,7 @@ public static class Trigger
                     door.Speed = Door.DefaultSpeed * 4;
                     if (door.TopHeight != sec.CeilingHeight)
                     {
-                        //S_StartSound((mobj_t*)&door->sector->soundorg,
-                        //    sfx_bdopn);
+                        DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_bdopn);
                     }
                     break;
 
@@ -665,8 +656,7 @@ public static class Trigger
                     door.TopHeight -= Fixed.FromInt(4);
                     if (door.TopHeight != sec.CeilingHeight)
                     {
-                        //S_StartSound((mobj_t*)&door->sector->soundorg,
-                        //    sfx_doropn);
+                        DoomGame.Instance.Sound.StartSound(door.Sector.SoundOrigin, SoundType.sfx_doropn);
                     }
                     break;
             }
@@ -694,7 +684,7 @@ public static class Trigger
                 if (!player.Cards[(int)KeyCardType.BlueCard] && !player.Cards[(int)KeyCardType.BlueSkull])
                 {
                     player.Message = Messages.PD_BLUEK;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return;
                 }
                 break;
@@ -709,7 +699,7 @@ public static class Trigger
                 if (!player.Cards[(int)KeyCardType.YellowCard] && !player.Cards[(int)KeyCardType.YellowSkull])
                 {
                     player.Message = Messages.PD_YELLOWK;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return;
                 }
                 break;
@@ -724,7 +714,7 @@ public static class Trigger
                 if (!player.Cards[(int)KeyCardType.RedCard] && !player.Cards[(int)KeyCardType.RedSkull])
                 {
                     player.Message = Messages.PD_REDK;
-                    // S_StartSound(NULL, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
                     return;
                 }
                 break;
@@ -765,16 +755,16 @@ public static class Trigger
         {
             case 117:   // BLAZING DOOR RAISE
             case 118:   // BLAZING DOOR OPEN
-                // S_StartSound((mobj_t*)&sec->soundorg, sfx_bdopn);
+                DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_bdopn);
                 break;
 
             case 1: // NORMAL DOOR SOUND
             case 31:
-                // S_StartSound((mobj_t*)&sec->soundorg, sfx_doropn);
+                DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_doropn);
                 break;
 
             default:    // LOCKED DOOR SOUND
-                // S_StartSound((mobj_t*)&sec->soundorg, sfx_doropn);
+                DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_doropn);
                 break;
         }
 
@@ -1017,8 +1007,7 @@ public static class Trigger
 
         if ((DoomGame.Instance.Game.LevelTime & 7) == 0)
         {
-            //S_StartSound((mobj_t*)&floor->sector->soundorg,
-            //    sfx_stnmov);
+            DoomGame.Instance.Sound.StartSound(floor.Sector!.SoundOrigin, SoundType.sfx_stnmov);
         }
 
         if (res == Result.PastDest)
@@ -1043,8 +1032,7 @@ public static class Trigger
             }
 
             DoomGame.Instance.Game.RemoveThinker(floor);
-            //S_StartSound((mobj_t*)&floor->sector->soundorg,
-            //    sfx_pstop);
+            DoomGame.Instance.Sound.StartSound(floor.Sector.SoundOrigin, SoundType.sfx_pstop);
         }
     }
 
@@ -1428,8 +1416,7 @@ public static class Trigger
                         case CeilingType.SilentCrushAndRaise:
                             break;
                         default:
-                            //S_StartSound((mobj_t*)&ceiling->sector->soundorg,
-                            //    sfx_stnmov);
+                            DoomGame.Instance.Sound.StartSound(ceiling.Sector!.SoundOrigin, SoundType.sfx_stnmov);
                             break;
                     }
                 }
@@ -1443,8 +1430,10 @@ public static class Trigger
                             break;
 
                         case CeilingType.SilentCrushAndRaise:
-                        //S_StartSound((mobj_t*)&ceiling->sector->soundorg,
-                        //    sfx_pstop);
+                            DoomGame.Instance.Sound.StartSound(ceiling.Sector!.SoundOrigin, SoundType.sfx_pstop);
+                            ceiling.Direction = -1;
+                            break;
+
                         case CeilingType.FastCrushAndRaise:
                         case CeilingType.CrushAndRaise:
                             ceiling.Direction = -1;
@@ -1464,8 +1453,7 @@ public static class Trigger
                         case CeilingType.SilentCrushAndRaise:
                             break;
                         default:
-                            //S_StartSound((mobj_t*)&ceiling->sector->soundorg,
-                            //    sfx_stnmov);
+                            DoomGame.Instance.Sound.StartSound(ceiling.Sector!.SoundOrigin, SoundType.sfx_stnmov);
                             break;
                     }
                 }
@@ -1475,12 +1463,16 @@ public static class Trigger
                     switch (ceiling.Type)
                     {
                         case CeilingType.SilentCrushAndRaise:
-                        //S_StartSound((mobj_t*)&ceiling->sector->soundorg,
-                        //    sfx_pstop);
+                            DoomGame.Instance.Sound.StartSound(ceiling.Sector!.SoundOrigin, SoundType.sfx_pstop);
+                            ceiling.Speed = Ceiling.DefaultSpeed;
+                            ceiling.Direction = 1;
+                            break;
+
                         case CeilingType.CrushAndRaise:
                             ceiling.Speed = Ceiling.DefaultSpeed;
                             ceiling.Direction = 1;
                             break;
+
                         case CeilingType.FastCrushAndRaise:
                             ceiling.Direction = 1;
                             break;
@@ -1599,8 +1591,7 @@ public static class Trigger
                 {
                     if ((game.LevelTime & 7) == 0)
                     {
-                        //S_StartSound((mobj_t*)&plat->sector->soundorg,
-                        //    sfx_stnmov);
+                        DoomGame.Instance.Sound.StartSound(platform.Sector!.SoundOrigin, SoundType.sfx_stnmov);
                     }
                 }
 
@@ -1608,15 +1599,13 @@ public static class Trigger
                 {
                     platform.Count = platform.Wait;
                     platform.Status = PlatformState.Down;
-                    //S_StartSound((mobj_t*)&plat->sector->soundorg,
-                    //    sfx_pstart);
+                    DoomGame.Instance.Sound.StartSound(platform.Sector!.SoundOrigin, SoundType.sfx_pstart);
                 }
                 else if (res == Result.PastDest)
                 {
                     platform.Count = platform.Wait;
                     platform.Status = PlatformState.Waiting;
-                    //S_StartSound((mobj_t*)&plat->sector->soundorg,
-                    //    sfx_pstop);
+                    DoomGame.Instance.Sound.StartSound(platform.Sector!.SoundOrigin, SoundType.sfx_pstop);
 
                     switch (platform.Type)
                     {
@@ -1641,7 +1630,7 @@ public static class Trigger
                 {
                     platform.Count = platform.Wait;
                     platform.Status = PlatformState.Waiting;
-                    // S_StartSound((mobj_t*)&plat->sector->soundorg, sfx_pstop);
+                    DoomGame.Instance.Sound.StartSound(platform.Sector!.SoundOrigin, SoundType.sfx_pstop);
                 }
 
                 break;
@@ -1650,7 +1639,7 @@ public static class Trigger
                 if (--platform.Count == 0)
                 {
                     platform.Status = platform.Sector!.FloorHeight == platform.Low ? PlatformState.Up : PlatformState.Down;
-                    // S_StartSound((mobj_t*)&plat->sector->soundorg, sfx_pstart);
+                    DoomGame.Instance.Sound.StartSound(platform.Sector.SoundOrigin, SoundType.sfx_pstart);
                 }
 
                 break;
@@ -1703,7 +1692,7 @@ public static class Trigger
                     // No more damage, if applicable
                     sec.Special = 0;
 
-                    // S_StartSound((mobj_t*)&sec->soundorg, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_stnmov);
                     break;
 
                 case PlatformType.RaiseAndChange:
@@ -1713,7 +1702,7 @@ public static class Trigger
                     plat.Wait = 0;
                     plat.Status = PlatformState.Up;
 
-                    // S_StartSound((mobj_t*)&sec->soundorg, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_stnmov);
                     break;
 
                 case PlatformType.DownWaitUpStay:
@@ -1729,7 +1718,7 @@ public static class Trigger
                     plat.Wait = 35 * Platform.DefaultWait;
                     plat.Status = PlatformState.Down;
 
-                    // S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+                    DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_pstart);
                     break;
 
                 case PlatformType.BlazeDWUS:
@@ -1745,7 +1734,7 @@ public static class Trigger
                     plat.Wait = 35 * Platform.DefaultWait;
                     plat.Status = PlatformState.Down;
 
-                    // S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+                    DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_pstart);
                     break;
 
                 case PlatformType.PerpetualRaise:
@@ -1767,7 +1756,7 @@ public static class Trigger
                     plat.Wait = 35 * Platform.DefaultWait;
                     plat.Status = (PlatformState)(DoomRandom.P_Random() & 1);
 
-                    // S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+                    DoomGame.Instance.Sound.StartSound(sec.SoundOrigin, SoundType.sfx_pstart);
                     break;
             }
 
@@ -1832,7 +1821,7 @@ public static class Trigger
 
                 // spawn teleport fog at source and destination
                 var fog = game.P_SpawnMapObject(oldX, oldY, oldZ, MapObjectType.MT_TFOG);
-                // S_StartSound(fog, sfx_telept);
+                DoomGame.Instance.Sound.StartSound(fog, SoundType.sfx_telept);
                 var an = m.Angle;
 
                 fog = game.P_SpawnMapObject(m.X + 20 * DoomMath.Cos(an),
@@ -1840,7 +1829,7 @@ public static class Trigger
                     thing.Z, MapObjectType.MT_TFOG);
 
                 // emit sound, where?
-                //S_StartSound(fog, sfx_telept);
+                DoomGame.Instance.Sound.StartSound(fog, SoundType.sfx_telept);
 
                 // don't move for a bit
                 if (thing.Player != null)

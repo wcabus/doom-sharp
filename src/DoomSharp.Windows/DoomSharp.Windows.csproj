@@ -5,6 +5,7 @@
     <TargetFramework>net6.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +14,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DoomSharp.Core\DoomSharp.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="fmod.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

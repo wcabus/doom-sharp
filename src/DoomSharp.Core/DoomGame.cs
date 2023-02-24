@@ -5,6 +5,7 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
 using System.Runtime.InteropServices;
 using DoomSharp.Core.GameLogic;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core;
 
@@ -13,6 +14,7 @@ public class DoomGame : IDisposable
     public const int Version = 109;
     private static IConsole _console = new NullConsole();
     private static IGraphics _graphics = new NullGraphics();
+    private static ISoundDriver _soundDriver = new NullSoundDriver();
 
     public static readonly DoomGame Instance = new();
 
@@ -21,6 +23,7 @@ public class DoomGame : IDisposable
 
     private readonly RenderEngine _renderer = new();
     private readonly Video _video = new(_graphics);
+    private readonly SoundController _sound = new(_soundDriver);
     private readonly Zone _zone = new();
 
     private readonly GameController _game = new();
@@ -174,7 +177,7 @@ public class DoomGame : IDisposable
             CheckNetGame();
 
             _console.WriteLine("S_Init: Setting up sound.");
-            // S_Init (snd_SfxVolume, snd_MusicVolume);
+            Sound.Initialize(Menu.SoundFxVolume, Menu.MusicVolume);
 
             _console.WriteLine("HU_Init: Setting up heads up display.");
             _hud = new HudController();
@@ -230,6 +233,7 @@ public class DoomGame : IDisposable
     public RenderEngine Renderer => _renderer;
     public GameController Game => _game;
     public Video Video => _video;
+    public SoundController Sound => _sound;
     public HudController Hud => _hud!;
     public WadFileCollection WadData => _wadFiles!;
     public MenuController Menu => _menu!;
@@ -245,6 +249,12 @@ public class DoomGame : IDisposable
     {
         _graphics = renderer;
         Instance.Video.SetOutputRenderer(renderer);
+    }
+
+    public static void SetSoundDriver(ISoundDriver driver)
+    {
+        _soundDriver = driver;
+        Instance.Sound.SetDriver(driver);
     }
 
     public static IConsole Console => _console;
@@ -455,20 +465,12 @@ public class DoomGame : IDisposable
                 TryRunTics(); // will run at least one tic
             }
 
-            //S_UpdateSounds(players[consoleplayer].mo);// move positional sounds
+            Sound.UpdateSounds(Game.Players[Game.ConsolePlayer].MapObject!); // move positional sounds
 
             // Update display, next frame, with current state.
             Display();
 
-            //# ifndef SNDSERV
-            //            // Sound mixing for the buffer is snychronous.
-            //            I_UpdateSound();
-            //#endif
-            //            // Synchronous sound output is explicitly called.
-            //# ifndef SNDINTR
-            //            // Update sound output.
-            //            I_SubmitSound();
-            //#endif
+            Sound.Submit();
         }
     }
 
@@ -1228,14 +1230,7 @@ public class DoomGame : IDisposable
                 }
                 _game.GameState = GameState.DemoScreen;
                 _demoPageName = "TITLEPIC";
-                if (GameMode == GameMode.Commercial)
-                {
-                    // S_StartMusic(mus_dm2ttl);
-                }
-                else
-                {
-                    // S_StartMusic(mus_intro);
-                }
+                Sound.StartMusic(GameMode == GameMode.Commercial ? MusicType.mus_dm2ttl : MusicType.mus_intro);
                 break;
             case 1:
                 _game.DeferedPlayDemo("demo1");
@@ -1254,7 +1249,7 @@ public class DoomGame : IDisposable
                 {
                     _demoPageTic = 35 * 11;
                     _demoPageName = "TITLEPIC";
-                    // S_StartMusic(mus_dm2ttl);
+                    Sound.StartMusic(MusicType.mus_dm2ttl);
                 }
                 else
                 {
