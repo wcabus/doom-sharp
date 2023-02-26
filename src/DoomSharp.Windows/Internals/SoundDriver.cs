@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using DoomSharp.Core;
 using DoomSharp.Core.Sound;
 using FMOD;
@@ -18,6 +17,8 @@ internal class SoundDriver : ISoundDriver, IDisposable
     private ChannelGroup _musicChannelGroup;
 
     private readonly Dictionary<SoundType, Sound> _sounds = new();
+
+    private readonly Sound?[] _loadedMusic = new Sound?[2];
     private Sound? _currentMusic = null;
     private Channel? _currentMusicChannel = null;
 
@@ -83,20 +84,37 @@ internal class SoundDriver : ISoundDriver, IDisposable
         };
 
         var result = _fmodSystem.createSound(data, MODE.OPENRAW | MODE.CREATESAMPLE | MODE.OPENMEMORY, ref soundInfo, out var music);
-        _currentMusic = music;
-        
-        return 1;
+        return AddMusicToLoadedList(music);
+    }
+
+    private int AddMusicToLoadedList(Sound music)
+    {
+        for (var i = 0; i < _loadedMusic.Length; i++)
+        {
+            if (_loadedMusic[i] != null)
+            {
+                continue;
+            }
+            
+            _loadedMusic[i] = music;
+            return i;
+        }
+
+        // You shouldn't get here
+        DoomGame.Error("No more music slots available!");
+        return -1;
     }
 
     public void PlaySong(int handle, bool looping)
     {
-        if (_currentMusic is null)
+        var music = GetCurrentMusic(handle);
+        if (music is null)
         {
             return;
         }
 
-        _currentMusic.Value.setLoopCount(looping ? -1 : 0);
-        var result = _fmodSystem.playSound(_currentMusic.Value, _musicChannelGroup, false, out var channel);
+        music.Value.setLoopCount(looping ? -1 : 0);
+        var result = _fmodSystem.playSound(music.Value, _musicChannelGroup, false, out var channel);
         _currentMusicChannel = channel;
     }
 
@@ -117,16 +135,25 @@ internal class SoundDriver : ISoundDriver, IDisposable
 
     public void UnregisterSong(int handle)
     {
-        _currentMusicChannel?.stop();
-        _currentMusic?.release();
-
-        _currentMusicChannel = null;
-        _currentMusic = null;
+        var music = GetCurrentMusic(handle);
+        music?.release();
+        
+        _loadedMusic[handle] = null;
     }
-
+    
     public void SetMusicVolume(int volume)
     {
         _currentMusicChannel?.setVolume(volume < 0 ? 1 : (volume / 128f));
+    }
+
+    private Sound? GetCurrentMusic(int handle)
+    {
+        if (handle < 0 || handle >= _loadedMusic.Length)
+        {
+            return null;
+        }
+
+        return _loadedMusic[handle];
     }
 
     public bool SoundIsPlaying(int handle)
