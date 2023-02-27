@@ -21,10 +21,11 @@ internal class SoundDriver : ISoundDriver, IDisposable
     private readonly Sound?[] _loadedMusic = new Sound?[2];
     private Sound? _currentMusic = null;
     private Channel? _currentMusicChannel = null;
-
+    private float _musicVolume = 1f;
+    
     private readonly Dictionary<SoundType, int> _soundChannelMap = new();
     private readonly Dictionary<int, SoundType> _channelSoundMap = new();
-
+    
     // The number of internal mixing channels,
     //  the samples calculated for each mixing step,
     //  the size of the 16bit, 2 hardware channel (stereo)
@@ -76,14 +77,16 @@ internal class SoundDriver : ISoundDriver, IDisposable
         var soundInfo = new CREATESOUNDEXINFO
         {
             cbsize = MarshalHelper.SizeOf(typeof(CREATESOUNDEXINFO)),
-            format = SOUND_FORMAT.PCM16,
-            numchannels = 2,
-            defaultfrequency = 44100,
             length = (uint)data.Length,
             suggestedsoundtype = SOUND_TYPE.MIDI
         };
 
-        var result = _fmodSystem.createSound(data, MODE.OPENRAW | MODE.CREATESAMPLE | MODE.OPENMEMORY, ref soundInfo, out var music);
+        var result = _fmodSystem.createSound(data, MODE.CREATESAMPLE | MODE.OPENMEMORY | MODE.LOOP_NORMAL, ref soundInfo, out var music);
+        if (result != RESULT.OK)
+        {
+            DoomGame.Console.WriteLine($"RegisterSong failed: {Error.String(result)}");
+        }
+        
         return AddMusicToLoadedList(music);
     }
 
@@ -116,6 +119,7 @@ internal class SoundDriver : ISoundDriver, IDisposable
         music.Value.setLoopCount(looping ? -1 : 0);
         var result = _fmodSystem.playSound(music.Value, _musicChannelGroup, false, out var channel);
         _currentMusicChannel = channel;
+        channel.setVolume(_musicVolume);
     }
 
     public void PauseSong(int handle)
@@ -143,7 +147,8 @@ internal class SoundDriver : ISoundDriver, IDisposable
     
     public void SetMusicVolume(int volume)
     {
-        _currentMusicChannel?.setVolume(volume < 0 ? 1 : (volume / 128f));
+        _musicVolume = volume < 0 ? 1 : (volume / 128f);
+        _currentMusicChannel?.setVolume(_musicVolume);
     }
 
     private Sound? GetCurrentMusic(int handle)
