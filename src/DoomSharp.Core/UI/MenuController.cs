@@ -240,7 +240,7 @@ public class MenuController
     public int ScreenSize { get; private set; }
     public int ScreenBlocks { get; private set; } = 10;
     public int SoundFxVolume { get; private set; } = 13;
-    public int MusicVolume { get; private set; } = 13;
+    public int MusicVolume { get; private set; } = 5;
 
     public int SelectedEpisode { get; private set; } = 0;
 
@@ -954,7 +954,7 @@ public class MenuController
                 break;
         }
 
-        // S_SetSfxVolume(SoundFxVolume /* *8 */);
+        DoomGame.Instance.Sound.SetSfxVolume(SoundFxVolume * 8);
     }
 
     private void ChangeMusicVolume(int choice)
@@ -975,7 +975,7 @@ public class MenuController
                 break;
         }
 
-        // S_SetMusicVolume(MusicVolume /* *8 */);
+        DoomGame.Instance.Sound.SetMusicVolume(MusicVolume * 8);
     }
 
     //
