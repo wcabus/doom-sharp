@@ -1,6 +1,11 @@
 # DooM#
 
-This is a port of the [DooM source code](https://github.com/id-Software/DOOM/tree/master/linuxdoom-1.10) to C#, currently targeting .NET 6
+This is a vanilla port of the [DooM source code](https://github.com/id-Software/DOOM/tree/master/linuxdoom-1.10) to C#, currently targeting .NET 6. 
+
+
+We currently support two platforms:
+* Windows, via WPF and MAUI
+* Android
 
 ## Getting started
 
@@ -12,7 +17,7 @@ This is a port of the [DooM source code](https://github.com/id-Software/DOOM/tre
 
 * Open the `src/DoomSharp.sln` file and set the DoomSharp.Windows project as your startup project.
 
-* Before running, you need some WAD files. If you have an original copy of DooM, you can use these files. If not, you can freely download the shareware WAD from Wad Archive: https://www.wad-archive.com/wad/Doom-Shareware-v1.9
+* Before running, you need some WAD files. If you have an original copy of DooM, you can use these files. If not, you can freely download the shareware files here: https://www.doomworld.com/idgames/idstuff/doom/doom19s
 
 * Once you have your WAD files in a directory - I prefer to use a directory called WAD in the repository's folder structure - , open the DoomSharp.Windows project properties and add a debug profile. In this debug profile, add an environment variable called `DOOMWADDIR` and set its value to the path that contains the WAD file(s).
 This should give you a file called `launchSettings.json` which looks like this:
@@ -30,7 +35,15 @@ This should give you a file called `launchSettings.json` which looks like this:
 ```
 
 ## Progress
-Loading the original WAD files should work, although I've only tested the shareware WAD for now. 
+Loading the original WAD files should work, only the shareware and retail WADs have been tested. 
 
 The demo games are not running as they should yet, the commands seem to be out of sync somehow. 
-You can start your own game, and probably play the entire first episode! Without sound or music however.
+You can start your own game, and probably play the entire first episode!
+
+What does not yet work:
+* Finishing an episode and going to the next one
+* Returning from the secret level
+* The automap
+* Cheats (hah!)
+* Messages when you pick up items
+* Network support (not the focus of this port, but who knows)
