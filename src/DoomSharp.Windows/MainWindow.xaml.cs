@@ -34,7 +34,7 @@ namespace DoomSharp.Windows
             RenderOptions.SetBitmapScalingMode(RenderTarget, BitmapScalingMode.Linear); // Linear looks somewhat blurry but still OK
             RenderOptions.SetEdgeMode(RenderTarget, EdgeMode.Aliased);
 
-            await Task.Run(() => DoomGame.Instance.Run());
+            await Task.Run(() => DoomGame.Instance.RunAsync());
         }
 
         private void HandleKeyDown(object sender, KeyEventArgs e)

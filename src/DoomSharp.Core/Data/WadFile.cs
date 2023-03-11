@@ -94,8 +94,8 @@ public class WadFile : IDisposable
         _reader = reader;
     }
 
-    public WadInfo Header { get; private init; }
-    public ICollection<WadLump> Lumps { get; private set; } = Array.Empty<WadLump>();
+    public WadInfo Header { get; init; }
+    public ICollection<WadLump> Lumps { get; set; } = Array.Empty<WadLump>();
     public int LumpCount => Header.NumLumps;
 
     public void Dispose()

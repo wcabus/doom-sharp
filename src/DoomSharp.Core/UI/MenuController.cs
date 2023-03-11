@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using DoomSharp.Core.Data;
 using DoomSharp.Core.Input;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.UI;
 
@@ -239,7 +240,7 @@ public class MenuController
     public int ScreenSize { get; private set; }
     public int ScreenBlocks { get; private set; } = 10;
     public int SoundFxVolume { get; private set; } = 13;
-    public int MusicVolume { get; private set; } = 13;
+    public int MusicVolume { get; private set; } = 5;
 
     public int SelectedEpisode { get; private set; } = 0;
 
@@ -485,7 +486,7 @@ public class MenuController
             _messageRoutine?.Invoke((char)ch);
             
             IsActive = false;
-            // S_StartSound(NULL, sfx_swtchx);
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchx);
             return true;
         }
 
@@ -505,7 +506,7 @@ public class MenuController
                     //    return false;
                     //}
                     SizeDisplay(0);
-                    // S_StartSound(NULL, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_stnmov);
                     return true;
 
                 case (int)Keys.Equals: // Screen size up
@@ -514,7 +515,7 @@ public class MenuController
                     //    return false;
                     //}
                     SizeDisplay(1);
-                    // S_StartSound(NULL, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_stnmov);
                     return true;
 
                 case (int)Keys.F1: // Help key
@@ -523,18 +524,18 @@ public class MenuController
                     _currentMenu = DoomGame.Instance.GameMode == GameMode.Retail ? _readMenu2 : _readMenu;
 
                     _itemOn = 0;
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     return true;
 
                 case (int)Keys.F2:            // Save
                     StartControlPanel();
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     SaveGame(0);
                     return true;
 
                 case (int)Keys.F3:            // Load
                     StartControlPanel();
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     LoadGame(0);
                     return true;
 
@@ -542,36 +543,36 @@ public class MenuController
                     StartControlPanel();
                     _currentMenu = _soundMenu;
                     _itemOn = (int)SoundMenuItemIndexes.SoundFxVolume;
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     return true;
 
                 case (int)Keys.F5:            // Detail toggle
                     ChangeDetail(0);
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     return true;
 
                 case (int)Keys.F6:            // Quicksave
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     QuickSave();
                     return true;
 
                 case (int)Keys.F7:            // End game
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     EndGame(0);
                     return true;
 
                 case (int)Keys.F8:            // Toggle messages
                     ChangeMessages(0);
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     return true;
 
                 case (int)Keys.F9:            // Quickload
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     QuickLoad();
                     return true;
 
                 case (int)Keys.F10:           // Quit DOOM
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                     QuitDOOM(0);
                     return true;
 
@@ -588,7 +589,7 @@ public class MenuController
             if (ch == (int)Keys.Escape)
             {
                 StartControlPanel();
-                // S_StartSound(NULL, sfx_swtchn);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                 return true;
             }
             return false;
@@ -608,7 +609,7 @@ public class MenuController
                     {
                         _itemOn++;
                     }
-                    // S_StartSound(NULL, sfx_pstop);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pstop);
                 } while (_currentMenu.Items[_itemOn].Status == MenuItemStatus.Empty);
                 return true;
 
@@ -623,14 +624,14 @@ public class MenuController
                     {
                         _itemOn--;
                     }
-                    // S_StartSound(NULL, sfx_pstop);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pstop);
                 } while (_currentMenu.Items[_itemOn].Status == MenuItemStatus.Empty);
                 return true;
 
             case (int)Keys.LeftArrow:
                 if (_currentMenu.Items[_itemOn].ChoiceRoutine is not null && _currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
                 {
-                    // S_StartSound(NULL, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_stnmov);
                     _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(0);
                 }
                 return true;
@@ -638,7 +639,7 @@ public class MenuController
             case (int)Keys.RightArrow:
                 if (_currentMenu.Items[_itemOn].ChoiceRoutine is not null && _currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
                 {
-                    // S_StartSound(NULL, sfx_stnmov);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_stnmov);
                     _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(1);
                 }
                 return true;
@@ -649,13 +650,13 @@ public class MenuController
                     _currentMenu.LastOn = _itemOn;
                     if (_currentMenu.Items[_itemOn].Status == MenuItemStatus.ArrowsOk)
                     {
-                        // S_StartSound(NULL, sfx_stnmov);
+                        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_stnmov);
                         _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(1); // right arrow
                     }
                     else
                     {
                         _currentMenu.Items[_itemOn].ChoiceRoutine?.Invoke(_itemOn);
-                        // S_StartSound(NULL, sfx_pistol);
+                        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pistol);
                     }
                 }
                 return true;
@@ -663,7 +664,7 @@ public class MenuController
             case (int)Keys.Escape:
                 _currentMenu.LastOn = _itemOn;
                 ClearMenus();
-                // S_StartSound(NULL, sfx_swtchx);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchx);
                 return true;
 
             case (int)Keys.Backspace:
@@ -672,7 +673,7 @@ public class MenuController
                 {
                     _currentMenu = _currentMenu.PreviousMenu;
                     _itemOn = _currentMenu.LastOn;
-                    // S_StartSound(NULL, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchn);
                 }
                 return true;
 
@@ -682,7 +683,7 @@ public class MenuController
                     if (_currentMenu.Items[i].HotKey == ch)
                     {
                         _itemOn = i;
-                        // S_StartSound(NULL, sfx_pstop);
+                        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pstop);
                         return true;
                     }
                 }
@@ -692,7 +693,7 @@ public class MenuController
                     if (_currentMenu.Items[i].HotKey == ch)
                     {
                         _itemOn = i;
-                        // S_StartSound(NULL, sfx_pstop);
+                        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pstop);
                         return true;
                     }
                 }
@@ -834,7 +835,7 @@ public class MenuController
         var game = DoomGame.Instance.Game;
         if (!game.UserGame)
         {
-            // S_StartSound(NULL, sfx_oof);
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
             return;
         }
 
@@ -953,7 +954,7 @@ public class MenuController
                 break;
         }
 
-        // S_SetSfxVolume(SoundFxVolume /* *8 */);
+        DoomGame.Instance.Sound.SetSfxVolume(SoundFxVolume * 8);
     }
 
     private void ChangeMusicVolume(int choice)
@@ -974,7 +975,7 @@ public class MenuController
                 break;
         }
 
-        // S_SetMusicVolume(MusicVolume /* *8 */);
+        DoomGame.Instance.Sound.SetMusicVolume(MusicVolume * 8);
     }
 
     //
@@ -1168,7 +1169,7 @@ public class MenuController
         if (ch == 'y')
         {
             DoSave(_quickSaveSlot);
-            // S_StartSound(NULL,sfx_swtchx);
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchx);
         }
     }
 
@@ -1203,7 +1204,7 @@ public class MenuController
         if (ch == 'y')
         {
             LoadSelect(_quickSaveSlot);
-            // S_StartSound(NULL,sfx_swtchx);
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_swtchx);
         }
     }
 
@@ -1274,11 +1275,11 @@ public class MenuController
         {
             if (DoomGame.Instance.GameMode == GameMode.Commercial)
             {
-                // S_StartSound(NULL, quitsounds2[(gametic >> 2) & 7]);
+                //DoomGame.Instance.Sound.StartSound(null, SoundType.quitsounds2[(gametic >> 2) & 7]);
             }
             else
             {
-                // S_StartSound(NULL, quitsounds[(gametic >> 2) & 7]);
+                //DoomGame.Instance.Sound.StartSound(null, SoundType.quitsounds[(gametic >> 2) & 7]);
             }
             DoomGame.Instance.WaitVBL(105);
         }

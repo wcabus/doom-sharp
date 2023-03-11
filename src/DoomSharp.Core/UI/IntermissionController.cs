@@ -2,6 +2,7 @@
 using DoomSharp.Core.GameLogic;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.UI;
 
@@ -294,14 +295,7 @@ public class IntermissionController
         if (_bcnt == 1)
         {
             // intermission music
-            if (DoomGame.Instance.GameMode == GameMode.Commercial)
-            {
-                //S_ChangeMusic(mus_dm2int, true);
-            }
-            else
-            {
-                //S_ChangeMusic(mus_inter, true);
-            }
+            DoomGame.Instance.Sound.ChangeMusic(DoomGame.Instance.GameMode == GameMode.Commercial ? MusicType.mus_dm2int : MusicType.mus_inter, true);
         }
 
         CheckForAccelerate();
@@ -742,7 +736,7 @@ public class IntermissionController
             _cntSecret[0] = (_players[_me].Secret * 100) / _wbs.MaxSecret;
             _cntTime = _players[_me].Time / Constants.TicRate;
             _cntPar = _wbs.ParTime / Constants.TicRate;
-            // S_StartSound(0, sfx_barexp);
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_barexp);
             _spState = 10;
         }
 
@@ -752,13 +746,13 @@ public class IntermissionController
 
             if ((_bcnt & 3) == 0)
             {
-                // S_StartSound(0, sfx_pistol);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pistol);
             }
 
             if (_cntKills[0] >= (_players[_me].Kills * 100) / _wbs.MaxKills)
             {
                 _cntKills[0] = (_players[_me].Kills * 100) / _wbs.MaxKills;
-                // S_StartSound(0, sfx_barexp);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_barexp);
                 _spState++;
             }
         }
@@ -768,13 +762,13 @@ public class IntermissionController
 
             if ((_bcnt & 3) == 0)
             {
-                // S_StartSound(0, sfx_pistol);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pistol);
             }
 
             if (_cntItems[0] >= (_players[_me].Items * 100) / _wbs.MaxItems)
             {
                 _cntItems[0] = (_players[_me].Items * 100) / _wbs.MaxItems;
-                // S_StartSound(0, sfx_barexp);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_barexp);
                 _spState++;
             }
         }
@@ -784,13 +778,13 @@ public class IntermissionController
 
             if ((_bcnt & 3) == 0)
             {
-                // S_StartSound(0, sfx_pistol);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pistol);
             }
 
             if (_cntSecret[0] >= (_players[_me].Secret * 100) / _wbs.MaxSecret)
             {
                 _cntSecret[0] = (_players[_me].Secret * 100) / _wbs.MaxSecret;
-                // S_StartSound(0, sfx_barexp);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_barexp);
                 _spState++;
             }
         }
@@ -798,7 +792,7 @@ public class IntermissionController
         {
             if ((_bcnt & 3) == 0)
             {
-                // S_StartSound(0, sfx_pistol);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_pistol);
             }
 
             _cntTime += 3;
@@ -816,7 +810,7 @@ public class IntermissionController
 
                 if (_cntTime >= _players[_me].Time / Constants.TicRate)
                 {
-                    // S_StartSound(0, sfx_barexp);
+                    DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_barexp);
                     _spState++;
                 }
             }
@@ -825,7 +819,7 @@ public class IntermissionController
         {
             if (_accelerateStage)
             {
-                // S_StartSound(0, sfx_sgcock);
+                DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_sgcock);
 
                 if (DoomGame.Instance.GameMode == GameMode.Commercial)
                 {

@@ -33,11 +33,11 @@ public class GameController
     // 
     // controls (have defaults) 
     // 
-    private int _keyRight = 'E';
-    private int _keyLeft = 'Q';
+    private int _keyRight = (int)Keys.RightArrow;
+    private int _keyLeft = (int)Keys.LeftArrow;
 
-    private int _keyUp = 'W';
-    private int _keyDown = 'S';
+    private int _keyUp = (int)Keys.UpArrow;
+    private int _keyDown = (int)Keys.DownArrow;
     private int _keyStrafeLeft = 'A';
     private int _keyStrafeRight = 'D';
     private int _keyFire = ' ';
@@ -399,11 +399,11 @@ public class GameController
                             Paused = !Paused;
                             if (Paused)
                             {
-                                // S_PauseSound();
+                                DoomGame.Instance.Sound.PauseSound();
                             }
                             else
                             {
-                                // S_ResumeSound();
+                                DoomGame.Instance.Sound.ResumeSound();
                             }
 
                             break;
@@ -552,11 +552,11 @@ public class GameController
         var an = (int)((Angle.Angle45.Value >> DoomMath.AngleToFineShift) *
                     ((int)Math.Round(mapThingAngle.ToDegrees()) / 45));
 
-        P_SpawnMapObject(x + 20 * DoomMath.Cos(an), y + 20 * DoomMath.Sin(an), ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
+        var mo = P_SpawnMapObject(x + 20 * DoomMath.Cos(an), y + 20 * DoomMath.Sin(an), ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
 
         if (Players[ConsolePlayer].ViewZ != new Fixed(1))
         {
-            // S_StartSound(mo, sfx_telept);   // don't start sound on first frame 
+            DoomGame.Instance.Sound.StartSound(mo, SoundType.sfx_telept); // don't start sound on first frame 
         }
 
         return true;
@@ -706,7 +706,7 @@ public class GameController
         if (Paused)
         {
             Paused = false;
-            // S_ResumeSound();
+            DoomGame.Instance.Sound.ResumeSound();
         }
 
         // This was quite messy with SPECIAL and commented parts.
@@ -1164,7 +1164,7 @@ public class GameController
                             break;
                     }
 
-                    // S_StartSound((mobj_t*)&buttonlist[i].soundorg, sfx_swtchn);
+                    DoomGame.Instance.Sound.StartSound(_buttonList[i].SoundOrigin, SoundType.sfx_swtchn);
                     _buttonList[i] = new Button();
                 }
             }
@@ -1470,7 +1470,7 @@ public class GameController
 
         if (player.PendingWeapon == WeaponType.Chainsaw)
         {
-            //S_StartSound(player->mo, sfx_sawup);
+            DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_sawup);
         }
 
         var newstate = WeaponInfo.GetByType(player.PendingWeapon).UpState;
@@ -1572,7 +1572,7 @@ public class GameController
         player.MapObject!.SetState(StateNum.S_PLAY_ATK1);
         var newState = WeaponInfo.GetByType(player.ReadyWeapon).AttackState;
         P_SetPlayerSprite(player, PlayerSpriteType.Weapon, newState);
-        // TODO P_NoiseAlert(player->mo, player->mo);
+        P_NoiseAlert(player.MapObject, player.MapObject);
     }
 
     private void P_SpawnMapThing(MapThing mapThing)
@@ -1791,7 +1791,7 @@ public class GameController
 
         if (mo.Info.DeathSound != SoundType.sfx_None)
         {
-            // S_StartSound(mo, mo.Info.DeathSound);
+            DoomGame.Instance.Sound.StartSound(mo, mo.Info.DeathSound);
         }
     }
 
@@ -2628,7 +2628,7 @@ public class GameController
             P_LineOpening(intercept.Line);
             if (_openRange <= Fixed.Zero)
             {
-                // S_StartSound (usething, sfx_noway);
+                DoomGame.Instance.Sound.StartSound(UseThing, SoundType.sfx_noway);
 
                 // can't use through a wall
                 return false;
@@ -3387,7 +3387,7 @@ public class GameController
                     // after hitting the ground (hard),
                     // and utter appropriate sound.
                     mo.Player.DeltaViewHeight = mo.MomZ >> 3;
-                    // S_StartSound(mo, sfx_oof);
+                    DoomGame.Instance.Sound.StartSound(mo, SoundType.sfx_oof);
                 }
                 mo.MomZ = Fixed.Zero;
             }
@@ -3669,8 +3669,8 @@ public class GameController
         // unlink from sector and block lists
         P_UnsetThingPosition(mobj);
 
-        //// stop any playing sound
-        //S_StopSound(mobj);
+        // stop any playing sound
+        DoomGame.Instance.Sound.StopSound(mobj);
 
         // free block
         RemoveThinker(mobj);
@@ -3891,7 +3891,7 @@ public class GameController
         Players[ConsolePlayer].ViewZ = new Fixed(1);
 
         // Make sure all sounds are stopped before Z_FreeTags.
-        // S_Start();
+        DoomGame.Instance.Sound.Start();
 
         // TODO Free up memory?
         // Z_FreeTags (PU_LEVEL, PU_PURGELEVEL-1);
@@ -4017,7 +4017,7 @@ public class GameController
         {
             if (_switchList[i] == texTop)
             {
-                // S_StartSound(_buttonList->soundorg, sound);
+                DoomGame.Instance.Sound.StartSound(_buttonList[0].SoundOrigin, sound);
                 _sides[line.SideNum[0]].TopTexture = _switchList[i ^ 1];
 
                 if (useAgain)
@@ -4030,7 +4030,7 @@ public class GameController
 
             if (_switchList[i] == texMid)
             {
-                // S_StartSound(buttonlist->soundorg, sound);
+                DoomGame.Instance.Sound.StartSound(_buttonList[0].SoundOrigin, sound);
                 _sides[line.SideNum[0]].MidTexture = _switchList[i ^ 1];
 
                 if (useAgain)
@@ -4043,7 +4043,7 @@ public class GameController
                 
             if (_switchList[i] == texBot)
             {
-                // S_StartSound(buttonlist->soundorg, sound);
+                DoomGame.Instance.Sound.StartSound(_buttonList[0].SoundOrigin, sound);
                 _sides[line.SideNum[0]].BottomTexture = _switchList[i ^ 1];
 
                 if (useAgain)
@@ -5308,7 +5308,7 @@ public class GameController
         player.BonusCount += BonusAdd;
         if (player == Players[ConsolePlayer])
         {
-            // S_StartSound(NULL, sound);
+            DoomGame.Instance.Sound.StartSound(null, sound);
         }
     }
 
@@ -6552,7 +6552,7 @@ public class GameController
 
         if (th.Info.SeeSound != SoundType.sfx_None)
         {
-            // S_StartSound (th, th->info->seesound);
+            DoomGame.Instance.Sound.StartSound(th, th.Info.SeeSound);
         }
 
         th.Target = source; // where it came from
@@ -6616,7 +6616,7 @@ public class GameController
         var th = P_SpawnMapObject(x, y, z, type);
         if (th.Info.SeeSound != SoundType.sfx_None)
         {
-            // S_StartSound (th, th->info->seesound);
+            DoomGame.Instance.Sound.StartSound(th, th.Info.SeeSound);
         }
 
         th.Target = source;
@@ -7226,6 +7226,72 @@ public class GameController
         }
 
         return true;
+    }
+
+    // Called by P_NoiseAlert
+    // Recursively traverse adjacent sectors,
+    // sound blocking lines cut off traversal
+    private MapObject? _soundTarget;
+
+    private void P_RecursiveSound(Sector sec, int soundBlocks) 
+    {
+        // wake up all monsters in this sector
+        if (sec.ValidCount == DoomGame.Instance.Renderer.ValidCount && sec.SoundTraversed <= soundBlocks + 1)
+        {
+            return;     // already flooded
+        }
+
+        sec.ValidCount = DoomGame.Instance.Renderer.ValidCount;
+        sec.SoundTraversed = soundBlocks + 1;
+        sec.SoundTarget = _soundTarget;
+
+        for (var i = 0; i < sec.LineCount; i++)
+        {
+            var check = sec.Lines[i];
+            if ((check.Flags & Constants.Line.TwoSided) == 0)
+            {
+                continue;
+            }
+
+            P_LineOpening(check);
+
+            if (_openRange <= Fixed.Zero)
+            {
+                continue;   // closed door
+            }
+
+            Sector? other;
+            if (_sides[check.SideNum[0]].Sector == sec)
+            {
+                other = _sides[check.SideNum[1]].Sector;
+            }
+            else
+            {
+                other = _sides[check.SideNum[0]].Sector;
+            }
+
+            if ((check.Flags & Constants.Line.SoundBlock) != 0)
+            {
+                if (soundBlocks == 0)
+                {
+                    P_RecursiveSound(other, 1);
+                }
+            }
+            else
+            {
+                P_RecursiveSound(other, soundBlocks);
+            }
+        }
+    }
+
+    /// <summary>
+    /// If a monster yells at a player, it will alert other monsters to the player.
+    /// </summary>
+    public void P_NoiseAlert(MapObject target, MapObject emitter)
+    {
+        _soundTarget = target;
+        DoomGame.Instance.Renderer.ValidCount++;
+        P_RecursiveSound(emitter.SubSector!.Sector!, 0);
     }
 
     public bool P_CheckMeleeRange(MapObject actor)

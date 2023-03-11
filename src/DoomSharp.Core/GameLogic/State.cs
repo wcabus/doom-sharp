@@ -55,7 +55,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
         if (player.ReadyWeapon == WeaponType.Chainsaw && psp.State == _states[(int)StateNum.S_SAW])
         {
-            // S_StartSound (player->mo, sfx_sawidl);
+            DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_sawidl);
         }
 
         // check for change
@@ -171,7 +171,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         var lineTarget = DoomGame.Instance.Game.LineTarget;
         if (lineTarget != null)
         {
-            //S_StartSound(player->mo, sfx_punch);
+            DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_punch);
             player.MapObject.Angle = DoomGame.Instance.Renderer.PointToAngle2(
                     player.MapObject.X,
                     player.MapObject.Y,
@@ -207,8 +207,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     {
         var player = actionParams.Player!;
         var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
-        //S_StartSound(player->mo, sfx_pistol);
-
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_pistol);
+        
         player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
         player.Ammo[(int)weapon.Ammo]--;
 
@@ -223,8 +223,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     {
         var player = actionParams.Player!;
         var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
-        //S_StartSound(player->mo, sfx_shotgn);
-
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_shotgn);
+        
         player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
         player.Ammo[(int)weapon.Ammo]--;
 
@@ -242,8 +242,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     {
         var player = actionParams.Player!;
         var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
-        //S_StartSound(player->mo, sfx_dshtgn);
-
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_dshtgn);
+        
         player.MapObject!.SetState(StateNum.S_PLAY_ATK2);
         player.Ammo[(int)weapon.Ammo] -= 2;
 
@@ -281,8 +281,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         var psp = actionParams.PlayerSprite!;
 
         var weapon = WeaponInfo.GetByType(player.ReadyWeapon);
-        //S_StartSound(player->mo, sfx_pistol);
-
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_pistol);
+        
         if (player.Ammo[(int)weapon.Ammo] == 0)
         {
             return;
@@ -335,12 +335,12 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         var lineTarget = DoomGame.Instance.Game.LineTarget;
         if (lineTarget == null)
         {
-            //S_StartSound(player->mo, sfx_sawful);
+            DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_sawful);
             return;
         }
 
-        //S_StartSound(player->mo, sfx_sawhit);
-
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_sawhit);
+        
         // turn to face target
         player.MapObject.Angle = DoomGame.Instance.Renderer.PointToAngle2(
                 player.MapObject.X,
@@ -380,7 +380,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
     private static void ActionBFGsound(ActionParams actionParams)
     {
-        // S_StartSound(player->mo, sfx_bfg);
+        var player = actionParams.Player!;
+        DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_bfg);
     }
 
     private static void ActionFireBFG(ActionParams actionParams)
@@ -438,7 +439,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         var actor = actionParams.MapObject!;
         if (actor.Info.PainSound != SoundType.sfx_None)
         {
-            //S_StartSound(actor, actor.Info.PainSound);
+            DoomGame.Instance.Sound.StartSound(actor, actor.Info.PainSound);
         }
     }
 
@@ -456,7 +457,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             sound = SoundType.sfx_pdiehi;
         }
 
-        // S_StartSound(mo, sound);
+        DoomGame.Instance.Sound.StartSound(mo, sound);
     }
 
     private static void ActionFall(ActionParams actionParams)
@@ -470,7 +471,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
     private static void ActionXScream(ActionParams actionParams)
     {
-        // S_StartSound(actor, sfx_slop);
+        var actor = actionParams.MapObject!;
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_slop);
     }
 
     /// <summary>
@@ -511,34 +513,35 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         {
             if (actor.Info.SeeSound != SoundType.sfx_None)
             {
-                //int sound;
+                SoundType sound;
 
-                //switch (actor->info->seesound)
-                //{
-                //    case sfx_posit1:
-                //    case sfx_posit2:
-                //    case sfx_posit3:
-                //        sound = sfx_posit1 + P_Random() % 3;
-                //        break;
+                switch (actor.Info.SeeSound)
+                {
+                    case SoundType.sfx_posit1:
+                    case SoundType.sfx_posit2:
+                    case SoundType.sfx_posit3:
+                        sound = SoundType.sfx_posit1 + DoomRandom.P_Random() % 3;
+                        break;
 
-                //    case sfx_bgsit1:
-                //    case sfx_bgsit2:
-                //        sound = sfx_bgsit1 + P_Random() % 2;
-                //        break;
+                    case SoundType.sfx_bgsit1:
+                    case SoundType.sfx_bgsit2:
+                        sound = SoundType.sfx_bgsit1 + DoomRandom.P_Random() % 2;
+                        break;
 
-                //    default:
-                //        sound = actor->info->seesound;
-                //        break;
-                //}
+                    default:
+                        sound = actor.Info.SeeSound;
+                        break;
+                }
 
-                //if (actor->type == MT_SPIDER
-                //    || actor->type == MT_CYBORG)
-                //{
-                //    // full volume
-                //    S_StartSound(NULL, sound);
-                //}
-                //else
-                //    S_StartSound(actor, sound);
+                if (actor.Type is MapObjectType.MT_SPIDER or MapObjectType.MT_CYBORG)
+                {
+                    // full volume
+                    DoomGame.Instance.Sound.StartSound(null, sound);
+                }
+                else
+                {
+                    DoomGame.Instance.Sound.StartSound(actor, sound);
+                }
             }
 
             actor.SetState(actor.Info.SeeState);
@@ -615,7 +618,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         {
             if (actor.Info.AttackSound != SoundType.sfx_None)
             {
-                // S_StartSound (actor, actor->info->attacksound);
+                DoomGame.Instance.Sound.StartSound(actor, actor.Info.AttackSound);
             }
 
             actor.SetState(actor.Info.MeleeState);
@@ -664,7 +667,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             // make active sound
             if (actor.Info.ActiveSound != SoundType.sfx_None && DoomRandom.P_Random() < 3)
             {
-                // S_StartSound (actor, actor->info->activesound);
+                DoomGame.Instance.Sound.StartSound(actor, actor.Info.ActiveSound);
             }
         }
     }
@@ -701,7 +704,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         var angle = actor.Angle;
         var slope = game.P_AimLineAttack(actor, angle, Constants.MissileRange);
 
-        // S_StartSound (actor, sfx_pistol);
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_pistol);
         angle += new Angle((DoomRandom.P_Random() - DoomRandom.P_Random()) << 20);
         var damage = ((DoomRandom.P_Random() % 5) + 1) * 3;
         game.P_LineAttack(actor, angle, Constants.MissileRange, slope, damage);
@@ -710,7 +713,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
     private static void ActionScream(ActionParams actionParams)
     {
         var actor = actionParams.MapObject!;
-        int sound;
+        SoundType sound;
 
         switch (actor.Info.DeathSound)
         {
@@ -720,16 +723,16 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             case SoundType.sfx_podth1:
             case SoundType.sfx_podth2:
             case SoundType.sfx_podth3:
-                sound = (int)SoundType.sfx_podth1 + DoomRandom.P_Random() % 3;
+                sound = SoundType.sfx_podth1 + DoomRandom.P_Random() % 3;
                 break;
 
             case SoundType.sfx_bgdth1:
             case SoundType.sfx_bgdth2:
-                sound = (int)SoundType.sfx_bgdth1 + DoomRandom.P_Random() % 2;
+                sound = SoundType.sfx_bgdth1 + DoomRandom.P_Random() % 2;
                 break;
 
             default:
-                sound = (int)actor.Info.DeathSound;
+                sound = actor.Info.DeathSound;
                 break;
         }
 
@@ -737,11 +740,11 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         if (actor.Type is MapObjectType.MT_SPIDER or MapObjectType.MT_CYBORG)
         {
             // full volume
-            // S_StartSound(NULL, sound);
+            DoomGame.Instance.Sound.StartSound(null, sound);
         }
         else
         {
-            // S_StartSound(actor, sound);
+            DoomGame.Instance.Sound.StartSound(actor, sound);
         }
     }
 
@@ -754,7 +757,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
 
         var game = DoomGame.Instance.Game;
-        // S_StartSound(actor, sfx_shotgn);
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_shotgn);
         ActionFaceTarget(actionParams);
         var bangle = actor.Angle;
         var slope = game.P_AimLineAttack(actor, bangle, Constants.MissileRange);
@@ -776,7 +779,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
 
         var game = DoomGame.Instance.Game;
-        // S_StartSound(actor, sfx_shotgn);
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_shotgn);
         ActionFaceTarget(actionParams);
         var bangle = actor.Angle;
         var slope = game.P_AimLineAttack(actor, bangle, Constants.MissileRange);
@@ -857,7 +860,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         ActionFaceTarget(actionParams);
         if (game.P_CheckMeleeRange(actor))
         {
-            // S_StartSound(actor, sfx_claw);
+            DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_claw);
             var damage = (DoomRandom.P_Random() % 8 + 1) * 3;
             MapObject.DamageMapObject(actor.Target, actor, actor, damage);
             return;
@@ -934,7 +937,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         ActionFaceTarget(actionParams);
         if (game.P_CheckMeleeRange(actor))
         {
-            // S_StartSound(actor, sfx_claw);
+            DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_claw);
             var damage = (DoomRandom.P_Random() % 8 + 1) * 10;
             MapObject.DamageMapObject(actor.Target, actor, actor, damage);
             return;

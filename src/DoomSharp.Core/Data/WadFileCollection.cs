@@ -1,8 +1,16 @@
-﻿namespace DoomSharp.Core.Data;
+﻿using DoomSharp.Core.Abstractions;
+
+namespace DoomSharp.Core.Data;
 
 public class WadFileCollection : List<WadLump>, IDisposable
 {
     private readonly List<WadFile> _wadFiles = new();
+    private static IWadStreamProvider _wadStreamProvider;
+
+    public static void Init(IWadStreamProvider wadStreamProvider)
+    {
+        _wadStreamProvider = wadStreamProvider;
+    }
 
     /// <summary>
     /// Pass a null terminated list of files to use.
@@ -17,13 +25,18 @@ public class WadFileCollection : List<WadLump>, IDisposable
     ///  does override all earlier ones.
     /// </summary>
     /// <param name="files"></param>
-    public static WadFileCollection InitializeMultipleFiles(IEnumerable<string> files)
+    public static async Task<WadFileCollection> InitializeMultipleFiles(IEnumerable<string> files)
     {
+        if (_wadStreamProvider == null)
+        {
+            throw new InvalidOperationException("WadStreamProvider is not initialized");
+        } 
+        
         var collection = new WadFileCollection();
 
         foreach (var file in files)
         {
-            var wadFile = WadFile.LoadFromFile(file);
+            var wadFile = await _wadStreamProvider.LoadFromFile(file).ConfigureAwait(false);
             if (wadFile != null)
             {
                 collection._wadFiles.Add(wadFile);
