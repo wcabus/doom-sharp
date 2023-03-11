@@ -177,7 +177,7 @@ public class DoomGame : IDisposable
             CheckNetGame();
 
             _console.WriteLine("S_Init: Setting up sound.");
-            Sound.Initialize(Menu.SoundFxVolume, Menu.MusicVolume);
+            Sound.Initialize(Menu.SoundFxVolume * 8, Menu.MusicVolume * 8);
 
             _console.WriteLine("HU_Init: Setting up heads up display.");
             _hud = new HudController();

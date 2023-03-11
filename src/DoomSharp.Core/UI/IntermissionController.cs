@@ -295,14 +295,7 @@ public class IntermissionController
         if (_bcnt == 1)
         {
             // intermission music
-            if (DoomGame.Instance.GameMode == GameMode.Commercial)
-            {
-                //S_ChangeMusic(mus_dm2int, true);
-            }
-            else
-            {
-                //S_ChangeMusic(mus_inter, true);
-            }
+            DoomGame.Instance.Sound.ChangeMusic(DoomGame.Instance.GameMode == GameMode.Commercial ? MusicType.mus_dm2int : MusicType.mus_inter, true);
         }
 
         CheckForAccelerate();

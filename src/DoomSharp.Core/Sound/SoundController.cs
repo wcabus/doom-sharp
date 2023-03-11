@@ -1,7 +1,5 @@
 ﻿using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
-using System;
-using System.Reflection.Metadata;
 
 namespace DoomSharp.Core.Sound;
 
@@ -18,7 +16,6 @@ public class SoundController
     // Internal default is max out of 0-15.
     private int _sfxVolume = 15;
     
-	// Maximum volume of music. Useless so far.
     private int _musicVolume = 15;
 
 	// whether songs are mus_paused
@@ -28,8 +25,6 @@ public class SoundController
 	private MusicInfo? _musicPlaying = null;
 
 	private int _nextCleanup;
-
-	public const int MaxVolume = 127;
 
 	// when to clip out sounds
 	// Does not fit the large outdoor areas.
@@ -578,7 +573,6 @@ public class SoundController
             return;
         }
 
-        _driver.SetMusicVolume(127);
         _driver.SetMusicVolume(volume);
         _musicVolume = volume;
     }
@@ -626,8 +620,9 @@ public class SoundController
 		}
 
 		// load & register it
-		music.Data = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!;
-		music.Handle = _driver.RegisterSong(music.Data);
+		var musicLumpData = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!;
+        music.Data = Mus2MidiConverter.TryConvert(musicLumpData, out var convertedData) ? convertedData : musicLumpData;
+        music.Handle = _driver.RegisterSong(music.Data);
 
 		// play it
 		_driver.PlaySong(music.Handle, looping);

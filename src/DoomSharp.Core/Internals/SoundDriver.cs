@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using DoomSharp.Core;
 using DoomSharp.Core.Sound;
 using FMOD;
@@ -13,12 +12,20 @@ public class SoundDriver : ISoundDriver, IDisposable
 {
     private FMOD.System _fmodSystem;
     private bool _fmodInitialized = false;
-    private ChannelGroup _channelGroup;
+
+    private ChannelGroup _soundFxChannelGroup;
+    private ChannelGroup _musicChannelGroup;
 
     private readonly Dictionary<SoundType, Sound> _sounds = new();
+
+    private readonly Sound?[] _loadedMusic = new Sound?[2];
+    private Sound? _currentMusic = null;
+    private Channel? _currentMusicChannel = null;
+    private float _musicVolume = 1f;
+    
     private readonly Dictionary<SoundType, int> _soundChannelMap = new();
     private readonly Dictionary<int, SoundType> _channelSoundMap = new();
-
+    
     // The number of internal mixing channels,
     //  the samples calculated for each mixing step,
     //  the size of the 16bit, 2 hardware channel (stereo)
@@ -59,17 +66,100 @@ public class SoundDriver : ISoundDriver, IDisposable
     public void SetChannels()
     {
         _fmodSystem.createChannelGroup("SoundFX", out var channelGroup);
-        _channelGroup = channelGroup;
+        _soundFxChannelGroup = channelGroup;
+
+        _fmodSystem.createChannelGroup("Music", out var channelGroup2);
+        _musicChannelGroup = channelGroup2;
     }
 
-    public int RegisterSong(byte[] data) => 1;
-    public void PlaySong(int handle, bool looping) { }
-    public void PauseSong(int handle) { }
-    public void ResumeSong(int handle) { }
-    public void StopSong(int handle) { }
-    public void UnregisterSong(int handle) { }
+    public int RegisterSong(byte[] data)
+    {
+        var soundInfo = new CREATESOUNDEXINFO
+        {
+            cbsize = MarshalHelper.SizeOf(typeof(CREATESOUNDEXINFO)),
+            length = (uint)data.Length,
+            suggestedsoundtype = SOUND_TYPE.MIDI
+        };
 
-    public void SetMusicVolume(int volume) { }
+        var result = _fmodSystem.createSound(data, MODE.CREATESAMPLE | MODE.OPENMEMORY | MODE.LOOP_NORMAL, ref soundInfo, out var music);
+        if (result != RESULT.OK)
+        {
+            DoomGame.Console.WriteLine($"RegisterSong failed: {Error.String(result)}");
+        }
+        
+        return AddMusicToLoadedList(music);
+    }
+
+    private int AddMusicToLoadedList(Sound music)
+    {
+        for (var i = 0; i < _loadedMusic.Length; i++)
+        {
+            if (_loadedMusic[i] != null)
+            {
+                continue;
+            }
+            
+            _loadedMusic[i] = music;
+            return i;
+        }
+
+        // You shouldn't get here
+        DoomGame.Error("No more music slots available!");
+        return -1;
+    }
+
+    public void PlaySong(int handle, bool looping)
+    {
+        var music = GetCurrentMusic(handle);
+        if (music is null)
+        {
+            return;
+        }
+
+        music.Value.setLoopCount(looping ? -1 : 0);
+        var result = _fmodSystem.playSound(music.Value, _musicChannelGroup, false, out var channel);
+        _currentMusicChannel = channel;
+        channel.setVolume(_musicVolume);
+    }
+
+    public void PauseSong(int handle)
+    {
+        _currentMusicChannel?.setPaused(true);
+    }
+
+    public void ResumeSong(int handle)
+    {
+        _currentMusicChannel?.setPaused(false);
+    }
+
+    public void StopSong(int handle)
+    {
+        _currentMusicChannel?.stop();
+    }
+
+    public void UnregisterSong(int handle)
+    {
+        var music = GetCurrentMusic(handle);
+        music?.release();
+        
+        _loadedMusic[handle] = null;
+    }
+    
+    public void SetMusicVolume(int volume)
+    {
+        _musicVolume = volume < 0 ? 1 : (volume / 128f);
+        _currentMusicChannel?.setVolume(_musicVolume);
+    }
+
+    private Sound? GetCurrentMusic(int handle)
+    {
+        if (handle < 0 || handle >= _loadedMusic.Length)
+        {
+            return null;
+        }
+
+        return _loadedMusic[handle];
+    }
 
     public bool SoundIsPlaying(int handle)
     {
@@ -107,10 +197,9 @@ public class SoundDriver : ISoundDriver, IDisposable
 
             var _ = reader.ReadUInt16();
             var sampleRate = reader.ReadUInt16();
-            var sampleCount = reader.ReadUInt32() - 32; // padded with 16 bytes pre and post sample
+            var sampleCount = reader.ReadUInt32();
 
-            ms.Seek(16, SeekOrigin.Current); // skip the 16 byte padding
-
+            // Read the sample including the pre/post 16 byte padding
             var sampleData = reader.ReadBytes((int)sampleCount);
 
             var soundInfo = new CREATESOUNDEXINFO
@@ -126,7 +215,7 @@ public class SoundDriver : ISoundDriver, IDisposable
             _sounds.Add(soundType, sound);
         }
 
-        _fmodSystem.playSound(sound, _channelGroup, false, out var channel);
+        _fmodSystem.playSound(sound, _soundFxChannelGroup, false, out var channel);
 
         channel.getIndex(out var handle);
         // _soundChannelMap.Add(soundType, handle);
