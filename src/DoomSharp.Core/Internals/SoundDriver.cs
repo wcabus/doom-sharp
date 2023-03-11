@@ -1,4 +1,5 @@
-﻿using DoomSharp.Core.Sound;
+﻿using System.Runtime.InteropServices;
+using DoomSharp.Core.Sound;
 using FMOD;
 using Channel = FMOD.Channel;
 
@@ -18,6 +19,8 @@ public class SoundDriver : ISoundDriver, IDisposable
     private FMOD.Sound? _currentMusic = null;
     private Channel? _currentMusicChannel = null;
     private float _musicVolume = 1f;
+
+    private string? _soundBankPath;
     
     private readonly Dictionary<SoundType, int> _soundChannelMap = new();
     private readonly Dictionary<int, SoundType> _channelSoundMap = new();
@@ -36,7 +39,16 @@ public class SoundDriver : ISoundDriver, IDisposable
 
     public const int SAMPLERATE = 11025;	// Hz
     public const SOUND_FORMAT SoundFormat = SOUND_FORMAT.PCM8;   	// 8-bit PCM
-    
+
+    /// <summary>
+    /// Constructor which takes a <paramref name="soundBankPath"/>
+    /// </summary>
+    /// <param name="soundBankPath">Path to a DLS file, used for MIDI playback.</param>
+    public SoundDriver(string soundBankPath) : this()
+    {
+        _soundBankPath = soundBankPath;
+    }
+
     public SoundDriver()
     {
         var result = Factory.System_Create(out var fmodSystem);
@@ -70,11 +82,16 @@ public class SoundDriver : ISoundDriver, IDisposable
 
     public int RegisterSong(byte[] data)
     {
+        var dlsName = _soundBankPath is null
+            ? IntPtr.Zero
+            : Marshal.StringToHGlobalAuto(_soundBankPath); // TODO Might need to use a more specific string to pointer method
+
         var soundInfo = new CREATESOUNDEXINFO
         {
             cbsize = MarshalHelper.SizeOf(typeof(CREATESOUNDEXINFO)),
             length = (uint)data.Length,
-            suggestedsoundtype = SOUND_TYPE.MIDI
+            suggestedsoundtype = SOUND_TYPE.MIDI,
+            dlsname = dlsName
         };
 
         var result = _fmodSystem.createSound(data, MODE.CREATESAMPLE | MODE.OPENMEMORY | MODE.LOOP_NORMAL, ref soundInfo, out var music);
