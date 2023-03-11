@@ -2,7 +2,7 @@
 using Android.Content.PM;
 using Android.OS;
 using DoomSharp.Core;
-using DoomSharp.Windows.Internals;
+using DoomSharp.Core.Internals;
 
 namespace DoomSharp.Maui
 {

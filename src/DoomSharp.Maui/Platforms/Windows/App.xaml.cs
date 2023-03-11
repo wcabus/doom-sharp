@@ -1,5 +1,5 @@
 ﻿using DoomSharp.Core;
-using DoomSharp.Windows.Internals;
+using DoomSharp.Core.Internals;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.UI.Xaml;
 using Window = Microsoft.UI.Xaml.Window;

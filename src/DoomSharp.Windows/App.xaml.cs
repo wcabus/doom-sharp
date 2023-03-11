@@ -1,8 +1,8 @@
 ﻿using System.Windows;
 using DoomSharp.Core;
 using DoomSharp.Core.Data;
+using DoomSharp.Core.Internals;
 using DoomSharp.Windows.Data;
-using DoomSharp.Windows.Internals;
 using DoomSharp.Windows.ViewModels;
 
 namespace DoomSharp.Windows

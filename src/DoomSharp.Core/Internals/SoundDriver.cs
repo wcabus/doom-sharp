@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using DoomSharp.Core;
-using DoomSharp.Core.Sound;
+﻿using DoomSharp.Core.Sound;
 using FMOD;
 using Channel = FMOD.Channel;
 
-namespace DoomSharp.Windows.Internals;
+namespace DoomSharp.Core.Internals;
 
 public class SoundDriver : ISoundDriver, IDisposable
 {
@@ -16,10 +12,10 @@ public class SoundDriver : ISoundDriver, IDisposable
     private ChannelGroup _soundFxChannelGroup;
     private ChannelGroup _musicChannelGroup;
 
-    private readonly Dictionary<SoundType, Sound> _sounds = new();
+    private readonly Dictionary<SoundType, FMOD.Sound> _sounds = new();
 
-    private readonly Sound?[] _loadedMusic = new Sound?[2];
-    private Sound? _currentMusic = null;
+    private readonly FMOD.Sound?[] _loadedMusic = new FMOD.Sound?[2];
+    private FMOD.Sound? _currentMusic = null;
     private Channel? _currentMusicChannel = null;
     private float _musicVolume = 1f;
     
@@ -90,7 +86,7 @@ public class SoundDriver : ISoundDriver, IDisposable
         return AddMusicToLoadedList(music);
     }
 
-    private int AddMusicToLoadedList(Sound music)
+    private int AddMusicToLoadedList(FMOD.Sound music)
     {
         for (var i = 0; i < _loadedMusic.Length; i++)
         {
@@ -151,7 +147,7 @@ public class SoundDriver : ISoundDriver, IDisposable
         _currentMusicChannel?.setVolume(_musicVolume);
     }
 
-    private Sound? GetCurrentMusic(int handle)
+    private FMOD.Sound? GetCurrentMusic(int handle)
     {
         if (handle < 0 || handle >= _loadedMusic.Length)
         {
@@ -185,7 +181,7 @@ public class SoundDriver : ISoundDriver, IDisposable
             }
         }
 
-        Sound sound;
+        FMOD.Sound sound;
         if (_sounds.ContainsKey(soundType))
         {
             sound = _sounds[soundType];
