@@ -41,6 +41,7 @@ The demo games are not running as they should yet, the commands seem to be out o
 You can start your own game, and probably play the entire first episode!
 
 What does not yet work:
+* Android: music (on Windows, music should work if you have the standard MIDI sound bank installed)
 * Finishing an episode and going to the next one
 * Returning from the secret level
 * The automap
