@@ -1,0 +1,17 @@
+on:
+  push:
+  
+  workflow_dispatch:
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '6.0.x'
+        
+    - uses: actions/checkout@v3
+    
+    - run: |
+        dotnet build src/DoomSharp.sln
