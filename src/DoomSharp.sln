@@ -9,12 +9,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Windows", "DoomSh
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{59C39BE7-05AF-4BE7-8A3B-6077BD17E405}"
 	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\build.yml = ..\.github\workflows\build.yml
+		..\.github\workflows\codeql.yml = ..\.github\workflows\codeql.yml
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Maui", "DoomSharp.Maui\DoomSharp.Maui.csproj", "{23FF2559-7A76-4AE0-BBBB-88C23198CB00}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoomSharp.Droid.Bindings", "DoomSharp.Droid.Bindings\DoomSharp.Droid.Bindings.csproj", "{5914DBCB-30BB-48F3-933C-523263290EA0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DoomSharp.Droid.Bindings", "DoomSharp.Droid.Bindings\DoomSharp.Droid.Bindings.csproj", "{5914DBCB-30BB-48F3-933C-523263290EA0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
