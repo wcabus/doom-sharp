@@ -13,11 +13,35 @@ public class NetworkController
         DoomGame.Instance.Game.NetGame = false;
         DoomCom.Id = Constants.DoomComId;
         DoomCom.NumPlayers = DoomCom.NumNodes = 1;
-        DoomCom.DeathMatch = 0;
+        DoomCom.DeathMatch = false;
         DoomCom.ConsolePlayer = 0;
+
+        // when multiplayer: setup netsend/netget functions
     }
 
     public void NetworkCommand()
+    {
+        if (DoomCom.Command == Command.Send)
+        {
+            NetSend();
+            return;
+        }
+
+        if (DoomCom.Command == Command.Get)
+        {
+            NetGet();
+            return;
+        }
+
+        DoomGame.Error($"Bad net cmd: {DoomCom.Command}");
+    }
+
+    private void NetSend()
+    {
+
+    }
+
+    private void NetGet()
     {
 
     }

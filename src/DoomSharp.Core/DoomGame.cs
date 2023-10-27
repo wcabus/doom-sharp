@@ -1180,13 +1180,14 @@ public class DoomGame : IDisposable
     public int GetTime()
     {
         var timeSinceEpoch = DateTime.UtcNow - DateTime.UnixEpoch;
-        var secondsSinceEpoch = (int)timeSinceEpoch.TotalSeconds;
+        var secondsSinceEpoch = (long)timeSinceEpoch.TotalSeconds;
         if (_baseTime == 0)
         {
             _baseTime = secondsSinceEpoch;
         }
 
-        return (int)((secondsSinceEpoch - _baseTime) * Constants.TicRate + timeSinceEpoch.Milliseconds * Constants.TicRate / 1000f);
+        return (int)(((secondsSinceEpoch - _baseTime) * Constants.TicRate)
+                     + (timeSinceEpoch.Milliseconds * Constants.TicRate / 1000));
     }
 
     public void StartTitle()
