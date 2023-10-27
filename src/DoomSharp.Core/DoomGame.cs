@@ -525,8 +525,8 @@ public class DoomGame : IDisposable
         var availableTics = lowTic - (_game.GameTic / TicDup);
 
         // decide how many tics to run
-        var counts = 0;
-        if (realTics < availableTics - 1)
+        int counts;
+        if (realTics < (availableTics - 1))
         {
             counts = realTics + 1;
         }
@@ -612,8 +612,9 @@ public class DoomGame : IDisposable
         }
 
         // run the count * ticdup tics
-        while (counts-- > 0)
+        while (counts > 0)
         {
+            counts--;
             for (var i = 0; i < TicDup; i++)
             {
                 if ((_game.GameTic / TicDup) > lowTic)
@@ -631,7 +632,7 @@ public class DoomGame : IDisposable
                 _game.GameTic++;
 
                 // modify command for duplicated tics
-                if (i != TicDup - 1)
+                if (i != (TicDup - 1))
                 {
                     var buf = (_game.GameTic / TicDup) % Constants.BackupTics;
                     for (var j = 0; j < Constants.MaxPlayers; j++)
@@ -683,7 +684,7 @@ public class DoomGame : IDisposable
         {
             _graphics.StartTic();
             ProcessEvents();
-            if (MakeTic - gameTicDiv >= ((Constants.BackupTics / 2) - 1))
+            if ((MakeTic - gameTicDiv) >= ((Constants.BackupTics / 2) - 1))
             {
                 break;          // can't hold any more
             }
@@ -718,7 +719,7 @@ public class DoomGame : IDisposable
 
             for (var j = 0; j < netBuffer.NumTics; j++)
             {
-                netBuffer.Commands[j] =  _localCommands[(realStart+ j) % Constants.BackupTics];
+                netBuffer.Commands[j] = _localCommands[(realStart + j) % Constants.BackupTics];
             }
 
             if (_remoteResend[i])

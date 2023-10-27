@@ -46,7 +46,7 @@ public class IntermissionController
     private readonly Patch?[] _yah = new Patch?[2];
     private Patch? _splat;
     private Patch? _wiminus;
-    private Patch?[] _num = new Patch[10];
+    private Patch?[] _num = new Patch?[10];
     private Patch? _percent;
     private Patch? _finished;
     private Patch? _entering;
@@ -64,8 +64,8 @@ public class IntermissionController
     private Patch? _total;
     private Patch? _star;
     private Patch? _bstar;
-    private readonly Patch?[] _p = new Patch[Constants.MaxPlayers];
-    private readonly Patch?[] _bp = new Patch[Constants.MaxPlayers];
+    private readonly Patch?[] _p = new Patch?[Constants.MaxPlayers];
+    private readonly Patch?[] _bp = new Patch?[Constants.MaxPlayers];
 
 
     private enum AnimationType
@@ -402,7 +402,7 @@ public class IntermissionController
 
         // background
         _background = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Cache)!);
-        DoomGame.Instance.Video.DrawPatch(0, 0, 1, _background);
+        DoomGame.Instance.Video.DrawPatch(0, 0, 1, _background.Value);
 
         // UNUSED unsigned char *pic = screens[1];
         // if (gamemode == commercial)
@@ -902,7 +902,7 @@ public class IntermissionController
     private void DrawStats()
     {
         // line height
-        var lh = (3 * (_num[0]!.Height)) / 2;
+        var lh = (3 * (_num[0].Value.Height)) / 2;
 
         SlamBackground();
 
@@ -911,21 +911,21 @@ public class IntermissionController
 
         DrawLevelFinished();
 
-        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY, FB, _kills!);
+        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY, FB, _kills.Value);
         DrawPercent(Constants.ScreenWidth - SP_STATSX, SP_STATSY, _cntKills[0]);
 
-        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY + lh, FB, _items!);
+        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY + lh, FB, _items.Value);
         DrawPercent(Constants.ScreenWidth - SP_STATSX, SP_STATSY + lh, _cntItems[0]);
 
-        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY + 2 * lh, FB, _spSecret!);
+        DoomGame.Instance.Video.DrawPatch(SP_STATSX, SP_STATSY + 2 * lh, FB, _spSecret.Value);
         DrawPercent(Constants.ScreenWidth - SP_STATSX, SP_STATSY + 2 * lh, _cntSecret[0]);
 
-        DoomGame.Instance.Video.DrawPatch(SP_TIMEX, SP_TIMEY, FB, _time!);
+        DoomGame.Instance.Video.DrawPatch(SP_TIMEX, SP_TIMEY, FB, _time.Value);
         DrawTime(Constants.ScreenWidth / 2 - SP_TIMEX, SP_TIMEY, _cntTime);
 
         if (_wbs.Episode < 3)
         {
-            DoomGame.Instance.Video.DrawPatch(Constants.ScreenWidth / 2 + SP_TIMEX, SP_TIMEY, FB, _par!);
+            DoomGame.Instance.Video.DrawPatch(Constants.ScreenWidth / 2 + SP_TIMEX, SP_TIMEY, FB, _par.Value);
             DrawTime(Constants.ScreenWidth - SP_TIMEX, SP_TIMEY, _cntPar);
         }
     }
@@ -971,7 +971,7 @@ public class IntermissionController
 
         // draw Finished!
         y += 5 * _levelNames[_wbs.Last].Height / 4;
-        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _finished!.Width) / 2, y, FB, _finished);
+        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _finished.Value.Width) / 2, y, FB, _finished.Value);
     }
 
     /// <summary>
@@ -982,24 +982,24 @@ public class IntermissionController
         var y = WI_TITLEY;
 
         // draw "Entering"
-        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _entering!.Width) / 2, y, FB, _entering);
+        DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _entering.Value.Width) / 2, y, FB, _entering.Value);
 
         // draw level name
         y += 5 * _levelNames[_wbs.Next].Height / 4;
         DoomGame.Instance.Video.DrawPatch((Constants.ScreenWidth - _levelNames[_wbs.Next].Width) / 2, y, FB, _levelNames[_wbs.Next]);
     }
 
-    private void DrawOnLevelNode(int level, IList<Patch> patches)
+    private void DrawOnLevelNode(int level, IList<Patch?> patches)
     {
         var i = 0;
         var fits = false;
 
         do
         {
-            var left = LevelNodes[_wbs.Episode][level].X - patches[i].LeftOffset;
-            var top = LevelNodes[_wbs.Episode][level].Y - patches[i].TopOffset;
-            var right = left + patches[i].Width;
-            var bottom = top + patches[i].Height;
+            var left = LevelNodes[_wbs.Episode][level].X - patches[i].Value.LeftOffset;
+            var top = LevelNodes[_wbs.Episode][level].Y - patches[i].Value.TopOffset;
+            var right = left + patches[i].Value.Width;
+            var bottom = top + patches[i].Value.Height;
 
             if (left >= 0
                 && right < Constants.ScreenWidth
@@ -1020,7 +1020,7 @@ public class IntermissionController
                 LevelNodes[_wbs.Episode][level].X,
                 LevelNodes[_wbs.Episode][level].Y,
                 FB,
-                patches[i]);
+                patches[i].Value);
         }
         else
         {
@@ -1035,7 +1035,7 @@ public class IntermissionController
             return;
         }
 
-        DoomGame.Instance.Video.DrawPatch(x, y, FB, _percent!);
+        DoomGame.Instance.Video.DrawPatch(x, y, FB, _percent.Value);
         DrawNum(x, y, p, -1);
     }
 
@@ -1047,7 +1047,7 @@ public class IntermissionController
     /// </summary>
     private int DrawNum(int x, int y, int n, int digits)
     {
-        var fontWidth = _num[0]!.Width;
+        var fontWidth = _num[0].Value.Width;
 
         if (digits < 0)
         {
@@ -1086,14 +1086,14 @@ public class IntermissionController
         while (digits-- != 0)
         {
             x -= fontWidth;
-            DoomGame.Instance.Video.DrawPatch(x, y, FB, _num[n % 10]!);
+            DoomGame.Instance.Video.DrawPatch(x, y, FB, _num[n % 10].Value);
             n /= 10;
         }
 
         // draw a minus sign if necessary
         if (neg)
         {
-            DoomGame.Instance.Video.DrawPatch(x -= 8, y, FB, _wiminus!);
+            DoomGame.Instance.Video.DrawPatch(x -= 8, y, FB, _wiminus.Value);
         }
 
         return x;
@@ -1117,13 +1117,13 @@ public class IntermissionController
             do
             {
                 var n = (t / div) % 60;
-                x = DrawNum(x, y, n, 2) - _colon!.Width;
+                x = DrawNum(x, y, n, 2) - _colon.Value.Width;
                 div *= 60;
 
                 // draw
                 if (div == 60 || (t / div) != 0)
                 {
-                    DoomGame.Instance.Video.DrawPatch(x, y, FB, _colon);
+                    DoomGame.Instance.Video.DrawPatch(x, y, FB, _colon.Value);
                 }
 
             } while (t / div != 0);
@@ -1131,7 +1131,7 @@ public class IntermissionController
         else
         {
             // "sucks"
-            DoomGame.Instance.Video.DrawPatch(x - _sucks!.Width, y, FB, _sucks);
+            DoomGame.Instance.Video.DrawPatch(x - _sucks.Value.Width, y, FB, _sucks.Value);
         }
     }
 
