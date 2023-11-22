@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Compile Remove="Behaviors\KeyboardBehavior.Windows.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="Assets\action.png" />
+    <None Remove="Assets\dotnet_bot.svg" />
+    <None Remove="Assets\down.png" />
+    <None Remove="Assets\left.png" />
+    <None Remove="Assets\right.png" />
+    <None Remove="Assets\start.png" />
+    <None Remove="Assets\up.png" />
+    <None Remove="Assets\use.png" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="Behaviors\KeyboardBehavior.Windows.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Controls.Skia" Version="11.0.0.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="$(AvaloniaVersion)" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DoomSharp.Core\DoomSharp.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Update="Assets\dotnet_bot.svg">
+      <BaseSize>168,208</BaseSize>
+    </AvaloniaResource>
+  </ItemGroup>
+</Project>

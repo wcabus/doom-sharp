@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:DoomSharp.Avalonia.ViewModels"
+             xmlns:gameControls="clr-namespace:DoomSharp.Avalonia.Controls"
+             xmlns:controls="clr-namespace:Avalonia.Controls.Skia;assembly=Avalonia.Controls.Skia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="DoomSharp.Avalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+	<Grid ColumnDefinitions="200,* , 120" Margin="24">
+		<controls:SKCanvasControl Name="GameSurface"
+                               Grid.Column="1" HorizontalAlignment="Stretch" Draw="GameSurface_OnDraw"
+                               VerticalAlignment="Stretch" />
+
+		<Grid ColumnDefinitions="1*, 1*"
+              Height="200"
+              HorizontalAlignment="Left"
+              RowDefinitions="1*, 1*"
+		  VerticalAlignment="Bottom"
+              Width="200">
+			<gameControls:GameControl Key="24"
+                                      Grid.ColumnSpan="2"
+								  HorizontalAlignment="Center"
+                                      Source="/Assets/up.png" />
+
+			<gameControls:GameControl Key="26"
+                                      Grid.Row="1"
+                                      Grid.ColumnSpan="2"
+								  HorizontalAlignment="Center"
+                                      Source="/Assets/down.png" />
+
+			<gameControls:GameControl Key="23"
+                                      Grid.RowSpan="2"
+                                      Source="/Assets/left.png"
+								  VerticalAlignment="Center" />
+
+			<gameControls:GameControl Key="25"
+                                      Grid.RowSpan="2"
+                                      Grid.Column="1"
+                                      Source="/Assets/right.png"
+								  VerticalAlignment="Center" />
+		</Grid>
+
+		<StackPanel Grid.Column="2"
+                     Spacing="16"
+                     VerticalAlignment="Bottom">
+			<gameControls:GameControl Key="Return"
+                                      Margin="0,0,12,0"
+                                      Stretch="Uniform"
+                                      Source="/Assets/start.png" />
+
+			<gameControls:GameControl Key="13"
+                                      Margin="0,0,12,0"
+                                      Stretch="Uniform"
+                                      Source="/Assets/use.png" />
+
+			<gameControls:GameControl Key="18"
+                                      Margin="0,0,12,0"
+                                      Stretch="Uniform"
+                                      Source="/Assets/action.png" />
+		</StackPanel>
+
+	</Grid>
+</UserControl>
