@@ -8,6 +8,7 @@ using SkiaSharp;
 using System.Threading.Tasks;
 using Avalonia.Controls.Skia;
 using Avalonia.Platform.Storage;
+using Avalonia.Platform;
 
 namespace DoomSharp.Avalonia.Views
 {
@@ -64,47 +65,47 @@ namespace DoomSharp.Avalonia.Views
         {
             (GameMode, string) version = new();
 
-            var topLevel = TopLevel.GetTopLevel(this);
-            var storage = topLevel.StorageProvider;
+            //var topLevel = TopLevel.GetTopLevel(this);
+            //var storage = topLevel.StorageProvider;
 
             // Shareware
-
-            IStorageFile? wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://C:\\Projects\\DoomSharp\\doom-sharp\\src\\DoomSharp.Avalonia\\DoomSharp.Avalonia\\Assets\\DOOM1.WAD"));
-            if (wadFile != null)
-            {
+            await using var wadFile = AssetLoader.Open(new Uri("avares://DoomSharp.Avalonia/Assets/DOOM1.WAD"));
+            //IStorageFile? wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOM1.WAD"));
+            //if (wadFile != null)
+            //{
                 version.Item1 = GameMode.Shareware;
-                version.Item2 = "C:\\Projects\\DoomSharp\\doom-sharp\\src\\DoomSharp.Avalonia\\DoomSharp.Avalonia\\Assets\\DOOM1.WAD";
+                version.Item2 = "DOOM1.WAD";
                 return version;
-            }
+            //}
 
-            // Commercial
-            wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOM2.WAD"));
-            if (wadFile != null)
-            {
-                version.Item1 = GameMode.Shareware;
-                version.Item2 = "file://DOOM2.WAD";
-                return version;
-            }
+            //// Commercial
+            //wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOM2.WAD"));
+            //if (wadFile != null)
+            //{
+            //    version.Item1 = GameMode.Shareware;
+            //    version.Item2 = "file://DOOM2.WAD";
+            //    return version;
+            //}
            
-            // Retail
-            wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOMU.WAD"));
-            if (wadFile != null)
-            {
-                version.Item1 = GameMode.Shareware;
-                version.Item2 = "file://DOOMU.WAD";
-                return version;
-            }
+            //// Retail
+            //wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOMU.WAD"));
+            //if (wadFile != null)
+            //{
+            //    version.Item1 = GameMode.Shareware;
+            //    version.Item2 = "file://DOOMU.WAD";
+            //    return version;
+            //}
 
-            // Registered
-            wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOM.WAD"));
-            if (wadFile != null)
-            {
-                version.Item1 = GameMode.Shareware;
-                version.Item2 = "file://DOOM.WAD";
-                return version;
-            }
+            //// Registered
+            //wadFile = await storage.TryGetFileFromPathAsync(new Uri("file://DOOM.WAD"));
+            //if (wadFile != null)
+            //{
+            //    version.Item1 = GameMode.Shareware;
+            //    version.Item2 = "file://DOOM.WAD";
+            //    return version;
+            //}
 
-            return version;
+            //return version;
         }
 
         private void KeyboardBehavior_OnKeyDown(object? sender, KeyDownEventArgs e)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Platform;
 using DoomSharp.Core;
 using DoomSharp.Core.Abstractions;
 using DoomSharp.Core.Data;
@@ -11,9 +12,9 @@ namespace DoomSharp.Avalonia.Data
 {
     internal sealed class WadStreamProvider : IWadStreamProvider
     {
-        public Task<WadFile> LoadFromFile(string file)
+        public Task<WadFile?> LoadFromFile(string file)
         {
-            var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
+            var fs = AssetLoader.Open(new Uri($"avares://DoomSharp.Avalonia/Assets/{file}"));
             var br = new BinaryReader(fs, Encoding.ASCII, false);
 
             if (string.Equals(Path.GetExtension(file), ".wad", StringComparison.OrdinalIgnoreCase))
