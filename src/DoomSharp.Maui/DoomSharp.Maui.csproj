@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net7.0-android;net7.0-ios;net7.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
+		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net6.0-tizen</TargetFrameworks> -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
 		<OutputType>Exe</OutputType>
 		<RootNamespace>DoomSharp.Maui</RootNamespace>
 		<UseMaui>true</UseMaui>
@@ -33,13 +33,13 @@
 	</PropertyGroup>
 
 	<!-- Android -->
-	<ItemGroup Condition="$(TargetFramework.StartsWith('net7.0-android')) != true">
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net8.0-android')) != true">
 		<Compile Remove="**\**\*.Android.cs" />
 		<None Include="**\**\*.Android.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
 	</ItemGroup>
 
 	<!-- iOS and Mac Catalyst -->
-	<ItemGroup Condition="$(TargetFramework.StartsWith('net7.0-ios')) != true AND $(TargetFramework.StartsWith('net7.0-maccatalyst')) != true">
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net8.0-ios')) != true AND $(TargetFramework.StartsWith('net8.0-maccatalyst')) != true">
 		<Compile Remove="**\**\*.MaciOS.cs" />
 		<None Include="**\**\*.MaciOS.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
 	</ItemGroup>
@@ -69,6 +69,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+      <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.3" />
 	  <PackageReference Include="SkiaSharp" Version="2.88.6" />
 	  <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="2.88.6" />
 	</ItemGroup>
@@ -77,7 +78,7 @@
 	  <ProjectReference Include="..\DoomSharp.Core\DoomSharp.Core.csproj" />
 	</ItemGroup>
 
-	<ItemGroup Condition="$(TargetFramework.StartsWith('net7.0-android'))">
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net8.0-android'))">
 		<ProjectReference Include="..\DoomSharp.Droid.Bindings\DoomSharp.Droid.Bindings.csproj" />
 	</ItemGroup>
 

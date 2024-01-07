@@ -1,6 +1,6 @@
 # DooM#
 
-This is a vanilla port of the [DooM source code](https://github.com/id-Software/DOOM/tree/master/linuxdoom-1.10) to C#, currently targeting .NET 7. 
+This is a vanilla port of the [DooM source code](https://github.com/id-Software/DOOM/tree/master/linuxdoom-1.10) to C#, currently targeting .NET 8. 
 
 
 We currently support two platforms:
@@ -9,7 +9,7 @@ We currently support two platforms:
 
 ## Getting started
 
-* Make sure you have the .NET 7 SDK installed: https://dotnet.microsoft.com/en-us/download .
+* Make sure you have the .NET 8 SDK installed: https://dotnet.microsoft.com/en-us/download .
 
 * Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads), there's a free community edition available, or use [VS Code](https://code.visualstudio.com/) if you want a lightweight editor. You can also check out [Rider](https://www.jetbrains.com/rider) from JetBrains if you're more familiar with IntelliJ.
 
