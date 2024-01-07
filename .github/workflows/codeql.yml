@@ -46,6 +46,11 @@ jobs:
       with:
         dotnet-version: '8.x'
 
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21.x'
+        distribution: 'microsoft'
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2

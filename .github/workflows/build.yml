@@ -10,7 +10,12 @@ jobs:
     - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.x'
-        
+
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21.x'
+        distribution: 'microsoft'
+
     - uses: actions/checkout@v3
     
     - run: |
