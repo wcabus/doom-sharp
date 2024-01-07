@@ -26,7 +26,7 @@ public class DoomCommunication
     // Flag: 1 = send a backup tic in every packet.
     public short ExtraTics { get; set; }
     // Flag: 1 = deathmatch.
-    public short DeathMatch { get; set; }
+    public bool DeathMatch { get; set; }
     // Flag: -1 = new game, 0-5 = load savegame
     public short SaveGame { get; set; }
     public short Episode { get; set; }	// 1-3

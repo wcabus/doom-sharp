@@ -532,11 +532,11 @@ public class StatusBar
             return;
         }
 
-        DoomGame.Instance.Video.DrawPatch(X, 0, BG, _statusBar!);
+        DoomGame.Instance.Video.DrawPatch(X, 0, BG, _statusBar.Value);
 
         if (DoomGame.Instance.Game.NetGame)
         {
-            DoomGame.Instance.Video.DrawPatch(ST_FX, 0, BG, _faceBackground!);
+            DoomGame.Instance.Video.DrawPatch(ST_FX, 0, BG, _faceBackground.Value);
         }
 
         DoomGame.Instance.Video.CopyRectangle(X, 0, BG, Width, Height, X, Y, FG);
@@ -563,14 +563,14 @@ public class StatusBar
             _tallNum!,
             () => _player.Health,
             () => _statusBarOn,
-            _tallPercent!
+            _tallPercent.Value
         );
         
         // arms background
         _armsBackgroundWidget = new BinaryIconWidget(
             ST_ARMSBGX,
             ST_ARMSBGY,
-            _armsBackground!,
+            _armsBackground.Value,
             () => _notDeathMatch,
             () => _statusBarOn);
 
@@ -581,7 +581,7 @@ public class StatusBar
             _armsWidgets[i] = new MultiIconWidget(
                 ST_ARMSX + (i % 3) * ST_ARMSXSPACE,
                 ST_ARMSY + (i / 3) * ST_ARMSYSPACE,
-                _arms[i]!,
+                _arms[i],
                 () => _player.WeaponOwned[weaponIdx + 1] ? 1 : 0,
                 () => _armsOn);
         }
@@ -610,7 +610,7 @@ public class StatusBar
             _tallNum!,
             () => _player.ArmorPoints,
             () => _statusBarOn, 
-            _tallPercent!);
+            _tallPercent.Value);
 
         // keyboxes 0-2
         _keyBoxWidgets[0] = new MultiIconWidget(
@@ -1026,7 +1026,7 @@ public class StatusBar
 
     private class NumberWidget : Widget
     {
-        public NumberWidget(int x, int y, Patch[] digits, Func<int> numFunc, Func<bool> onFunc, int width) 
+        public NumberWidget(int x, int y, Patch?[] digits, Func<int> numFunc, Func<bool> onFunc, int width) 
             : base(x, y, onFunc)
         {
             Digits = digits;
@@ -1044,15 +1044,15 @@ public class StatusBar
         public Func<int> NumFunc { get; set; }
 
         // list of patches for 0-9
-        public Patch[] Digits { get; }
+        public Patch?[] Digits { get; }
 
         protected override void Draw(bool refresh)
         {
             var numdigits = Width;
             var num = NumFunc();
 
-            var w = Digits[0].Width;
-            var h = Digits[0].Height;
+            var w = Digits[0].Value.Width;
+            var h = Digits[0].Value.Height;
 
             OldNum = NumFunc();
 
@@ -1094,28 +1094,28 @@ public class StatusBar
             // in the special case of 0, you draw 0
             if (num == 0)
             {
-                DoomGame.Instance.Video.DrawPatch(x - w, Y, FG, Digits[0]);
+                DoomGame.Instance.Video.DrawPatch(x - w, Y, FG, Digits[0].Value);
             }
 
             // draw the new number
             while (num != 0 && numdigits-- != 0)
             {
                 x -= w;
-                DoomGame.Instance.Video.DrawPatch(x, Y, FG, Digits[num % 10]);
+                DoomGame.Instance.Video.DrawPatch(x, Y, FG, Digits[num % 10].Value);
                 num /= 10;
             }
 
             // draw a minus sign if necessary
             if (neg)
             {
-                DoomGame.Instance.Video.DrawPatch(x - 8, Y, FG, DoomGame.Instance.StatusBar._minus!);
+                DoomGame.Instance.Video.DrawPatch(x - 8, Y, FG, DoomGame.Instance.StatusBar._minus.Value);
             }
         }
     }
 
     private class PercentWidget : NumberWidget
     {
-        public PercentWidget(int x, int y, Patch[] digits, Func<int> numFunc, Func<bool> onFunc, Patch percentSign) : base(x, y, digits, numFunc, onFunc, 3)
+        public PercentWidget(int x, int y, Patch?[] digits, Func<int> numFunc, Func<bool> onFunc, Patch percentSign) : base(x, y, digits, numFunc, onFunc, 3)
         {
             PercentSign = percentSign;
         }
@@ -1126,7 +1126,7 @@ public class StatusBar
         {
             if (refresh && OnFunc())
             {
-                DoomGame.Instance.Video.DrawPatch(X, Y, FG, PercentSign!);
+                DoomGame.Instance.Video.DrawPatch(X, Y, FG, PercentSign.Value);
             }
 
             base.Update(refresh);
@@ -1135,7 +1135,7 @@ public class StatusBar
 
     private class MultiIconWidget : Widget
     {
-        public MultiIconWidget(int x, int y, Patch[] icons, Func<int> iconNumberFunc, Func<bool> onFunc)
+        public MultiIconWidget(int x, int y, Patch?[] icons, Func<int> iconNumberFunc, Func<bool> onFunc)
             : base(x, y, onFunc)
         {
             Icons = icons;
@@ -1149,7 +1149,7 @@ public class StatusBar
         public Func<int> IconNumberFunc { get; }
 
         // list of icons
-        public Patch[]? Icons { get; }
+        public Patch?[] Icons { get; }
 
         public override void Update(bool refresh)
         {
@@ -1165,10 +1165,10 @@ public class StatusBar
         {
             if (OldIconNumber != -1)
             {
-                var x = X - Icons![OldIconNumber].LeftOffset;
-                var y = Y - Icons[OldIconNumber].TopOffset;
-                var w = Icons[OldIconNumber].Width;
-                var h = Icons[OldIconNumber].Height;
+                var x = X - Icons![OldIconNumber].Value.LeftOffset;
+                var y = Y - Icons[OldIconNumber].Value.TopOffset;
+                var w = Icons[OldIconNumber].Value.Width;
+                var h = Icons[OldIconNumber].Value.Height;
 
                 if (y - StatusBar.Y < 0)
                 {
@@ -1179,7 +1179,7 @@ public class StatusBar
                 DoomGame.Instance.Video.CopyRectangle(x, y - StatusBar.Y, BG, w, h, x, y, FG);
             }
 
-            DoomGame.Instance.Video.DrawPatch(X, Y, FG, Icons![IconNumberFunc()]);
+            DoomGame.Instance.Video.DrawPatch(X, Y, FG, Icons![IconNumberFunc()].Value);
             OldIconNumber = IconNumberFunc();
         }
     }
@@ -1213,10 +1213,10 @@ public class StatusBar
 
         protected override void Draw(bool refresh)
         {
-            var x = X - Icon!.LeftOffset;
-            var y = Y - Icon.TopOffset;
-            var w = Icon.Width;
-            var h = Icon.Height;
+            var x = X - Icon.Value.LeftOffset;
+            var y = Y - Icon.Value.TopOffset;
+            var w = Icon.Value.Width;
+            var h = Icon.Value.Height;
 
             if (y - StatusBar.Y < 0)
             {
@@ -1226,7 +1226,7 @@ public class StatusBar
 
             if (ValueFunc())
             {
-                DoomGame.Instance.Video.DrawPatch(X, Y, FG, Icon);
+                DoomGame.Instance.Video.DrawPatch(X, Y, FG, Icon.Value);
             }
             else
             {

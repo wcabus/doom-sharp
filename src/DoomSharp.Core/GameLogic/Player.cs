@@ -212,7 +212,7 @@ public class Player
         // Strength counts up to diminish fade.
         if (Powers[(int)PowerUpType.Strength] > 0)
         {
-            Powers[(int)PowerUpType.Strength]--;
+            Powers[(int)PowerUpType.Strength]++;
         }
 
         if (Powers[(int)PowerUpType.Invulnerability] > 0)

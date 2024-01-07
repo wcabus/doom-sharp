@@ -7,7 +7,7 @@
 /// and we compose textures from the TEXTURE1/2 lists
 /// of patches.
 /// </summary>
-public record Patch(ushort Width, ushort Height, short LeftOffset, short TopOffset, uint[] ColumnOffsets, Column?[] Columns)
+public record struct Patch(ushort Width, ushort Height, short LeftOffset, short TopOffset, uint[] ColumnOffsets, Column?[] Columns)
 {
     public static Patch FromBytes(byte[] patchData)
     {
