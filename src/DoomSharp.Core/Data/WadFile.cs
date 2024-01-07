@@ -2,7 +2,7 @@
 
 namespace DoomSharp.Core.Data;
 
-public class WadFile : IDisposable
+public class WadFile(BinaryReader reader) : IDisposable
 {
     public struct WadInfo
     {
@@ -87,25 +87,18 @@ public class WadFile : IDisposable
         return wadFile;
     }
 
-    private readonly BinaryReader _reader;
-
-    public WadFile(BinaryReader reader)
-    {
-        _reader = reader;
-    }
-
     public WadInfo Header { get; init; }
     public ICollection<WadLump> Lumps { get; set; } = Array.Empty<WadLump>();
     public int LumpCount => Header.NumLumps;
 
     public void Dispose()
     {
-        _reader.Dispose();
+        reader.Dispose();
     }
 
     public void ReadLumpData(WadLump destination)
     {
-        _reader.BaseStream.Seek(destination.Lump.FilePos, SeekOrigin.Begin);
-        destination.Data = _reader.ReadBytes(destination.Lump.Size);
+        reader.BaseStream.Seek(destination.Lump.FilePos, SeekOrigin.Begin);
+        destination.Data = reader.ReadBytes(destination.Lump.Size);
     }
 }

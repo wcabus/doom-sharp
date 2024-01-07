@@ -5,7 +5,7 @@ namespace DoomSharp.Core.Data;
 public class WadFileCollection : List<WadLump>, IDisposable
 {
     private readonly List<WadFile> _wadFiles = new();
-    private static IWadStreamProvider _wadStreamProvider;
+    private static IWadStreamProvider? _wadStreamProvider;
 
     public static void Init(IWadStreamProvider wadStreamProvider)
     {
@@ -27,7 +27,7 @@ public class WadFileCollection : List<WadLump>, IDisposable
     /// <param name="files"></param>
     public static async Task<WadFileCollection> InitializeMultipleFiles(IEnumerable<string> files)
     {
-        if (_wadStreamProvider == null)
+        if (_wadStreamProvider is null)
         {
             throw new InvalidOperationException("WadStreamProvider is not initialized");
         } 
@@ -37,7 +37,7 @@ public class WadFileCollection : List<WadLump>, IDisposable
         foreach (var file in files)
         {
             var wadFile = await _wadStreamProvider.LoadFromFile(file).ConfigureAwait(false);
-            if (wadFile != null)
+            if (wadFile is not null)
             {
                 collection._wadFiles.Add(wadFile);
                 collection.AddRange(wadFile.Lumps);
@@ -52,12 +52,12 @@ public class WadFileCollection : List<WadLump>, IDisposable
         return collection;
     }
 
-    public byte[]? GetLumpName(string name, PurgeTag tag)
+    public ReadOnlyMemory<byte>? GetLumpName(string name, PurgeTag tag)
     {
         return GetLumpNum(GetNumForName(name), tag);
     }
 
-    public byte[]? GetLumpNum(int lump, PurgeTag tag)
+    public ReadOnlyMemory<byte>? GetLumpNum(int lump, PurgeTag tag)
     {
         if (lump < 0)
         {
@@ -69,7 +69,7 @@ public class WadFileCollection : List<WadLump>, IDisposable
             DoomGame.Error($"W_CacheLumpNum: {lump} >= numlumps");
         }
 
-        if (this[lump].Data == null)
+        if (this[lump].Data is null)
         {
             // read the lump in
             ReadLump(lump, this[lump]);

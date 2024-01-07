@@ -392,7 +392,7 @@ public class DoomGame : IDisposable
                 y = Renderer.ViewWindowY + 4;
             }
 
-            _video.DrawPatchDirect(Renderer.ViewWindowX + (Renderer.ScaledViewWidth - 68) / 2, y, 0, WadData.GetLumpName("M_PAUSE", PurgeTag.Cache));
+            _video.DrawPatchDirect(Renderer.ViewWindowX + (Renderer.ScaledViewWidth - 68) / 2, y, 0, WadData.GetLumpName("M_PAUSE", PurgeTag.Cache)!.Value.ToArray()); // TODO SPAN
         }
 
         // menus go directly to the screen
@@ -1279,7 +1279,7 @@ public class DoomGame : IDisposable
 
     private void PageDrawer()
     {
-        _video.DrawPatch(0, 0, 0, WadData.GetLumpName(_demoPageName, PurgeTag.Cache));
+        _video.DrawPatch(0, 0, 0, WadData.GetLumpName(_demoPageName, PurgeTag.Cache)!.Value.ToArray()); // TODO Span
     }
 
     public void PageTicker()

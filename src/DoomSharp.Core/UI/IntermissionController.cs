@@ -401,7 +401,7 @@ public class IntermissionController
         }
 
         // background
-        _background = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Cache)!);
+        _background = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Cache)!.Value);
         DoomGame.Instance.Video.DrawPatch(0, 0, 1, _background.Value);
 
         // UNUSED unsigned char *pic = screens[1];
@@ -423,7 +423,7 @@ public class IntermissionController
             for (var i = 0; i < _numCommercialMaps; i++)
             {
                 name = $"CWILV{i:00}";
-                _levelNames.Add(Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!));
+                _levelNames.Add(Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value));
             }
         }
         else
@@ -433,17 +433,17 @@ public class IntermissionController
             for (var i = 0; i < NumMaps; i++)
             {
                 name = $"WILV{_wbs.Episode}{i}";
-                _levelNames.Add(Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!));
+                _levelNames.Add(Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value));
             }
 
             // you are here
-            _yah[0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIURH0", PurgeTag.Static)!);
+            _yah[0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIURH0", PurgeTag.Static)!.Value);
 
             // you are here (alt.)
-            _yah[1] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIURH1", PurgeTag.Static)!);
+            _yah[1] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIURH1", PurgeTag.Static)!.Value);
 
             // splat
-            _splat = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISPLAT", PurgeTag.Static)!);
+            _splat = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISPLAT", PurgeTag.Static)!.Value);
 
             if (_wbs.Episode < 3)
             {
@@ -458,7 +458,7 @@ public class IntermissionController
                         if (_wbs.Episode != 1 || j != 8)
                         {
                             // animations
-                            a.Patches[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WIA{_wbs.Episode}{j:00}{i:00}", PurgeTag.Static)!);
+                            a.Patches[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WIA{_wbs.Episode}{j:00}{i:00}", PurgeTag.Static)!.Value);
                         }
                         else
                         {
@@ -471,31 +471,31 @@ public class IntermissionController
         }
 
         // More hacks on minus sign.
-        _wiminus = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIMINUS", PurgeTag.Static)!);
+        _wiminus = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIMINUS", PurgeTag.Static)!.Value);
 
         for (var i = 0; i < 10; i++)
         {
             // numbers 0-9
-            _num[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WINUM{i}", PurgeTag.Static)!);
+            _num[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WINUM{i}", PurgeTag.Static)!.Value);
         }
 
         // percent sign
-        _percent = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIPCNT", PurgeTag.Static)!);
+        _percent = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIPCNT", PurgeTag.Static)!.Value);
 
         // "finished"
-        _finished = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIF", PurgeTag.Static)!);
+        _finished = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIF", PurgeTag.Static)!.Value);
 
         // "entering"
-        _entering = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIENTER", PurgeTag.Static)!);
+        _entering = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIENTER", PurgeTag.Static)!.Value);
 
         // "kills"
-        _kills = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTK", PurgeTag.Static)!);
+        _kills = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTK", PurgeTag.Static)!.Value);
 
         // "scrt"
-        _secret = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTS", PurgeTag.Static)!);
+        _secret = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTS", PurgeTag.Static)!.Value);
 
         // "secret"
-        _spSecret = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISCRT2", PurgeTag.Static)!);
+        _spSecret = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISCRT2", PurgeTag.Static)!.Value);
 
         // Yuck. 
         //if (french)
@@ -507,45 +507,45 @@ public class IntermissionController
         //        items = W_CacheLumpName("WIOSTI", PU_STATIC);
         //}
         //else
-        _items = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTI", PurgeTag.Static)!);
+        _items = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIOSTI", PurgeTag.Static)!.Value);
 
         // "frgs"
-        _frags = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIFRGS", PurgeTag.Static)!);
+        _frags = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIFRGS", PurgeTag.Static)!.Value);
 
         // ":"
-        _colon = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WICOLON", PurgeTag.Static)!);
+        _colon = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WICOLON", PurgeTag.Static)!.Value);
 
         // "time"
-        _time = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WITIME", PurgeTag.Static)!);
+        _time = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WITIME", PurgeTag.Static)!.Value);
 
         // "sucks"
-        _sucks = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISUCKS", PurgeTag.Static)!);
+        _sucks = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WISUCKS", PurgeTag.Static)!.Value);
 
         // "par"
-        _par = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIPAR", PurgeTag.Static)!);
+        _par = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIPAR", PurgeTag.Static)!.Value);
 
         // "killers" (vertical)
-        _killers = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIKILRS", PurgeTag.Static)!);
+        _killers = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIKILRS", PurgeTag.Static)!.Value);
 
         // "victims" (horiz)
-        _victims = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIVCTMS", PurgeTag.Static)!);
+        _victims = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIVCTMS", PurgeTag.Static)!.Value);
 
         // "total"
-        _total = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIMSTT", PurgeTag.Static)!);
+        _total = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("WIMSTT", PurgeTag.Static)!.Value);
 
         // your face
-        _star = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFST01", PurgeTag.Static)!);
+        _star = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFST01", PurgeTag.Static)!.Value);
 
         // dead face
-        _bstar = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFDEAD0", PurgeTag.Static)!);
+        _bstar = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFDEAD0", PurgeTag.Static)!.Value);
 
         for (var i = 0; i < Constants.MaxPlayers; i++)
         {
             // "1,2,3,4"
-            _p[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"STPB{i}", PurgeTag.Static)!);
+            _p[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"STPB{i}", PurgeTag.Static)!.Value);
 
             // "1,2,3,4"
-            _bp[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WIBP{i+1}", PurgeTag.Static)!);
+            _bp[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName($"WIBP{i+1}", PurgeTag.Static)!.Value);
         }
     }
 

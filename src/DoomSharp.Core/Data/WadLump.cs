@@ -1,7 +1,9 @@
-﻿namespace DoomSharp.Core.Data;
+﻿using static DoomSharp.Core.Data.WadFile;
 
-public record WadLump(WadFile File, WadFile.FileLump Lump)
+namespace DoomSharp.Core.Data;
+
+public record WadLump(WadFile File, FileLump Lump)
 {
-    public byte[]? Data { get; set; }
+    public ReadOnlyMemory<byte>? Data { get; set; }
     public PurgeTag Tag { get; set; } = PurgeTag.Cache; // Default (purgeable)
 }

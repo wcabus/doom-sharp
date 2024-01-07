@@ -351,7 +351,7 @@ public class RenderEngine
 
         if (lump > 0)
         {
-            var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!;
+            var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!.Value.ToArray(); // TODO Span
             var patch = Patch.FromBytes(data);
             return patch.GetColumnByOffset(ofs) ?? new Column(0xff, 0, Array.Empty<byte>());
         }
@@ -371,7 +371,7 @@ public class RenderEngine
     private void InitTextures()
     {
         // Load the patch names from pnames.lmp.
-        var names = DoomGame.Instance.WadData.GetLumpName("PNAMES", PurgeTag.Static)!;
+        var names = DoomGame.Instance.WadData.GetLumpName("PNAMES", PurgeTag.Static)!.Value.ToArray(); // TODO Span
         var numMapPatches = DoomConvert.ToInt32(names[..4]);
         var patchLookup = new int[numMapPatches];
 
@@ -384,7 +384,7 @@ public class RenderEngine
         // Load the map texture definitions from textures.lmp.
         // The data is contained in one or two lumps,
         //  TEXTURE1 for shareware, plus TEXTURE2 for commercial.
-        var mapTex = DoomGame.Instance.WadData.GetLumpName("TEXTURE1", PurgeTag.Static)!;
+        var mapTex = DoomGame.Instance.WadData.GetLumpName("TEXTURE1", PurgeTag.Static)!.Value.ToArray(); // TODO Span
         var numTextures1 = DoomConvert.ToInt32(mapTex[..4]);
 
         var maxOff = DoomGame.Instance.WadData.LumpLength(DoomGame.Instance.WadData.GetNumForName("TEXTURE1"));
@@ -395,7 +395,7 @@ public class RenderEngine
         var maxOff2 = 0;
         if (DoomGame.Instance.WadData.CheckNumForName("TEXTURE2") != -1)
         {
-            mapTex2 = DoomGame.Instance.WadData.GetLumpName("TEXTURE2", PurgeTag.Static)!;
+            mapTex2 = DoomGame.Instance.WadData.GetLumpName("TEXTURE2", PurgeTag.Static)!.Value.ToArray(); // TODO Span
             numTextures2 = DoomConvert.ToInt32(mapTex2[..4]);
             maxOff2 = DoomGame.Instance.WadData.LumpLength(DoomGame.Instance.WadData.GetNumForName("TEXTURE2"));
         }
@@ -555,7 +555,7 @@ public class RenderEngine
         for (var i = 0; i < texture.PatchCount; i++)
         {
             var patch = texture.Patches[i];
-            var realPatch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(patch.Patch, PurgeTag.Cache)!);
+            var realPatch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(patch.Patch, PurgeTag.Cache)!.Value);
             var x1 = patch.OriginX;
             var x2 = x1 + realPatch.Width;
 
@@ -605,7 +605,7 @@ public class RenderEngine
         for (var i = 0; i < texture.PatchCount; i++)
         {
             var patch = texture.Patches[i];
-            var realPatch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(patch.Patch, PurgeTag.Cache)!);
+            var realPatch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(patch.Patch, PurgeTag.Cache)!.Value);
             var x1 = patch.OriginX;
             var x2 = x1 + realPatch.Width;
 
@@ -689,7 +689,7 @@ public class RenderEngine
                 DoomGame.Console.Write(".");
             }
 
-            var patchData = DoomGame.Instance.WadData.GetLumpNum(_firstSpriteLump + i, PurgeTag.Cache);
+            var patchData = DoomGame.Instance.WadData.GetLumpNum(_firstSpriteLump + i, PurgeTag.Cache)!.Value.ToArray(); // TODO Span
             var patch = Patch.FromBytes(patchData!);
             _spriteWidth[i] = patch.Width;
             _spriteOffset[i] = patch.LeftOffset;
@@ -711,7 +711,7 @@ public class RenderEngine
         colormaps = (byte *)( ((int)colormaps + 255)&~0xff); 
          */
 
-        _colorMaps = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!;
+        _colorMaps = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Cache)!.Value.ToArray(); // TODO Span
     }
 
     public int FlatNumForName(string name)
@@ -1749,7 +1749,7 @@ public class RenderEngine
 
         var name = DoomGame.Instance.GameMode == GameMode.Commercial ? name2 : name1;
 
-        var src = DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Cache)!;
+        var src = DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Cache)!.Value.ToArray(); // TODO Span
         var dest = DoomGame.Instance.Video.Screens[1];
         var destIdx = 0;
 
@@ -1768,28 +1768,28 @@ public class RenderEngine
             }
         }
 
-        var patch = DoomGame.Instance.WadData.GetLumpName("brdr_t", PurgeTag.Cache)!;
+        var patch = DoomGame.Instance.WadData.GetLumpName("brdr_t", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
 
         for (var x = 0; x < ScaledViewWidth; x += 8)
         {
             DoomGame.Instance.Video.DrawPatch(ViewWindowX + x, ViewWindowY - 8, 1, patch);
         }
 
-        patch = DoomGame.Instance.WadData.GetLumpName("brdr_b", PurgeTag.Cache)!;
+        patch = DoomGame.Instance.WadData.GetLumpName("brdr_b", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
 
         for (var x = 0; x < ScaledViewWidth; x += 8)
         {
             DoomGame.Instance.Video.DrawPatch(ViewWindowX + x, ViewWindowY + ViewHeight, 1, patch);
         }
 
-        patch = DoomGame.Instance.WadData.GetLumpName("brdr_l", PurgeTag.Cache)!;
+        patch = DoomGame.Instance.WadData.GetLumpName("brdr_l", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
 
         for (var y = 0; y < ViewHeight; y += 8)
         {
             DoomGame.Instance.Video.DrawPatch(ViewWindowX - 8, ViewWindowY + y, 1, patch);
         }
 
-        patch = DoomGame.Instance.WadData.GetLumpName("brdr_r", PurgeTag.Cache)!;
+        patch = DoomGame.Instance.WadData.GetLumpName("brdr_r", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
 
         for (var y = 0; y < ViewHeight; y += 8)
         {
@@ -3570,7 +3570,7 @@ public class RenderEngine
             }
 
             // regular flat
-            _dsSource = DoomGame.Instance.WadData.GetLumpNum(_firstFlat + _flatTranslation[pl.PicNum], PurgeTag.Static)!;
+            _dsSource = DoomGame.Instance.WadData.GetLumpNum(_firstFlat + _flatTranslation[pl.PicNum], PurgeTag.Static)!.Value.ToArray(); // TODO Span
 
             _planeHeight = Fixed.Abs(pl.Height - _viewZ);
             var light = (pl.LightLevel >> LightSegShift) + _extraLight;
@@ -3796,7 +3796,7 @@ public class RenderEngine
     //
     private void DrawVisSprite(VisSprite vis, int x1, int x2)
     {
-        var patch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(vis.Patch + _firstSpriteLump, PurgeTag.Cache)!);
+        var patch = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpNum(vis.Patch + _firstSpriteLump, PurgeTag.Cache)!.Value);
 
         if (vis.Colormap != null)
         {

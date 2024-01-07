@@ -9,6 +9,11 @@
 /// </summary>
 public record struct Patch(ushort Width, ushort Height, short LeftOffset, short TopOffset, uint[] ColumnOffsets, Column?[] Columns)
 {
+    public static Patch FromBytes(ReadOnlyMemory<byte> data)
+    {
+        return FromBytes(data.ToArray()); // Todo refactor
+    }
+
     public static Patch FromBytes(byte[] patchData)
     {
         using var stream = new MemoryStream(patchData, false);

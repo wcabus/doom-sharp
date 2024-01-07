@@ -990,12 +990,12 @@ public class MenuController
         switch (DoomGame.Instance.GameMode)
         {
             case GameMode.Commercial:
-                lump = DoomGame.Instance.WadData.GetLumpName("HELP", PurgeTag.Cache);
+                lump = DoomGame.Instance.WadData.GetLumpName("HELP", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
                 break;
             case GameMode.Shareware:
             case GameMode.Registered:
             case GameMode.Retail:
-                lump = DoomGame.Instance.WadData.GetLumpName("HELP1", PurgeTag.Cache);
+                lump = DoomGame.Instance.WadData.GetLumpName("HELP1", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
                 break;
             default:
                 lump = null;
@@ -1023,11 +1023,11 @@ public class MenuController
             case GameMode.Retail:
             case GameMode.Commercial:
                 // This hack keeps us from having to change menus.
-                lump = DoomGame.Instance.WadData.GetLumpName("CREDIT", PurgeTag.Cache);
+                lump = DoomGame.Instance.WadData.GetLumpName("CREDIT", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
                 break;
             case GameMode.Shareware:
             case GameMode.Registered:
-                lump = DoomGame.Instance.WadData.GetLumpName("HELP2", PurgeTag.Cache);
+                lump = DoomGame.Instance.WadData.GetLumpName("HELP2", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
                 break;
             default:
                 lump = null;

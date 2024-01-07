@@ -7,7 +7,7 @@ namespace DoomSharp.Maui.Data
 {
     internal sealed class WadStreamProvider : IWadStreamProvider
     {
-        public async Task<WadFile> LoadFromFile(string file)
+        public async Task<WadFile?> LoadFromFile(string file)
         {
             Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(file);
             BinaryReader reader;

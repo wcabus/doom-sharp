@@ -468,7 +468,7 @@ public class SoundController
             {
                 sfx.LumpNum = DoomGame.Instance.WadData.GetNumForName("DSPISTOL"); // fix for loading sounds that don't exist
             }
-			sfx.Data = DoomGame.Instance.WadData.GetLumpNum(sfx.LumpNum, PurgeTag.Sound)!;
+			sfx.Data = DoomGame.Instance.WadData.GetLumpNum(sfx.LumpNum, PurgeTag.Sound)!.Value.ToArray(); // TODO Span
         }
 
 		// increase the usefulness
@@ -620,7 +620,7 @@ public class SoundController
 		}
 
 		// load & register it
-		var musicLumpData = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!;
+		var musicLumpData = DoomGame.Instance.WadData.GetLumpNum(music.LumpNum, Data.PurgeTag.Music)!.Value.ToArray(); // TODO Span
         music.Data = Mus2MidiConverter.TryConvert(musicLumpData, out var convertedData) ? convertedData : musicLumpData;
         music.Handle = _driver.RegisterSong(music.Data);
 

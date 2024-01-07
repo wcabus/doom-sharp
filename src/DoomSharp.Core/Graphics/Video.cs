@@ -134,7 +134,7 @@ public class Video
     public void SetPalette(string paletteName, int paletteIndex = 0)
     {
         const int bytesPerPalette = 256 * 3;
-        var paletteLump = DoomGame.Instance.WadData.GetLumpName(paletteName, PurgeTag.Cache)!;
+        var paletteLump = DoomGame.Instance.WadData.GetLumpName(paletteName, PurgeTag.Cache)!.Value.ToArray(); // TODO Span
         var palette = new byte[bytesPerPalette];
         var j = 0;
 
@@ -259,6 +259,16 @@ public class Video
         DrawPatch(x, y, screen, Patch.FromBytes(patch));
     }
 
+    public void DrawPatch(int x, int y, int screen, ReadOnlyMemory<byte>? patch)
+    {
+        if (patch is null)
+        {
+            return;
+        }
+
+        DrawPatch(x, y, screen, Patch.FromBytes(patch.Value));
+    }
+
     //
     // V_DrawPatchDirect
     // Draws directly to the screen on the pc. 
@@ -280,6 +290,16 @@ public class Video
         }
 
         DrawPatch(x, y, screen, Patch.FromBytes(patch));
+    }
+
+    public void DrawPatchDirect(int x, int y, int screen, ReadOnlyMemory<byte>? patch)
+    {
+        if (patch is null)
+        {
+            return;
+        }
+
+        DrawPatch(x, y, screen, Patch.FromBytes(patch.Value));
     }
 
     // Wiping / melting functions

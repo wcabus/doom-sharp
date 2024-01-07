@@ -4,6 +4,8 @@ using DoomSharp.Core.Networking;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Sound;
 using DoomSharp.Core.UI;
+using System;
+using System.Buffers.Binary;
 
 namespace DoomSharp.Core.GameLogic;
 
@@ -642,7 +644,8 @@ public class GameController
     {
         GameAction = GameAction.Nothing;
         _demoDataIdx = 0;
-        _demoData = DoomGame.Instance.WadData.GetLumpName(DemoName, PurgeTag.Static) ?? Array.Empty<byte>();
+        _demoData = DoomGame.Instance.WadData.GetLumpName(DemoName, PurgeTag.Static)?.ToArray() ?? Array.Empty<byte>();
+
         if (_demoData.Length == 0 || _demoData[_demoDataIdx++] != DoomGame.Version)
         {
             DoomGame.Console.WriteLine("Demo is from a different game version!");
@@ -1181,17 +1184,15 @@ public class GameController
         _vertices = new Vertex[_numVertices];
 
         // Load data into cache.
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
-        using var stream = new MemoryStream(data, false);
-        using var reader = new BinaryReader(stream);
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.Span;
 
         // Copy and convert vertex coordinates,
         // internal representation as fixed.
         for (var i = 0; i < _numVertices; i++)
         {
             _vertices[i] = new Vertex(
-                new Fixed(reader.ReadInt16() << Constants.FracBits),
-                new Fixed(reader.ReadInt16() << Constants.FracBits)
+                new Fixed(BinaryPrimitives.ReadInt16LittleEndian(data.Slice(i * 4, 2)) << Constants.FracBits),
+                new Fixed(BinaryPrimitives.ReadInt16LittleEndian(data.Slice(i * 4 + 2, 2)) << Constants.FracBits)
             );
         }
     }
@@ -1202,7 +1203,7 @@ public class GameController
         _numSegments = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapSeg;
         _segments = new Segment[_numSegments];
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -1217,7 +1218,7 @@ public class GameController
         _numSubSectors = DoomGame.Instance.WadData.LumpLength(lump) / 4; // two shorts
         _subSectors = new SubSector[_numSubSectors];
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -1233,7 +1234,7 @@ public class GameController
         _numSectors = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapSector;
         _sectors = new List<Sector>(_numSectors);
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -1249,7 +1250,7 @@ public class GameController
         _numNodes = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapNode;
         _nodes = new Node[_numNodes];
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -1261,7 +1262,7 @@ public class GameController
 
     private void P_LoadThings(int lump)
     {
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray();
         var numThings = DoomGame.Instance.WadData.LumpLength(lump) / MapThing.SizeOfStruct;
 
         using var stream = new MemoryStream(data, false);
@@ -3686,7 +3687,7 @@ public class GameController
         _numLines = DoomGame.Instance.WadData.LumpLength(lump) / sizeOfMapLineDef;
         _lines = new Line[_numLines];
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -3748,7 +3749,7 @@ public class GameController
         _numSides = DoomGame.Instance.WadData.LumpLength(lump) / mapSideDefSize;
         _sides = new SideDef[_numSides];
         
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Static)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -3760,7 +3761,7 @@ public class GameController
 
     private void P_LoadBlockMap(int lump)
     {
-        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Level)!;
+        var data = DoomGame.Instance.WadData.GetLumpNum(lump, PurgeTag.Level)!.Value.ToArray(); // TODO: Span
         using var stream = new MemoryStream(data, false);
         using var reader = new BinaryReader(stream);
 
@@ -3918,7 +3919,7 @@ public class GameController
         P_LoadNodes(lumpNum + MapLumps.Nodes);
         P_LoadSegments(lumpNum + MapLumps.Segs);
 
-        _rejectMatrix = DoomGame.Instance.WadData.GetLumpNum(lumpNum + MapLumps.Reject, PurgeTag.Level)!;
+        _rejectMatrix = DoomGame.Instance.WadData.GetLumpNum(lumpNum + MapLumps.Reject, PurgeTag.Level)!.Value.ToArray(); // TODO: Span
         P_GroupLines();
 
         _bodyQueueSlot = 0;

@@ -357,25 +357,25 @@ public class StatusBar
         for (var i = 0; i < 10; i++)
         {
             name = $"STTNUM{i}";
-            _tallNum[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _tallNum[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
 
             name = $"STYSNUM{i}";
-            _shortNum[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _shortNum[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
         }
 
         // Load percent key.
         //Note: why not load STMINUS here, too?
-        _tallPercent = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STTPRCNT", PurgeTag.Static)!);
+        _tallPercent = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STTPRCNT", PurgeTag.Static)!.Value);
 
         // key cards
         for (var i = 0; i < (int)KeyCardType.NumberOfKeyCards; i++)
         {
             name = $"STKEYS{i}";
-            _keys[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _keys[i] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
         }
 
         // arms background
-        _armsBackground = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STARMS", PurgeTag.Static)!);
+        _armsBackground = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STARMS", PurgeTag.Static)!.Value);
 
         // arms ownership widgets
         for (var i = 0; i < 6; i++)
@@ -383,7 +383,7 @@ public class StatusBar
             name = $"STGNUM{i + 2}";
 
             // gray #
-            _arms[i][0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _arms[i][0] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
 
             // yellow #
             _arms[i][1] = _shortNum[i + 2];
@@ -391,10 +391,10 @@ public class StatusBar
 
         // face backgrounds for different color players
         name = $"STGNUM{DoomGame.Instance.Game.ConsolePlayer}";
-        _faceBackground = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+        _faceBackground = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
 
         // status bar background bits
-        _statusBar = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STBAR", PurgeTag.Static)!);
+        _statusBar = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STBAR", PurgeTag.Static)!.Value);
 
         // face states
         var facenum = 0;
@@ -403,24 +403,24 @@ public class StatusBar
             for (var j = 0; j < ST_NUMSTRAIGHTFACES; j++)
             {
                 name = $"STFST{i}{j}";
-                _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+                _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
             }
 
             name = $"STFTR{i}0"; // turn right
-            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
             name = $"STFTL{i}0"; // turn left
-            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
             name = $"STFOUCH{i}"; // ouch!
-            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
             name = $"STFEVL{i}"; // evil grin ;)
-            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
             name = $"STFKILL{i}"; // pissed off
-            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!);
+            _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName(name, PurgeTag.Static)!.Value);
         }
-        _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFGOD0", PurgeTag.Static)!);
-        _faces[facenum] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFDEAD0", PurgeTag.Static)!);
+        _faces[facenum++] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFGOD0", PurgeTag.Static)!.Value);
+        _faces[facenum] = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STFDEAD0", PurgeTag.Static)!.Value);
 
-        _minus = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STTMINUS", PurgeTag.Static)!);
+        _minus = Patch.FromBytes(DoomGame.Instance.WadData.GetLumpName("STTMINUS", PurgeTag.Static)!.Value);
     }
 
     private void InitData()

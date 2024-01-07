@@ -136,7 +136,7 @@ public class HudController
         var j = (int)HuFontStart;
         for (var i = 0; i < HuFontSize; i++)
         {
-            var lump = DoomGame.Instance.WadData.GetLumpName($"STCFN{j++:000}", PurgeTag.Cache)!;
+            var lump = DoomGame.Instance.WadData.GetLumpName($"STCFN{j++:000}", PurgeTag.Cache)!.Value.ToArray(); // TODO Span
             Font[i] = Patch.FromBytes(lump);
         }
     }
