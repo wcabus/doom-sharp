@@ -29,7 +29,7 @@ namespace DoomSharp.Windows.Data
                 // TODO
             }
 
-            return null;
+            return Task.FromResult<WadFile?>(null);
         }
 
         private static WadFile? LoadWad(string file, BinaryReader reader)
