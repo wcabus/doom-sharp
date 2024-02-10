@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "DoomSharp.Windows": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOOMWADDIR": "C:\\git\\doom-sharp\\wads\\Retail",
+        "DOOMWADDIRShareware": "C:\\git\\doom-sharp\\wads\\Shareware",
+        "DOOMWADDIRRetail": "C:\\git\\doom-sharp\\wads\\Retail",
+        "DOOMWADDIRDoom2": "C:\\git\\doom-sharp\\wads\\Doom2"
+      }
+    }
+  }
+}
