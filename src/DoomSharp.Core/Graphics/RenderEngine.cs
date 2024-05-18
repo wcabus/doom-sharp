@@ -901,9 +901,9 @@ public class RenderEngine
     {
         InitData();
         DoomGame.Console.Write($"{Environment.NewLine}R_InitData");
-        // R_InitPointToAngle(); // Unused, there is a fixed table instead
+        DoomMath.InitPointToAngle();
         DoomGame.Console.Write($"{Environment.NewLine}R_InitPointToAngle");
-        // R_InitTables(); // Unused, there is a fixed table instead
+        DoomMath.InitTables();
         // viewwidth / viewheight / detailLevel are set by the defaults
         DoomGame.Console.Write($"{Environment.NewLine}R_InitTables");
 
@@ -3629,11 +3629,11 @@ public class RenderEngine
                 if (x > y)
                 {
                     // octant 0
-                    return DoomMath.TanToAngle(SlopeDiv(y, x));
+                    return DoomMath.TanToAngle[SlopeDiv(y, x)];
                 }
              
                 // octant 1
-                return new Angle(Angle.Angle90.Value - 1) - DoomMath.TanToAngle(SlopeDiv(x, y));
+                return new Angle(Angle.Angle90.Value - 1) - DoomMath.TanToAngle[SlopeDiv(x, y)];
             }
             
 
@@ -3643,11 +3643,11 @@ public class RenderEngine
             if (x > y)
             {
                 // octant 8
-                return -DoomMath.TanToAngle(SlopeDiv(y, x));
+                return -DoomMath.TanToAngle[SlopeDiv(y, x)];
             }
          
             // octant 7
-            return Angle.Angle270 + DoomMath.TanToAngle(SlopeDiv(x, y));
+            return Angle.Angle270 + DoomMath.TanToAngle[SlopeDiv(x, y)];
         }
          
         // x<0
@@ -3659,11 +3659,11 @@ public class RenderEngine
             if (x > y)
             {
                 // octant 3
-                return new Angle(Angle.Angle180.Value - 1) - DoomMath.TanToAngle(SlopeDiv(y, x));
+                return new Angle(Angle.Angle180.Value - 1) - DoomMath.TanToAngle[SlopeDiv(y, x)];
             }
 
             // octant 2
-            return Angle.Angle90 + DoomMath.TanToAngle(SlopeDiv(x, y));
+            return Angle.Angle90 + DoomMath.TanToAngle[SlopeDiv(x, y)];
         }
          
         // y<0
@@ -3672,11 +3672,11 @@ public class RenderEngine
         if (x > y)
         {
             // octant 4
-            return Angle.Angle180 + DoomMath.TanToAngle(SlopeDiv(y, x));
+            return Angle.Angle180 + DoomMath.TanToAngle[SlopeDiv(y, x)];
         }
      
         // octant 5
-        return new Angle(Angle.Angle270.Value - 1) - DoomMath.TanToAngle(SlopeDiv(x, y));
+        return new Angle(Angle.Angle270.Value - 1) - DoomMath.TanToAngle[SlopeDiv(x, y)];
     }
 
     public Angle PointToAngle2(Fixed x1, Fixed y1, Fixed x2, Fixed y2)
@@ -3697,7 +3697,7 @@ public class RenderEngine
             (dx, dy) = (dy, dx);
         }
 
-        var angle = DoomMath.TanToAngle((uint)((dy / dx).Value) >> DBits) + Angle.Angle90;
+        var angle = DoomMath.TanToAngle[(uint)((dy / dx).Value) >> DBits] + Angle.Angle90;
         
         // use as cosine
         return dx / DoomMath.Sin(angle);
@@ -3784,7 +3784,7 @@ public class RenderEngine
                 //  or (SHADOW) R_DrawFuzzColumn.
                 _colFunc();
             }
-            column = column.Next ?? new Column(0xff, 0, Array.Empty<byte>());
+            column = column.Next ?? new Column(0xff, 0, []);
         }
 
         _dcTextureMid = baseTextureMid; // Reset when done
