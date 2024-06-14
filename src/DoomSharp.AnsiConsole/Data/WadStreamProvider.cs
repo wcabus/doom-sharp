@@ -3,34 +3,21 @@ using DoomSharp.Core;
 using DoomSharp.Core.Abstractions;
 using DoomSharp.Core.Data;
 
-namespace DoomSharp.Maui.Data
+namespace DoomSharp.AnsiConsole.Data
 {
     internal sealed class WadStreamProvider : IWadStreamProvider
     {
-        public async Task<WadFile?> LoadFromFile(string file)
+        public Task<WadFile?> LoadFromFile(string file)
         {
-            Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(file);
-            BinaryReader reader;
+            var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
+            var br = new BinaryReader(fs, Encoding.ASCII, false);
 
-            //some platforms, like Android, can't seek on a stream, so we need to wrap it in a MemoryStream
-            if (fileStream.CanSeek)
-            {
-                reader = new BinaryReader(fileStream, Encoding.ASCII, false);
-            }
-            else
-            {
-                MemoryStream memoryStream = new();
-                await fileStream.CopyToAsync(memoryStream);
-                memoryStream.Position = 0;
-                reader = new BinaryReader(memoryStream, Encoding.ASCII, false);
-            }
-           
             DoomGame.Console.WriteLine($" adding {file}");
 
-            if (string.Equals(Path.GetExtension(file), ".WAD", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(Path.GetExtension(file), ".wad", StringComparison.OrdinalIgnoreCase))
             {
                 // WAD file
-                return LoadWad(file, reader);
+                return Task.FromResult(LoadWad(file, br));
             }
             else
             {
@@ -38,7 +25,7 @@ namespace DoomSharp.Maui.Data
                 // TODO
             }
 
-            return null;
+            return Task.FromResult<WadFile?>(null);
         }
 
         private static WadFile? LoadWad(string file, BinaryReader reader)
@@ -65,6 +52,7 @@ namespace DoomSharp.Maui.Data
             }
 
             var fileInfo = new List<WadLump>(wadFile.LumpCount);
+
             reader.BaseStream.Seek(wadFile.Header.InfoTableOfs, SeekOrigin.Begin);
             for (var i = 0; i < wadFile.LumpCount; i++)
             {

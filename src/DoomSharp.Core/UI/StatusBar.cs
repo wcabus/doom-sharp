@@ -1113,6 +1113,59 @@ public class StatusBar
         }
     }
 
+    private class PercentageWidget
+    {
+        public PercentageWidget(int x, int y, Patch?[] digits, ref int number, ref bool on, Patch percentSign)
+        {
+            X = x;
+            Y = y;
+            Digits = digits;
+            Number = number;
+            On = on;
+            PercentSign = percentSign;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+
+        // list of patches for 0-9
+        public Patch?[] Digits { get; }
+
+        public int Number { get; }
+        public bool On { get; }
+
+        public Patch? PercentSign { get; }
+    }
+
+    private class PercentageWidget2
+    {
+        public PercentageWidget2(int x, int y, Patch?[] digits, Reference<int> number, Reference<bool> on, Patch percentSign)
+        {
+            X = x;
+            Y = y;
+            Digits = digits;
+            Number = number;
+            On = on;
+            PercentSign = percentSign;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+
+        // list of patches for 0-9
+        public Patch?[] Digits { get; }
+
+        public Reference<int> Number { get; }
+        public Reference<bool> On { get; }
+
+        public Patch? PercentSign { get; }
+    }
+
+    private class Reference<T> where T : struct
+    {
+        public T Value { get; set; }
+    }
+
     private class PercentWidget : NumberWidget
     {
         public PercentWidget(int x, int y, Patch?[] digits, Func<int> numFunc, Func<bool> onFunc, Patch percentSign) : base(x, y, digits, numFunc, onFunc, 3)

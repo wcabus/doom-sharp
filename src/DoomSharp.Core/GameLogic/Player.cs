@@ -394,7 +394,7 @@ public class Player
         }
 
         var angle = (DoomMath.FineAngleCount / 20 * DoomGame.Instance.Game.LevelTime) & DoomMath.FineMask;
-        var bob = Bob / 2 * DoomMath.Sin(angle);
+        var bob = (Bob / 2) * DoomMath.Sin(angle);
 
         // move viewheight
         if (PlayerState == PlayerState.Alive)
