@@ -3,12 +3,10 @@ using BenchmarkDotNet.Jobs;
 
 namespace DoomSharp.Benchmarks.Runner.Workloads;
 
-[SimpleJob(RuntimeMoniker.Net60)]
-[SimpleJob(RuntimeMoniker.NativeAot60)]
-[SimpleJob(RuntimeMoniker.Net70)]
-[SimpleJob(RuntimeMoniker.NativeAot70)]
 [SimpleJob(RuntimeMoniker.Net80)]
 [SimpleJob(RuntimeMoniker.NativeAot80)]
+[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.NativeAot90)]
 [MemoryDiagnoser]
 public class ArrayClearVsNewInstance
 {
