@@ -663,7 +663,7 @@ public class Player
     public bool GiveWeapon(WeaponType weapon, bool dropped)
     {
         var game = DoomGame.Instance.Game;
-        if (game.NetGame && game.DeathMatch && !dropped)
+        if (game.NetGame && game.DeathMatch != 2 && !dropped)
         {
             // leave placed weapons forever on net games
             if (WeaponOwned[(int)weapon])
@@ -674,7 +674,7 @@ public class Player
             BonusCount += GameController.BonusAdd;
             WeaponOwned[(int)weapon] = true;
 
-            if (game.DeathMatch)
+            if (game.DeathMatch != 0)
             {
                 GiveAmmo(WeaponInfo.GetByType(weapon).Ammo, 5);
             }

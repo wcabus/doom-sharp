@@ -38,11 +38,11 @@ public class GameController
 
     private int _keyUp = (int)Keys.UpArrow;
     private int _keyDown = (int)Keys.DownArrow;
-    private int _keyStrafeLeft = 'A';
-    private int _keyStrafeRight = 'D';
-    private int _keyFire = ' ';
-    private int _keyUse = (int)Keys.Enter;
-    private int _keyStrafe = (int)Keys.LAlt;
+    private int _keyStrafeLeft = ',';
+    private int _keyStrafeRight = '.';
+    private int _keyFire = (int)Keys.RCtrl;
+    private int _keyUse = ' ';
+    private int _keyStrafe = (int)Keys.RAlt;
     private int _keySpeed = (int)Keys.RShift;
 
     private int _mouseButtonFire = 0;
@@ -230,6 +230,7 @@ public class GameController
 
     public SkillLevel GameSkill { get; set; }
     public bool RespawnMonsters { get; set; }
+    public bool RespawnParm { get; set; }
     public bool FastParm { get; set; }
     public bool NoMonsters { get; set; }
     public int GameEpisode { get; set; }
@@ -247,7 +248,7 @@ public class GameController
 
     public bool ViewActive { get; set; }
 
-    public bool DeathMatch { get; set; }
+    public int DeathMatch { get; set; }
     public bool NetGame { get; set; } = false;
     public bool[] PlayerInGame { get; } = new bool[Constants.MaxPlayers];
     public Player[] Players { get; } = new Player[Constants.MaxPlayers];
@@ -615,7 +616,7 @@ public class GameController
             Players[player].MapObject!.Player = null;
 
             // spawn at random spot if in death match 
-            if (DeathMatch)
+            if (DeathMatch != 0)
             {
                 DeathMatchSpawnPlayer(player);
                 return;
@@ -664,8 +665,9 @@ public class GameController
         var skill = (SkillLevel)_demoData[_demoDataIdx++];
         var episode = _demoData[_demoDataIdx++];
         var map = _demoData[_demoDataIdx++];
-        DeathMatch = _demoData[_demoDataIdx++] != 0;
+        DeathMatch = _demoData[_demoDataIdx++];
         var respawnparm = _demoData[_demoDataIdx++] != 0;
+        RespawnParm = respawnparm;
         FastParm = _demoData[_demoDataIdx++] != 0;
         NoMonsters = _demoData[_demoDataIdx++] != 0;
         ConsolePlayer = _demoData[_demoDataIdx++];
@@ -702,11 +704,11 @@ public class GameController
         DemoPlayback = false;
         NetDemo = false;
         NetGame = false;
-        DeathMatch = false;
+        DeathMatch = 0;
         PlayerInGame[1] = PlayerInGame[2] = PlayerInGame[3] = false;
-        //respawnparm = false;
-        //fastparm = false;
-        //nomonsters = false;
+        RespawnParm = false;
+        FastParm = false;
+        NoMonsters = false;
         ConsolePlayer = 0;
         InitNew(_d_skill, _d_episode, _d_map);
         GameAction = GameAction.Nothing;
@@ -762,7 +764,7 @@ public class GameController
 
         DoomRandom.ClearRandom();
 
-        if (skill == SkillLevel.Nightmare || RespawnMonsters)
+        if (skill == SkillLevel.Nightmare || RespawnParm)
             RespawnMonsters = true;
         else
             RespawnMonsters = false;
@@ -898,7 +900,7 @@ public class GameController
         _demoData[_demoDataIdx++] = (byte)GameSkill;
         _demoData[_demoDataIdx++] = (byte)GameEpisode;
         _demoData[_demoDataIdx++] = (byte)GameMap;
-        _demoData[_demoDataIdx++] = (byte)(DeathMatch ? 1 : 0);
+        _demoData[_demoDataIdx++] = (byte)DeathMatch;
         _demoData[_demoDataIdx++] = 0; // respawnparam
         _demoData[_demoDataIdx++] = 0; // fastparm;
         _demoData[_demoDataIdx++] = 0; // nomonsters;
@@ -1005,11 +1007,11 @@ public class GameController
             DemoPlayback = false;
             NetDemo = false;
             NetGame = false;
-            DeathMatch = false;
+            DeathMatch = 0;
             PlayerInGame[1] = PlayerInGame[2] = PlayerInGame[3] = false;
-            //respawnparm = false;
-            //fastparm = false;
-            //nomonsters = false;
+            RespawnParm = false;
+            FastParm = false;
+            NoMonsters = false;
             ConsolePlayer = 0;
             DoomGame.Instance.AdvanceDemo();
             return true;
@@ -1112,8 +1114,8 @@ public class GameController
 
     private void RespawnSpecials()
     {
-        // only respawn items in deathmatch
-        if (!DeathMatch)
+        // only respawn items in deathmatch 2 (altdeath)
+        if (DeathMatch != 2)
         {
             return;
         }
@@ -1423,7 +1425,7 @@ public class GameController
         P_SetupPlayerSprites(p);
 
         // give all cards in death match mode
-        if (DeathMatch)
+        if (DeathMatch != 0)
         {
             for (i = 0; i < (int)KeyCardType.NumberOfKeyCards; i++)
             {
@@ -1661,7 +1663,7 @@ public class GameController
         {
             // save spots for respawning in network games
             _playerStarts[mapThing.Type - 1] = mapThing;
-            if (!DeathMatch)
+            if (DeathMatch == 0)
             {
                 P_SpawnPlayer(mapThing);
             }
@@ -1696,7 +1698,7 @@ public class GameController
         }
 
         // don't spawn keycards and players in deathmatch
-        if (DeathMatch && (moInfo.Value.Flags & MapObjectFlag.MF_NOTDMATCH) != 0)
+        if (DeathMatch != 0 && (moInfo.Value.Flags & MapObjectFlag.MF_NOTDMATCH) != 0)
         {
             return;
         }
@@ -4053,7 +4055,7 @@ public class GameController
         P_LoadThings(lumpNum + MapLumps.Things);
 
         // if deathmatch, randomly spawn the active players
-        if (DeathMatch)
+        if (DeathMatch != 0)
         {
             for (var i = 0; i < Constants.MaxPlayers; i++)
             {
@@ -5704,7 +5706,7 @@ public class GameController
         if (GameState == GameState.Level && 
             currentEvent.Type == EventType.KeyDown &&
             currentEvent.Data1 == (int)Keys.F12 && 
-            (SingleDemo || !DeathMatch))
+            (SingleDemo || DeathMatch == 0))
         {
             // spy mode 
             do

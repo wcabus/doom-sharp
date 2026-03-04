@@ -270,7 +270,7 @@ public class IntermissionController
         InitVariables(wmInfo);
         LoadData();
 
-        if (DoomGame.Instance.Game.DeathMatch)
+        if (DoomGame.Instance.Game.DeathMatch != 0)
         {
             InitDeathmatchStats();
         }
@@ -303,7 +303,7 @@ public class IntermissionController
         switch (_state)
         {
             case IntermissionState.StatCounting:
-                if (DoomGame.Instance.Game.DeathMatch)
+                if (DoomGame.Instance.Game.DeathMatch != 0)
                 {
                     UpdateDeathmatchStats();
                 }
@@ -333,7 +333,7 @@ public class IntermissionController
         switch (_state)
         {
             case IntermissionState.StatCounting:
-                if (DoomGame.Instance.Game.DeathMatch)
+                if (DoomGame.Instance.Game.DeathMatch != 0)
                 {
                     DrawDeathmatchStats();
                 }

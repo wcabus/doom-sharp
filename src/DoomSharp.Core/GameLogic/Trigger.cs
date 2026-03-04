@@ -1351,8 +1351,11 @@ public static class Trigger
             var s2 = s1.Lines[0].GetNextSector(s1)!;
             for (var i = 0; i < s2.LineCount; i++)
             {
-                if ((s2.Lines[i].Flags & Constants.Line.TwoSided) == 0 ||
-                    s2.Lines[i].BackSector == s1)
+                // NOTE: Original C code has a bug here: (!s2->lines[i]->flags & ML_TWOSIDED)
+                // Due to C operator precedence, ! binds tighter than &, so this evaluates as
+                // ((!flags) & ML_TWOSIDED) which is always false for non-zero flags.
+                // We replicate the vanilla bug for demo compatibility by omitting the two-sided check.
+                if (s2.Lines[i].BackSector == s1)
                 {
                     continue;
                 }

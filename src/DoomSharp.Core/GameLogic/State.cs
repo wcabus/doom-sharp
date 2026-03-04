@@ -344,7 +344,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         DoomGame.Instance.Sound.StartSound(player.MapObject, SoundType.sfx_sawhit);
         
         // turn to face target
-        player.MapObject.Angle = DoomGame.Instance.Renderer.PointToAngle2(
+        angle = DoomGame.Instance.Renderer.PointToAngle2(
                 player.MapObject.X,
                 player.MapObject.Y,
                 lineTarget.X,

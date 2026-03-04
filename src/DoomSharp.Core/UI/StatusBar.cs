@@ -1,7 +1,8 @@
-﻿using DoomSharp.Core.Data;
+using DoomSharp.Core.Data;
 using DoomSharp.Core.GameLogic;
 using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
+using DoomSharp.Core.Sound;
 
 namespace DoomSharp.Core.UI;
 
@@ -284,6 +285,27 @@ public class StatusBar
 
     // a random number per tick
     private int _randomNumber;
+
+    // Cheat sequences
+    private readonly CheatSequence _cheatMus = new("idmus\x01\x01");
+    private readonly CheatSequence _cheatGod = new("iddqd");
+    private readonly CheatSequence _cheatAmmo = new("idkfa");
+    private readonly CheatSequence _cheatAmmoNoKey = new("idfa");
+    private readonly CheatSequence _cheatNoClip = new("idspispopd");
+    private readonly CheatSequence _cheatCommercialNoClip = new("idclip");
+    private readonly CheatSequence[] _cheatPowerup = new CheatSequence[]
+    {
+        new("idbeholdv"),
+        new("idbeholds"),
+        new("idbeholdi"),
+        new("idbeholdr"),
+        new("idbeholda"),
+        new("idbeholdl"),
+        new("idbehold"),
+    };
+    private readonly CheatSequence _cheatChoppers = new("idchoppers");
+    private readonly CheatSequence _cheatClev = new("idclev\x01\x01");
+    private readonly CheatSequence _cheatMyPos = new("idmypos");
 
     public void Ticker()
     {
@@ -703,7 +725,7 @@ public class StatusBar
 
     private void DrawWidgets(bool refresh)
     {
-        var deathMatch = DoomGame.Instance.Game.DeathMatch;
+        var deathMatch = DoomGame.Instance.Game.DeathMatch != 0;
         // used by w_arms[] widgets
         _armsOn = _statusBarOn && !deathMatch;
         // used by w_frags widget
@@ -967,7 +989,7 @@ public class StatusBar
         UpdateFaceWidget();
 
         // used by the w_armsbg widget
-        var deathMatch = DoomGame.Instance.Game.DeathMatch;
+        var deathMatch = DoomGame.Instance.Game.DeathMatch != 0;
         _notDeathMatch = !deathMatch;
 
         // used by w_arms[] widgets
@@ -1310,13 +1332,216 @@ public class StatusBar
         //    }
         //}
 
-        //// if a user keypress...
-        // else if 
+        // if a user keypress...
         if (currentEvent.Type == EventType.KeyDown)
         {
             if (!DoomGame.Instance.Game.NetGame)
             {
-                // cheats go here
+                var game = DoomGame.Instance.Game;
+                var plyr = _player!;
+                var key = (char)currentEvent.Data1;
+
+                // 'dqd' cheat for toggleable god mode
+                if (_cheatGod.CheckCheat(key))
+                {
+                    plyr.Cheats ^= Cheat.GodMode;
+                    if ((plyr.Cheats & Cheat.GodMode) != 0)
+                    {
+                        if (plyr.MapObject != null)
+                        {
+                            plyr.MapObject.Health = 100;
+                        }
+
+                        plyr.Health = 100;
+                        plyr.Message = Messages.STSTR_DQDON;
+                    }
+                    else
+                    {
+                        plyr.Message = Messages.STSTR_DQDOFF;
+                    }
+                }
+                // 'fa' cheat for killer fucking arsenal
+                else if (_cheatAmmoNoKey.CheckCheat(key))
+                {
+                    plyr.ArmorPoints = 200;
+                    plyr.ArmorType = 2;
+
+                    for (var i = 0; i < (int)WeaponType.NumberOfWeapons; i++)
+                    {
+                        plyr.WeaponOwned[i] = true;
+                    }
+
+                    for (var i = 0; i < (int)AmmoType.NumAmmo; i++)
+                    {
+                        plyr.Ammo[i] = plyr.MaxAmmo[i];
+                    }
+
+                    plyr.Message = Messages.STSTR_FAADDED;
+                }
+                // 'kfa' cheat for key full ammo
+                else if (_cheatAmmo.CheckCheat(key))
+                {
+                    plyr.ArmorPoints = 200;
+                    plyr.ArmorType = 2;
+
+                    for (var i = 0; i < (int)WeaponType.NumberOfWeapons; i++)
+                    {
+                        plyr.WeaponOwned[i] = true;
+                    }
+
+                    for (var i = 0; i < (int)AmmoType.NumAmmo; i++)
+                    {
+                        plyr.Ammo[i] = plyr.MaxAmmo[i];
+                    }
+
+                    for (var i = 0; i < (int)KeyCardType.NumberOfKeyCards; i++)
+                    {
+                        plyr.Cards[i] = true;
+                    }
+
+                    plyr.Message = Messages.STSTR_KFAADDED;
+                }
+                // 'mus' cheat for changing music
+                else if (_cheatMus.CheckCheat(key))
+                {
+                    var buf = new char[3];
+                    plyr.Message = Messages.STSTR_MUS;
+                    _cheatMus.GetParam(buf);
+
+                    if (DoomGame.Instance.GameMode == GameMode.Commercial)
+                    {
+                        var musnum = (int)MusicType.mus_runnin + (buf[0] - '0') * 10 + buf[1] - '0' - 1;
+
+                        if ((buf[0] - '0') * 10 + buf[1] - '0' > 35)
+                        {
+                            plyr.Message = Messages.STSTR_NOMUS;
+                        }
+                        else
+                        {
+                            DoomGame.Instance.Sound.ChangeMusic((MusicType)musnum, true);
+                        }
+                    }
+                    else
+                    {
+                        var musnum = (int)MusicType.mus_e1m1 + (buf[0] - '1') * 9 + (buf[1] - '1');
+
+                        if ((buf[0] - '1') * 9 + buf[1] - '1' > 31)
+                        {
+                            plyr.Message = Messages.STSTR_NOMUS;
+                        }
+                        else
+                        {
+                            DoomGame.Instance.Sound.ChangeMusic((MusicType)musnum, true);
+                        }
+                    }
+                }
+                // Simplified, accepting both "noclip" and "idspispopd".
+                // no clipping mode cheat
+                else if (_cheatNoClip.CheckCheat(key)
+                         || _cheatCommercialNoClip.CheckCheat(key))
+                {
+                    plyr.Cheats ^= Cheat.NoClip;
+
+                    if ((plyr.Cheats & Cheat.NoClip) != 0)
+                    {
+                        plyr.Message = Messages.STSTR_NCON;
+                    }
+                    else
+                    {
+                        plyr.Message = Messages.STSTR_NCOFF;
+                    }
+                }
+
+                // 'behold?' power-up cheats
+                for (var i = 0; i < 6; i++)
+                {
+                    if (_cheatPowerup[i].CheckCheat(key))
+                    {
+                        if (plyr.Powers[i] == 0)
+                        {
+                            plyr.GivePower((PowerUpType)i);
+                        }
+                        else if (i != (int)PowerUpType.Strength)
+                        {
+                            plyr.Powers[i] = 1;
+                        }
+                        else
+                        {
+                            plyr.Powers[i] = 0;
+                        }
+
+                        plyr.Message = Messages.STSTR_BEHOLDX;
+                    }
+                }
+
+                // 'behold' power-up menu
+                if (_cheatPowerup[6].CheckCheat(key))
+                {
+                    plyr.Message = Messages.STSTR_BEHOLD;
+                }
+                // 'choppers' invulnerability & chainsaw
+                else if (_cheatChoppers.CheckCheat(key))
+                {
+                    plyr.WeaponOwned[(int)WeaponType.Chainsaw] = true;
+                    plyr.Powers[(int)PowerUpType.Invulnerability] = 1; // true in original (non-zero)
+                    plyr.Message = Messages.STSTR_CHOPPERS;
+                }
+                // 'mypos' for player position
+                else if (_cheatMyPos.CheckCheat(key))
+                {
+                    var mo = game.Players[game.ConsolePlayer].MapObject!;
+                    plyr.Message = $"ang=0x{mo.Angle.Value:x};x,y=(0x{mo.X.Value:x},0x{mo.Y.Value:x})";
+                }
+            }
+
+            // 'clev' change-level cheat
+            if (_cheatClev.CheckCheat((char)currentEvent.Data1))
+            {
+                var buf = new char[3];
+                _cheatClev.GetParam(buf);
+
+                int epsd;
+                int map;
+
+                if (DoomGame.Instance.GameMode == GameMode.Commercial)
+                {
+                    epsd = 0;
+                    map = (buf[0] - '0') * 10 + buf[1] - '0';
+                }
+                else
+                {
+                    epsd = buf[0] - '0';
+                    map = buf[1] - '0';
+                }
+
+                // Catch invalid maps.
+                if (epsd < 1)
+                    return false;
+
+                if (map < 1)
+                    return false;
+
+                // Ohmygod - this is not going to work.
+                if (DoomGame.Instance.GameMode == GameMode.Retail
+                    && (epsd > 4 || map > 9))
+                    return false;
+
+                if (DoomGame.Instance.GameMode == GameMode.Registered
+                    && (epsd > 3 || map > 9))
+                    return false;
+
+                if (DoomGame.Instance.GameMode == GameMode.Shareware
+                    && (epsd > 1 || map > 9))
+                    return false;
+
+                if (DoomGame.Instance.GameMode == GameMode.Commercial
+                    && (epsd > 1 || map > 34))
+                    return false;
+
+                // So be it.
+                _player!.Message = Messages.STSTR_CLEV;
+                DoomGame.Instance.Game.DeferedInitNew(
+                    DoomGame.Instance.Game.GameSkill, epsd, map);
             }
         }
 

@@ -165,6 +165,34 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             case Key.OemMinus:
                 return (int)Keys.Minus;
 
+            case Key.OemComma:
+                return ',';
+
+            case Key.OemPeriod:
+                return '.';
+
+            case Key.OemTilde:
+                return '`';
+
+            case Key.OemSemicolon:
+                return ';';
+
+            case Key.OemQuotes:
+                return '\'';
+
+            case Key.OemOpenBrackets:
+                return '[';
+
+            case Key.OemCloseBrackets:
+                return ']';
+
+            case Key.OemBackslash:
+            case Key.OemPipe:
+                return '\\';
+
+            case Key.OemQuestion:
+                return '/';
+
             case Key.LeftShift:
             case Key.RightShift:
                 return (int)Keys.RShift;
@@ -186,7 +214,7 @@ public class MainViewModel : INotifyPropertyChanged, IGraphics
             //    return '0' + (keyIndex - (int)Key.NumPad0);
 
             case >= Key.A and <= Key.Z:
-                return 'A' + (int.Parse(keyIndex) - (int)Key.A);
+                return 'a' + (int.Parse(keyIndex) - (int)Key.A);
 
             case Key.Space:
                 return ' ';

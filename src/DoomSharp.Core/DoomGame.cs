@@ -1096,8 +1096,8 @@ public class DoomGame : IDisposable
                         return;
                     }
 
-                    StartSkill = (SkillLevel)(netBuffer.RetransmitFrom & 15);
-                    _game.DeathMatch = ((netBuffer.RetransmitFrom & 0xc0) >> 6) != 0;
+                StartSkill = (SkillLevel)(netBuffer.RetransmitFrom & 15);
+                _game.DeathMatch = (netBuffer.RetransmitFrom & 0xc0) >> 6;
                     var nomonsters = (netBuffer.RetransmitFrom & 0x20) > 0;
                     var respawnparm = (netBuffer.RetransmitFrom & 0x10) > 0;
                     StartMap = netBuffer.StartTic & 0x3f;
@@ -1119,9 +1119,9 @@ public class DoomGame : IDisposable
                 for (i = 0; i < _network.DoomCom.NumNodes; i++)
                 {
                     netBuffer.RetransmitFrom = (byte)StartSkill;
-                    if (_game.DeathMatch)
+                    if (_game.DeathMatch != 0)
                     {
-                        netBuffer.RetransmitFrom |= (byte)((_game.DeathMatch ? 1 : 0) << 6);
+                        netBuffer.RetransmitFrom |= (byte)(_game.DeathMatch << 6);
                     }
                     //if (nomonsters)
                     //    netbuffer->retransmitfrom |= 0x20;

@@ -151,6 +151,34 @@ namespace DoomSharp.Windows
                 case Key.OemMinus:
                     return (int)Keys.Minus;
 
+                case Key.OemComma:
+                    return ',';
+
+                case Key.OemPeriod:
+                    return '.';
+
+                case Key.OemTilde:
+                    return '`';
+
+                case Key.OemSemicolon:
+                    return ';';
+
+                case Key.OemQuotes:
+                    return '\'';
+
+                case Key.OemOpenBrackets:
+                    return '[';
+
+                case Key.OemCloseBrackets:
+                    return ']';
+
+                case Key.OemBackslash:
+                case Key.OemPipe:
+                    return '\\';
+
+                case Key.OemQuestion:
+                    return '/';
+
                 case Key.LeftShift:
                 case Key.RightShift:
                     return (int)Keys.RShift;
@@ -170,7 +198,7 @@ namespace DoomSharp.Windows
                     return '0' + (e.Key - Key.NumPad0);
 
                 case >= Key.A and <= Key.Z:
-                    return 'A' + (e.Key - Key.A);
+                    return 'a' + (e.Key - Key.A);
 
                 case Key.Space:
                     return ' ';

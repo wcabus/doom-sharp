@@ -436,7 +436,7 @@ public class HudController
         {
             _messageOn = true;
             _messageCounter = MessageTimeout;
-            return true;
+            return true; // eat the key, matching original HU_Responder
         }
 
         return false;

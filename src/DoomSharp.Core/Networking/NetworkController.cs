@@ -13,7 +13,7 @@ public class NetworkController
         DoomGame.Instance.Game.NetGame = false;
         DoomCom.Id = Constants.DoomComId;
         DoomCom.NumPlayers = DoomCom.NumNodes = 1;
-        DoomCom.DeathMatch = false;
+        DoomCom.DeathMatch = 0;
         DoomCom.ConsolePlayer = 0;
 
         // when multiplayer: setup netsend/netget functions
