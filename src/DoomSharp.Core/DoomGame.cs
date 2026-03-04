@@ -3,6 +3,7 @@ using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Networking;
 using DoomSharp.Core.UI;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using DoomSharp.Core.GameLogic;
 using DoomSharp.Core.Sound;
@@ -39,7 +40,7 @@ public class DoomGame : IDisposable
     private int _frameOn;
     private bool[] _frameskip = new bool[4];
     
-    private long _baseTime = 0;
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     private int _skiptics = 0;
     private int _gametime;
 
@@ -1179,15 +1180,7 @@ public class DoomGame : IDisposable
 
     public int GetTime()
     {
-        var timeSinceEpoch = DateTime.UtcNow - DateTime.UnixEpoch;
-        var secondsSinceEpoch = (long)timeSinceEpoch.TotalSeconds;
-        if (_baseTime == 0)
-        {
-            _baseTime = secondsSinceEpoch;
-        }
-
-        return (int)(((secondsSinceEpoch - _baseTime) * Constants.TicRate)
-                     + (timeSinceEpoch.Milliseconds * Constants.TicRate / 1000));
+        return (int)(_stopwatch.Elapsed.TotalSeconds * Constants.TicRate);
     }
 
     public void StartTitle()

@@ -16,6 +16,13 @@ public struct MapObjectInfo
         return _predefinedTypes[(int)type];
     }
 
+    public static void SetSpeed(MapObjectType type, int speed)
+    {
+        var info = _predefinedTypes[(int)type];
+        info.Speed = speed;
+        _predefinedTypes[(int)type] = info;
+    }
+
     public static MapObjectInfo? FindByDoomedNum(int doomedNum)
     {
         var query = _predefinedTypes.Where(x => x.DoomedNum == doomedNum);

@@ -72,7 +72,7 @@ public readonly struct Fixed : IComparable<Fixed>
     {
         if ((Math.Abs(a._value) >> 14) >= Math.Abs(b._value))
         {
-            return new Fixed((a._value ^ b._value) < 0 ? int.MaxValue : int.MinValue);
+            return new Fixed((a._value ^ b._value) < 0 ? int.MinValue : int.MaxValue);
         }
 
         return Div2(a, b);

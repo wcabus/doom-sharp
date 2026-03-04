@@ -1,4 +1,4 @@
-﻿using DoomSharp.Core.Graphics;
+using DoomSharp.Core.Graphics;
 
 namespace DoomSharp.Core;
 
@@ -8,49 +8,33 @@ public static class DoomMath
     public const int FineMask = FineAngleCount - 1;
     public const int AngleToFineShift = 19;
 
-    private const float PI = 3.141592654f;
-
     public static void InitTables()
     {
-        // viewangle tangent table
-        for (var i = 0; i < (FineAngleCount / 2); i++)
-        {
-            var angle = (i - FineAngleCount / 4.0 + 0.5) * PI * 2 / FineAngleCount;
-            var fv = Constants.FracUnit * Math.Tan(angle);
-            FineTangent[i] = (int)fv;
-        }
+        // Use the exact precomputed tables from the original DOOM source (tables.c).
+        // Computing these at runtime with floating point math introduces precision
+        // differences that cause demo playback desync.
+        Array.Copy(DoomTables.FineTangent, FineTangent, FineAngleCount / 2);
+        Array.Copy(DoomTables.FineSine, FineSine, 5 * FineAngleCount / 4);
 
-        // finesine table
+        // finecosine is finesine offset by FINEANGLES/4, matching original DOOM:
+        // int *finecosine = &finesine[FINEANGLES/4];
         const int fineCosOffset = FineAngleCount / 4;
-        for (var i = 0; i < (5 * FineAngleCount / 4); i++)
-        {
-            var angle = (i + 0.5) * PI * 2 / FineAngleCount;
-            var t = Constants.FracUnit * Math.Sin(angle);
-            FineSine[i] = (int)t;
-
-            var c = i - fineCosOffset;
-            if (c < 0)
-            {
-                c += 5 * FineAngleCount / 4;
-            }
-            FineCosine[c] = (int)t;
-        }
+        Array.Copy(DoomTables.FineSine, fineCosOffset, FineCosine, 0, FineAngleCount);
     }
 
     public static void InitPointToAngle()
     {
+        // Use the exact precomputed tantoangle table from original DOOM source (tables.c).
         for (var i = 0; i <= RenderEngine.SlopeRange; i++)
         {
-            var f = (float)Math.Atan((float)i / RenderEngine.SlopeRange) / (PI * 2); // PI was wrong here: 3.141592657f
-            var t = (long)(0xffffffff * f);
-            TanToAngle[i] = new Angle((uint)t);
+            TanToAngle[i] = new Angle(DoomTables.TanToAngle[i]);
         }
     }
 
     public static Fixed Tan(Angle angle)
     {
         var idx = angle.Value >> AngleToFineShift;
-        if (idx > (FineAngleCount / 2))
+        if (idx >= (FineAngleCount / 2))
         {
             idx -= FineAngleCount / 2;
         }
@@ -60,7 +44,7 @@ public static class DoomMath
 
     public static Fixed Tan(int fineAngle)
     {
-        if (fineAngle > (FineAngleCount / 2))
+        if (fineAngle >= (FineAngleCount / 2))
         {
             fineAngle -= FineAngleCount / 2;
         }
@@ -89,6 +73,6 @@ public static class DoomMath
 
     private static readonly int[] FineTangent = new int[FineAngleCount / 2];
     private static readonly int[] FineSine = new int[5 * FineAngleCount / 4];
-    private static readonly int[] FineCosine = new int[5 * FineAngleCount / 4];
+    private static readonly int[] FineCosine = new int[FineAngleCount];
     public static readonly Angle[] TanToAngle = new Angle[RenderEngine.SlopeRange + 1];
 }

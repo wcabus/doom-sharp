@@ -1545,7 +1545,7 @@ public static class Trigger
                 case CeilingType.CrushAndRaise:
                     ceiling.Crush = true;
                     ceiling.TopHeight = sec.CeilingHeight;
-                    break;
+                    goto case CeilingType.LowerAndCrush; // fall through
 
                 case CeilingType.LowerAndCrush:
                 case CeilingType.LowerToFloor:
@@ -1784,7 +1784,7 @@ public static class Trigger
         var game = DoomGame.Instance.Game;
         foreach (var sector in game.Sectors.Where(x => x.Tag == tag))
         {
-            for (var thinkerNode = game.Thinkers.First; thinkerNode == null || thinkerNode.Next != game.Thinkers.First; thinkerNode = thinkerNode.Next)
+            for (var thinkerNode = game.Thinkers.First; thinkerNode != null; thinkerNode = thinkerNode.Next)
             {
                 if (thinkerNode.Value is not MapObject m)
                 {

@@ -91,6 +91,12 @@ public class GameController
     private MapObject[] _bodyQueue = new MapObject[BodyQueueSize];
     private int _bodyQueueSlot = 0;
 
+    public const int ItemQueueSize = 128;
+    private MapThing[] _itemRespawnQueue = new MapThing[ItemQueueSize];
+    private int[] _itemRespawnTime = new int[ItemQueueSize];
+    private int _iqueueHead;
+    private int _iqueueTail;
+
     //
     // MAP related Lookup tables.
     // Store VERTEXES, LINEDEFS, SIDEDEFS, etc.
@@ -224,6 +230,8 @@ public class GameController
 
     public SkillLevel GameSkill { get; set; }
     public bool RespawnMonsters { get; set; }
+    public bool FastParm { get; set; }
+    public bool NoMonsters { get; set; }
     public int GameEpisode { get; set; }
     public int GameMap { get; set; }
 
@@ -284,6 +292,9 @@ public class GameController
     public MapObject? LineTarget => _lineTarget;
     public Fixed BulletSlope => _bulletSlope;
 
+    public Fixed BlockMapOriginX => _blockMapOriginX;
+    public Fixed BlockMapOriginY => _blockMapOriginY;
+
     public void Ticker()
     {
         var buf = 0;
@@ -321,7 +332,7 @@ public class GameController
                     DoCompleted();
                     break;
                 case GameAction.Victory:
-                    // F_StartFinale();
+                    StartFinale();
                     break;
                 case GameAction.WorldDone:
                     DoWorldDone();
@@ -654,9 +665,9 @@ public class GameController
         var episode = _demoData[_demoDataIdx++];
         var map = _demoData[_demoDataIdx++];
         DeathMatch = _demoData[_demoDataIdx++] != 0;
-        var respawnparm = _demoData[_demoDataIdx++];
-        var fastparm = _demoData[_demoDataIdx++];
-        var nomonsters = _demoData[_demoDataIdx++];
+        var respawnparm = _demoData[_demoDataIdx++] != 0;
+        FastParm = _demoData[_demoDataIdx++] != 0;
+        NoMonsters = _demoData[_demoDataIdx++] != 0;
         ConsolePlayer = _demoData[_demoDataIdx++];
 
         for (var i = 0; i < Constants.MaxPlayers; i++)
@@ -751,27 +762,27 @@ public class GameController
 
         DoomRandom.ClearRandom();
 
-        //if (skill == sk_nightmare || respawnparm)
-        //    respawnmonsters = true;
-        //else
-        //    respawnmonsters = false;
+        if (skill == SkillLevel.Nightmare || RespawnMonsters)
+            RespawnMonsters = true;
+        else
+            RespawnMonsters = false;
 
-        //if (fastparm || (skill == sk_nightmare && gameskill != sk_nightmare))
-        //{
-        //    for (i = S_SARG_RUN1; i <= S_SARG_PAIN2; i++)
-        //        states[i].tics >>= 1;
-        //    mobjinfo[MT_BRUISERSHOT].speed = 20 * FRACUNIT;
-        //    mobjinfo[MT_HEADSHOT].speed = 20 * FRACUNIT;
-        //    mobjinfo[MT_TROOPSHOT].speed = 20 * FRACUNIT;
-        //}
-        //else if (skill != sk_nightmare && gameskill == sk_nightmare)
-        //{
-        //    for (i = S_SARG_RUN1; i <= S_SARG_PAIN2; i++)
-        //        states[i].tics <<= 1;
-        //    mobjinfo[MT_BRUISERSHOT].speed = 15 * FRACUNIT;
-        //    mobjinfo[MT_HEADSHOT].speed = 10 * FRACUNIT;
-        //    mobjinfo[MT_TROOPSHOT].speed = 10 * FRACUNIT;
-        //}
+        if (FastParm || (skill == SkillLevel.Nightmare && GameSkill != SkillLevel.Nightmare))
+        {
+            for (var i = (int)StateNum.S_SARG_RUN1; i <= (int)StateNum.S_SARG_PAIN2; i++)
+                State.GetSpawnState((StateNum)i).Tics >>= 1;
+            MapObjectInfo.SetSpeed(MapObjectType.MT_BRUISERSHOT, 20 * Constants.FracUnit);
+            MapObjectInfo.SetSpeed(MapObjectType.MT_HEADSHOT, 20 * Constants.FracUnit);
+            MapObjectInfo.SetSpeed(MapObjectType.MT_TROOPSHOT, 20 * Constants.FracUnit);
+        }
+        else if (skill != SkillLevel.Nightmare && GameSkill == SkillLevel.Nightmare)
+        {
+            for (var i = (int)StateNum.S_SARG_RUN1; i <= (int)StateNum.S_SARG_PAIN2; i++)
+                State.GetSpawnState((StateNum)i).Tics <<= 1;
+            MapObjectInfo.SetSpeed(MapObjectType.MT_BRUISERSHOT, 15 * Constants.FracUnit);
+            MapObjectInfo.SetSpeed(MapObjectType.MT_HEADSHOT, 10 * Constants.FracUnit);
+            MapObjectInfo.SetSpeed(MapObjectType.MT_TROOPSHOT, 10 * Constants.FracUnit);
+        }
 
 
         // force players to be initialized upon first level load         
@@ -1090,7 +1101,7 @@ public class GameController
 
         RunThinkers();
         UpdateSpecials();
-        //RespawnSpecials();
+        RespawnSpecials();
 
         // for par times
         LevelTime++;
@@ -1098,6 +1109,64 @@ public class GameController
 
     private bool _levelTimer;
     private int _levelTimeCount;
+
+    private void RespawnSpecials()
+    {
+        // only respawn items in deathmatch
+        if (!DeathMatch)
+        {
+            return;
+        }
+
+        // nothing left to respawn?
+        if (_iqueueHead == _iqueueTail)
+        {
+            return;
+        }
+
+        // wait at least 30 seconds
+        if (LevelTime - _itemRespawnTime[_iqueueTail] < 30 * 35)
+        {
+            return;
+        }
+
+        var mthing = _itemRespawnQueue[_iqueueTail];
+
+        var x = new Fixed(mthing.X << Constants.FracBits);
+        var y = new Fixed(mthing.Y << Constants.FracBits);
+
+        // spawn a teleport fog at the new spot
+        var ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+        var mo = P_SpawnMapObject(x, y, ss.Sector!.FloorHeight, MapObjectType.MT_IFOG);
+        DoomGame.Instance.Sound.StartSound(mo, SoundType.sfx_itmbk);
+
+        // find which type to spawn
+        var moInfo = MapObjectInfo.FindByDoomedNum(mthing.Type);
+        if (moInfo == null)
+        {
+            // pull it from the queue even if we can't find the type
+            _iqueueTail = (_iqueueTail + 1) & (ItemQueueSize - 1);
+            return;
+        }
+
+        // spawn it
+        Fixed z;
+        if ((moInfo.Value.Flags & MapObjectFlag.MF_SPAWNCEILING) != 0)
+        {
+            z = Constants.OnCeilingZ;
+        }
+        else
+        {
+            z = Constants.OnFloorZ;
+        }
+
+        mo = P_SpawnMapObject(x, y, z, moInfo.Value.Type);
+        mo.Spawnpoint = mthing;
+        mo.Angle = Angle.Angle45 * (uint)(mthing.Angle / 45);
+
+        // pull it from the queue
+        _iqueueTail = (_iqueueTail + 1) & (ItemQueueSize - 1);
+    }
 
     private void UpdateSpecials()
     {
@@ -1633,12 +1702,12 @@ public class GameController
         }
 
         // don't spawn any monsters if -nomonsters
-        //if (NoMonsters
-        //    && (i == MT_SKULL
-        //        || (mobjinfo[i].flags & MF_COUNTKILL)))
-        //{
-        //    return;
-        //}
+        if (NoMonsters
+            && (moInfo.Value.Type == MapObjectType.MT_SKULL
+                || (moInfo.Value.Flags & MapObjectFlag.MF_COUNTKILL) != 0))
+        {
+            return;
+        }
 
         // spawn it
         var x = Fixed.FromInt(mapThing.X);
@@ -1675,7 +1744,7 @@ public class GameController
         }
     }
 
-    private void P_UnsetThingPosition(MapObject thing)
+    public void P_UnsetThingPosition(MapObject thing)
     {
         if ((thing.Flags & MapObjectFlag.MF_NOSECTOR) == 0)
         {
@@ -1722,7 +1791,7 @@ public class GameController
         }
     }
 
-    private void P_SetThingPosition(MapObject thing)
+    public void P_SetThingPosition(MapObject thing)
     {
         // link into subsector
         var ss = DoomGame.Instance.Renderer.PointInSubSector(thing.X, thing.Y);
@@ -2058,7 +2127,7 @@ public class GameController
         return true; // everything was checked
     }
 
-    private bool P_BlockThingsIterator(int x, int y, Func<MapObject, bool> thingFunction)
+    public bool P_BlockThingsIterator(int x, int y, Func<MapObject, bool> thingFunction)
     {
         if (x < 0
             || y < 0
@@ -2104,7 +2173,7 @@ public class GameController
     ///  speciallines[]
     ///  numspeciallines
     /// </summary>
-    private bool P_CheckPosition(MapObject thing, Fixed x, Fixed y)
+    public bool P_CheckPosition(MapObject thing, Fixed x, Fixed y)
     {
         _tmThing = thing;
         _tmFlags = thing.Flags;
@@ -2180,7 +2249,7 @@ public class GameController
     /// Attempt to move to a new position,
     /// crossing special lines unless MF_TELEPORT is set.
     /// </summary>
-    private bool P_TryMove(MapObject thing, Fixed x, Fixed y)
+    public bool P_TryMove(MapObject thing, Fixed x, Fixed y)
     {
         _floatOk = false;
         if (!P_CheckPosition(thing, x, y))
@@ -2349,9 +2418,9 @@ public class GameController
         _bombSource = source;
         _bombDamage = damage;
 
-        for (var y = yl; y < yh; y++)
+        for (var y = yl; y <= yh; y++)
         {
-            for (var x = xl; x < xh; x++)
+            for (var x = xl; x <= xh; x++)
             {
                 P_BlockThingsIterator(x, y, PIT_RadiusAttack);
             }
@@ -2923,7 +2992,11 @@ public class GameController
 
         _slideMapObject = mo;
 
-        Retry();
+        retry:
+        if (++hitcount == 3)
+        {
+            goto stairstep; // don't loop forever
+        }
 
         // trace along the three leading corners
         if (mo.MomX > Fixed.Zero)
@@ -2961,8 +3034,7 @@ public class GameController
         if (_bestSlideFrac == new Fixed(Constants.FracUnit + 1))
         {
             // the move most have hit the middle, so stairstep
-            StairStep();
-            return;
+            goto stairstep;
         }
 
         // fudge a bit to make sure it doesn't hit
@@ -2974,7 +3046,7 @@ public class GameController
 
             if (!P_TryMove(mo, mo.X + newx, mo.Y + newy))
             {
-                StairStep();
+                goto stairstep;
             }
         }
 
@@ -3002,23 +3074,15 @@ public class GameController
 
         if (!P_TryMove(mo, mo.X + _tmXMove, mo.Y + _tmYMove))
         {
-            Retry();
+            goto retry;
         }
 
-        void Retry()
-        {
-            if (++hitcount == 3)
-            {
-                StairStep(); // don't loop forever
-            }
-        }
+        return;
 
-        void StairStep()
+        stairstep:
+        if (!P_TryMove(mo, mo.X, mo.Y + mo.MomY))
         {
-            if (!P_TryMove(mo, mo.X, mo.Y + mo.MomY))
-            {
-                P_TryMove(mo, mo.X + mo.MomX, mo.Y);
-            }
+            P_TryMove(mo, mo.X + mo.MomX, mo.Y);
         }
     }
 
@@ -3150,7 +3214,7 @@ public class GameController
             && (player == null || (player.Command.ForwardMove == 0 && player.Command.SideMove == 0)))
         {
             // if in a walking frame, stop moving
-            if (player != null && (State.GetStateNum(player.MapObject!.State!) - StateNum.S_PLAY_RUN1) < 4)
+            if (player != null && (uint)(State.GetStateNum(player.MapObject!.State!) - StateNum.S_PLAY_RUN1) < 4)
             {
                 player.MapObject.SetState(StateNum.S_PLAY);
             }
@@ -3577,8 +3641,10 @@ public class GameController
                 return;
             }
 
-            // if (!respawnmonsters)
-                // return;
+            if (!RespawnMonsters)
+            {
+                return;
+            }
 
             mobj.MoveCount++;
 
@@ -3597,8 +3663,67 @@ public class GameController
                 return;
             }
 
-            // P_NightmareRespawn(mobj);
+            P_NightmareRespawn(mobj);
         }
+    }
+
+    private void P_NightmareRespawn(MapObject mobj)
+    {
+        var x = new Fixed(mobj.Spawnpoint.X << Constants.FracBits);
+        var y = new Fixed(mobj.Spawnpoint.Y << Constants.FracBits);
+
+        // something is occupying its position?
+        if (!P_CheckPosition(mobj, x, y))
+        {
+            return; // no respawn
+        }
+
+        // spawn a teleport fog at old spot
+        // because of removal of the body?
+        var mo = P_SpawnMapObject(
+            mobj.X,
+            mobj.Y,
+            mobj.SubSector!.Sector!.FloorHeight,
+            MapObjectType.MT_TFOG);
+
+        // initiate teleport sound
+        DoomGame.Instance.Sound.StartSound(mo, SoundType.sfx_telept);
+
+        // spawn a teleport fog at the new spot
+        var ss = DoomGame.Instance.Renderer.PointInSubSector(x, y);
+
+        mo = P_SpawnMapObject(x, y, ss.Sector!.FloorHeight, MapObjectType.MT_TFOG);
+
+        DoomGame.Instance.Sound.StartSound(mo, SoundType.sfx_telept);
+
+        // spawn the new monster
+        var mthing = mobj.Spawnpoint;
+
+        // spawn it
+        Fixed z;
+        if ((mobj.Info.Flags & MapObjectFlag.MF_SPAWNCEILING) != 0)
+        {
+            z = Constants.OnCeilingZ;
+        }
+        else
+        {
+            z = Constants.OnFloorZ;
+        }
+
+        // inherit attributes from deceased one
+        mo = P_SpawnMapObject(x, y, z, mobj.Type);
+        mo.Spawnpoint = mobj.Spawnpoint;
+        mo.Angle = Angle.Angle45 * (uint)(mthing.Angle / 45);
+
+        if ((mthing.Options & (int)MapThingFlag.MTF_AMBUSH) != 0)
+        {
+            mo.Flags |= MapObjectFlag.MF_AMBUSH;
+        }
+
+        mo.ReactionTime = 18;
+
+        // remove the old monster
+        P_RemoveMapObject(mobj);
     }
 
     public MapObject P_SpawnMapObject(Fixed x, Fixed y, Fixed z, MapObjectType type)
@@ -3657,13 +3782,15 @@ public class GameController
             && (mobj.Type != MapObjectType.MT_INV)
             && (mobj.Type != MapObjectType.MT_INS))
         {
-            //itemrespawnque[iquehead] = mobj->spawnpoint;
-            //itemrespawntime[iquehead] = leveltime;
-            //iquehead = (iquehead + 1) & (ITEMQUESIZE - 1);
+            _itemRespawnQueue[_iqueueHead] = mobj.Spawnpoint;
+            _itemRespawnTime[_iqueueHead] = LevelTime;
+            _iqueueHead = (_iqueueHead + 1) & (ItemQueueSize - 1);
 
-            //// lose one off the end?
-            //if (iquehead == iquetail)
-            //    iquetail = (iquetail + 1) & (ITEMQUESIZE - 1);
+            // lose one off the end?
+            if (_iqueueHead == _iqueueTail)
+            {
+                _iqueueTail = (_iqueueTail + 1) & (ItemQueueSize - 1);
+            }
         }
 
         // unlink from sector and block lists
@@ -3939,7 +4066,7 @@ public class GameController
         }
 
         // clear special respawning que
-        // iquehead = iquetail = 0;
+        _iqueueHead = _iqueueTail = 0;
 
         // set up world state
         P_SpawnSpecials();
@@ -4695,7 +4822,6 @@ public class GameController
         {
             // EFFECT FIRSTCOL SCROLL+
             _lineSpecialList[_numLineSpecials++] = line;
-            break;
         }
 
         //	Init other misc stuff
@@ -6133,13 +6259,12 @@ public class GameController
                     {
                         break;
                     }
-                    // F_StartFinale();
-                    break;
+                    goto case 6;
                 case 6:
                 case 11:
                 case 20:
                 case 30:
-                    // F_StartFinale();
+                    StartFinale();
                     break;
             }
         }
@@ -6152,6 +6277,19 @@ public class GameController
         DoLoadLevel();
         GameAction = GameAction.Nothing;
         ViewActive = true;
+    }
+
+    /// <summary>
+    /// F_StartFinale - minimal implementation for demo playback.
+    /// Sets the game into finale state so that P_Ticker stops
+    /// and the demo can end cleanly.
+    /// </summary>
+    public void StartFinale()
+    {
+        GameAction = GameAction.Nothing;
+        GameState = GameState.Finale;
+        ViewActive = false;
+        AutomapActive = false;
     }
 
     public int GetPlayerIndex(Player player)
@@ -6621,9 +6759,9 @@ public class GameController
 
         th.Target = source;
         th.Angle = an;
-        th.MomX = th.Info.Speed * DoomMath.Cos(an);
-        th.MomY = th.Info.Speed * DoomMath.Sin(an);
-        th.MomZ = th.Info.Speed * slope;
+        th.MomX = new Fixed(th.Info.Speed) * DoomMath.Cos(an);
+        th.MomY = new Fixed(th.Info.Speed) * DoomMath.Sin(an);
+        th.MomZ = new Fixed(th.Info.Speed) * slope;
 
         P_CheckMissileSpawn(th);
     }
@@ -7090,7 +7228,7 @@ public class GameController
         // randomly determine direction of search
         if ((DoomRandom.P_Random() & 1) != 0)
         {
-            for (var dir = DirectionType.East; dir < DirectionType.SouthEast; dir++)
+            for (var dir = DirectionType.East; dir <= DirectionType.SouthEast; dir++)
             {
                 if (dir != turnAround)
                 {
@@ -7150,12 +7288,12 @@ public class GameController
         return true;
     }
 
-    private static readonly Fixed[] XSpeed =
+    public static readonly Fixed[] XSpeed =
     {
         Fixed.Unit, new(47000), Fixed.Zero, new(-47000), -Fixed.Unit, new(-47000), Fixed.Zero, new(47000)
     };
 
-    private static readonly Fixed[] YSpeed =
+    public static readonly Fixed[] YSpeed =
     {
         Fixed.Zero, new(47000), Fixed.Unit, new(47000), Fixed.Zero, new(-47000), -Fixed.Unit, new(-47000)
     };

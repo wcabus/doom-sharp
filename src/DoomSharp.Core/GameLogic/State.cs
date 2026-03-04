@@ -1,4 +1,5 @@
 ﻿using DoomSharp.Core.Data;
+using DoomSharp.Core.Graphics;
 using DoomSharp.Core.Input;
 using DoomSharp.Core.Sound;
 
@@ -6,6 +7,7 @@ namespace DoomSharp.Core.GameLogic;
 
 public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>? Action, StateNum NextState, int Misc1, int Misc2)
 {
+    public int Tics { get; set; } = Tics;
     private static readonly List<State> _states = new();
 
     static State()
@@ -273,7 +275,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
 
     private static void ActionOpenShotgun2(ActionParams actionParams) { }
     private static void ActionLoadShotgun2(ActionParams actionParams) { }
-    private static void ActionCloseShotgun2(ActionParams actionParams) { }
+    private static void ActionCloseShotgun2(ActionParams actionParams) { ActionReFire(actionParams); }
 
     private static void ActionFireCGun(ActionParams actionParams)
     {
@@ -496,9 +498,11 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
                     return;
                 }
             }
-
-            SeeYou();
-            return;
+            else
+            {
+                SeeYou();
+                return;
+            }
         }
 
         if (!DoomGame.Instance.Game.P_LookForPlayers(actor, false))
@@ -599,13 +603,14 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             }
 
             actor.SetState(actor.Info.SpawnState);
+            return;
         }
 
         // do not attack twice in a row
         if ((actor.Flags & MapObjectFlag.MF_JUSTATTACKED) != 0)
         {
             actor.Flags &= ~MapObjectFlag.MF_JUSTATTACKED;
-            if (game.GameSkill != SkillLevel.Nightmare /* && !fastparm */)
+            if (game.GameSkill != SkillLevel.Nightmare && !game.FastParm)
             {
                 game.P_NewChaseDir(actor);
             }
@@ -628,7 +633,7 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         // check for missile attack
         if (actor.Info.MissileState != StateNum.S_NULL)
         {
-            if (game.GameSkill < SkillLevel.Nightmare && actor.MoveCount != 0 /* && !fastparm */)
+            if (game.GameSkill < SkillLevel.Nightmare && actor.MoveCount != 0 && !game.FastParm)
             {
                 NoMissile();
                 return;
@@ -934,7 +939,6 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             return;
         }
 
-        ActionFaceTarget(actionParams);
         if (game.P_CheckMeleeRange(actor))
         {
             DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_claw);
@@ -1022,9 +1026,8 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
             }
         }
 
-        // BUG May need to convert speed into a Fixed first to get FixedMul behavior
-        actor.MomX = actor.Info.Speed * DoomMath.Cos(exact);
-        actor.MomY = actor.Info.Speed * DoomMath.Sin(exact);
+        actor.MomX = new Fixed(actor.Info.Speed) * DoomMath.Cos(actor.Angle);
+        actor.MomY = new Fixed(actor.Info.Speed) * DoomMath.Sin(actor.Angle);
 
         // change slope
         var dist = game.P_AproxDistance(dest.X - actor.X, dest.Y - actor.Y).Value;
@@ -1049,36 +1052,786 @@ public record State(SpriteNum Sprite, int Frame, int Tics, Action<ActionParams>?
         }
     }
 
-    private static void ActionVileChase(ActionParams actionParams) { }
-    private static void ActionVileStart(ActionParams actionParams) { }
-    private static void ActionVileTarget(ActionParams actionParams) { }
-    private static void ActionVileAttack(ActionParams actionParams) { }
-    private static void ActionStartFire(ActionParams actionParams) { }
-    private static void ActionFire(ActionParams actionParams) { }
-    private static void ActionFireCrackle(ActionParams actionParams) { }
-    
-    private static void ActionSkelWhoosh(ActionParams actionParams) { }
-    private static void ActionSkelFist(ActionParams actionParams) { }
-    private static void ActionFatRaise(ActionParams actionParams) { }
-    private static void ActionFatAttack1(ActionParams actionParams) { }
-    private static void ActionFatAttack2(ActionParams actionParams) { }
-    private static void ActionFatAttack3(ActionParams actionParams) { }
-    private static void ActionBossDeath(ActionParams actionParams) { }
-    private static void ActionSkullAttack(ActionParams actionParams) { }
-    private static void ActionMetal(ActionParams actionParams) { }
-    private static void ActionBabyMetal(ActionParams actionParams) { }
-    private static void ActionHoof(ActionParams actionParams) { }
-    private static void ActionPainAttack(ActionParams actionParams) { }
-    private static void ActionPainDie(ActionParams actionParams) { }
-    private static void ActionKeenDie(ActionParams actionParams) { }
-    private static void ActionBrainPain(ActionParams actionParams) { }
-    private static void ActionBrainScream(ActionParams actionParams) { }
-    private static void ActionBrainDie(ActionParams actionParams) { }
-    private static void ActionBrainAwake(ActionParams actionParams) { }
-    private static void ActionBrainSpit(ActionParams actionParams) { }
-    private static void ActionSpawnSound(ActionParams actionParams) { }
-    private static void ActionSpawnFly(ActionParams actionParams) { }
-    private static void ActionBrainExplode(ActionParams actionParams) { }
+    //
+    // PIT_VileCheck
+    // Detect a corpse that could be raised.
+    //
+    private static MapObject? _corpsehit;
+    private static MapObject? _vileobj;
+    private static Fixed _viletryx;
+    private static Fixed _viletryy;
+
+    private static bool PIT_VileCheck(MapObject thing)
+    {
+        if ((thing.Flags & MapObjectFlag.MF_CORPSE) == 0)
+            return true; // not a monster
+
+        if (thing.Tics != -1)
+            return true; // not lying still yet
+
+        if (thing.Info.RaiseState == StateNum.S_NULL)
+            return true; // monster doesn't have a raise state
+
+        var maxdist = thing.Info.Radius + MapObjectInfo.GetByType(MapObjectType.MT_VILE).Radius;
+
+        if (Fixed.Abs(thing.X - _viletryx).Value > maxdist
+            || Fixed.Abs(thing.Y - _viletryy).Value > maxdist)
+            return true; // not actually touching
+
+        _corpsehit = thing;
+        _corpsehit.MomX = Fixed.Zero;
+        _corpsehit.MomY = Fixed.Zero;
+        _corpsehit.Height = new Fixed(_corpsehit.Height.Value << 2);
+
+        var game = DoomGame.Instance.Game;
+        var check = game.P_CheckPosition(_corpsehit, _corpsehit.X, _corpsehit.Y);
+        _corpsehit.Height = new Fixed(_corpsehit.Height.Value >> 2);
+
+        if (!check)
+            return true; // doesn't fit here
+
+        return false; // got one, so stop checking
+    }
+
+    //
+    // A_VileChase
+    // Check for resurrecting a body
+    //
+    private static void ActionVileChase(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.MoveDir != DirectionType.NoDirection)
+        {
+            // check for corpses to raise
+            _viletryx =
+                actor.X + actor.Info.Speed * GameController.XSpeed[(int)actor.MoveDir];
+            _viletryy =
+                actor.Y + actor.Info.Speed * GameController.YSpeed[(int)actor.MoveDir];
+
+            var xl = (_viletryx - game.BlockMapOriginX - new Fixed(Constants.MaxRadius.Value * 2)).Value >> Constants.MapBlockShift;
+            var xh = (_viletryx - game.BlockMapOriginX + new Fixed(Constants.MaxRadius.Value * 2)).Value >> Constants.MapBlockShift;
+            var yl = (_viletryy - game.BlockMapOriginY - new Fixed(Constants.MaxRadius.Value * 2)).Value >> Constants.MapBlockShift;
+            var yh = (_viletryy - game.BlockMapOriginY + new Fixed(Constants.MaxRadius.Value * 2)).Value >> Constants.MapBlockShift;
+
+            _vileobj = actor;
+            for (var bx = xl; bx <= xh; bx++)
+            {
+                for (var by = yl; by <= yh; by++)
+                {
+                    // Call PIT_VileCheck to check
+                    // whether object is a corpse
+                    // that can be raised.
+                    if (!game.P_BlockThingsIterator(bx, by, PIT_VileCheck))
+                    {
+                        // got one!
+                        var temp = actor.Target;
+                        actor.Target = _corpsehit;
+                        ActionFaceTarget(actionParams);
+                        actor.Target = temp;
+
+                        actor.SetState(StateNum.S_VILE_HEAL1);
+                        DoomGame.Instance.Sound.StartSound(_corpsehit, SoundType.sfx_slop);
+                        var info = _corpsehit!.Info;
+
+                        _corpsehit.SetState(info.RaiseState);
+                        _corpsehit.Height = new Fixed(_corpsehit.Height.Value << 2);
+                        _corpsehit.Flags = info.Flags;
+                        _corpsehit.Health = info.SpawnHealth;
+                        _corpsehit.Target = null;
+
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Return to normal attack.
+        ActionChase(actionParams);
+    }
+
+    //
+    // A_VileStart
+    //
+    private static void ActionVileStart(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_vilatk);
+    }
+
+    //
+    // A_VileTarget
+    // Spawn the hellfire
+    //
+    private static void ActionVileTarget(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+            return;
+
+        ActionFaceTarget(actionParams);
+
+        var fog = game.P_SpawnMapObject(actor.Target.X,
+                                        actor.Target.X, // NOTE: yes, this is actor->target->x in the original (bug in original DOOM)
+                                        actor.Target.Z, MapObjectType.MT_FIRE);
+
+        actor.Tracer = fog;
+        fog.Target = actor;
+        fog.Tracer = actor.Target;
+        ActionFire(new ActionParams(fog));
+    }
+
+    //
+    // A_VileAttack
+    //
+    private static void ActionVileAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (actor.Target is null)
+            return;
+
+        ActionFaceTarget(actionParams);
+
+        if (!game.P_CheckSight(actor, actor.Target))
+            return;
+
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_barexp);
+        MapObject.DamageMapObject(actor.Target, actor, actor, 20);
+        actor.Target.MomZ = new Fixed(1000 * Constants.FracUnit / actor.Target.Info.Mass);
+
+        var an = (int)(actor.Angle.Value >> DoomMath.AngleToFineShift);
+
+        var fire = actor.Tracer;
+
+        if (fire is null)
+            return;
+
+        // move the fire between the vile and the player
+        fire.X = actor.Target.X - Fixed.FromInt(24) * DoomMath.Cos(an);
+        fire.Y = actor.Target.Y - Fixed.FromInt(24) * DoomMath.Sin(an);
+        game.P_RadiusAttack(fire, actor, 70);
+    }
+
+    //
+    // A_StartFire
+    //
+    private static void ActionStartFire(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_flamst);
+        ActionFire(actionParams);
+    }
+
+    //
+    // A_FireCrackle
+    //
+    private static void ActionFireCrackle(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_flame);
+        ActionFire(actionParams);
+    }
+
+    //
+    // A_Fire
+    // Keep fire in front of player unless out of sight
+    //
+    private static void ActionFire(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        var dest = actor.Tracer;
+        if (dest is null)
+            return;
+
+        // don't move it if the vile lost sight
+        if (!game.P_CheckSight(actor.Target!, dest))
+            return;
+
+        var an = (int)(dest.Angle.Value >> DoomMath.AngleToFineShift);
+
+        game.P_UnsetThingPosition(actor);
+        actor.X = dest.X + Fixed.FromInt(24) * DoomMath.Cos(an);
+        actor.Y = dest.Y + Fixed.FromInt(24) * DoomMath.Sin(an);
+        actor.Z = dest.Z;
+        game.P_SetThingPosition(actor);
+    }
+
+    //
+    // A_SkelWhoosh
+    //
+    private static void ActionSkelWhoosh(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+            return;
+        ActionFaceTarget(actionParams);
+        DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_skeswg);
+    }
+
+    //
+    // A_SkelFist
+    //
+    private static void ActionSkelFist(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+            return;
+
+        ActionFaceTarget(actionParams);
+
+        if (DoomGame.Instance.Game.P_CheckMeleeRange(actor))
+        {
+            var damage = ((DoomRandom.P_Random() % 10) + 1) * 6;
+            DoomGame.Instance.Sound.StartSound(actor, SoundType.sfx_skepch);
+            MapObject.DamageMapObject(actor.Target, actor, actor, damage);
+        }
+    }
+
+    //
+    // A_FatRaise
+    //
+    private static void ActionFatRaise(ActionParams actionParams)
+    {
+        ActionFaceTarget(actionParams);
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_manatk);
+    }
+
+    private static readonly Angle FatSpread = Angle.Angle90 / 8;
+
+    //
+    // A_FatAttack1
+    //
+    private static void ActionFatAttack1(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        ActionFaceTarget(actionParams);
+        // Change direction to ...
+        actor.Angle += FatSpread;
+        game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+
+        var mo = game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+        mo.Angle += FatSpread;
+        var an = (int)(mo.Angle.Value >> DoomMath.AngleToFineShift);
+        mo.MomX = new Fixed(mo.Info.Speed) * DoomMath.Cos(an);
+        mo.MomY = new Fixed(mo.Info.Speed) * DoomMath.Sin(an);
+    }
+
+    //
+    // A_FatAttack2
+    //
+    private static void ActionFatAttack2(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        ActionFaceTarget(actionParams);
+        // Now here choose opposite deviation.
+        actor.Angle -= FatSpread;
+        game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+
+        var mo = game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+        mo.Angle -= FatSpread * 2;
+        var an = (int)(mo.Angle.Value >> DoomMath.AngleToFineShift);
+        mo.MomX = new Fixed(mo.Info.Speed) * DoomMath.Cos(an);
+        mo.MomY = new Fixed(mo.Info.Speed) * DoomMath.Sin(an);
+    }
+
+    //
+    // A_FatAttack3
+    //
+    private static void ActionFatAttack3(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        ActionFaceTarget(actionParams);
+
+        var mo = game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+        mo.Angle -= FatSpread / 2;
+        var an = (int)(mo.Angle.Value >> DoomMath.AngleToFineShift);
+        mo.MomX = new Fixed(mo.Info.Speed) * DoomMath.Cos(an);
+        mo.MomY = new Fixed(mo.Info.Speed) * DoomMath.Sin(an);
+
+        mo = game.P_SpawnMissile(actor, actor.Target!, MapObjectType.MT_FATSHOT);
+        mo.Angle += FatSpread / 2;
+        an = (int)(mo.Angle.Value >> DoomMath.AngleToFineShift);
+        mo.MomX = new Fixed(mo.Info.Speed) * DoomMath.Cos(an);
+        mo.MomY = new Fixed(mo.Info.Speed) * DoomMath.Sin(an);
+    }
+
+    //
+    // A_BossDeath
+    // Possibly trigger special effects
+    // if on first boss level
+    //
+    private static void ActionBossDeath(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            if (game.GameMap != 7)
+                return;
+
+            if (mo.Type != MapObjectType.MT_FATSO
+                && mo.Type != MapObjectType.MT_BABY)
+                return;
+        }
+        else
+        {
+            switch (game.GameEpisode)
+            {
+                case 1:
+                    if (game.GameMap != 8)
+                        return;
+                    if (mo.Type != MapObjectType.MT_BRUISER)
+                        return;
+                    break;
+
+                case 2:
+                    if (game.GameMap != 8)
+                        return;
+                    if (mo.Type != MapObjectType.MT_CYBORG)
+                        return;
+                    break;
+
+                case 3:
+                    if (game.GameMap != 8)
+                        return;
+                    if (mo.Type != MapObjectType.MT_SPIDER)
+                        return;
+                    break;
+
+                case 4:
+                    switch (game.GameMap)
+                    {
+                        case 6:
+                            if (mo.Type != MapObjectType.MT_CYBORG)
+                                return;
+                            break;
+
+                        case 8:
+                            if (mo.Type != MapObjectType.MT_SPIDER)
+                                return;
+                            break;
+
+                        default:
+                            return;
+                    }
+                    break;
+
+                default:
+                    if (game.GameMap != 8)
+                        return;
+                    break;
+            }
+        }
+
+        // make sure there is a player alive for victory
+        int i;
+        for (i = 0; i < Constants.MaxPlayers; i++)
+        {
+            if (game.PlayerInGame[i] && game.Players[i].Health > 0)
+                break;
+        }
+
+        if (i == Constants.MaxPlayers)
+            return; // no one left alive, so do not end game
+
+        // scan the remaining thinkers to see
+        // if all bosses are dead
+        foreach (var thinker in game.Thinkers)
+        {
+            if (thinker is not MapObject mo2)
+                continue;
+
+            if (mo2 != mo
+                && mo2.Type == mo.Type
+                && mo2.Health > 0)
+            {
+                // other boss not dead
+                return;
+            }
+        }
+
+        // victory!
+        var dummyVertex = new Vertex(Fixed.Zero, Fixed.Zero);
+
+        if (DoomGame.Instance.GameMode == GameMode.Commercial)
+        {
+            if (game.GameMap == 7)
+            {
+                if (mo.Type == MapObjectType.MT_FATSO)
+                {
+                    var junk = new Line(dummyVertex, dummyVertex, 0, 0, 666);
+                    Trigger.FloorEvent(junk, FloorType.LowerFloorToLowest);
+                    return;
+                }
+
+                if (mo.Type == MapObjectType.MT_BABY)
+                {
+                    var junk = new Line(dummyVertex, dummyVertex, 0, 0, 667);
+                    Trigger.FloorEvent(junk, FloorType.RaiseToTexture);
+                    return;
+                }
+            }
+        }
+        else
+        {
+            switch (game.GameEpisode)
+            {
+                case 1:
+                {
+                    var junk = new Line(dummyVertex, dummyVertex, 0, 0, 666);
+                    Trigger.FloorEvent(junk, FloorType.LowerFloorToLowest);
+                    return;
+                }
+
+                case 4:
+                    switch (game.GameMap)
+                    {
+                        case 6:
+                        {
+                            var junk = new Line(dummyVertex, dummyVertex, 0, 0, 666);
+                            Trigger.DoorEvent(junk, DoorType.BlazeOpen);
+                            return;
+                        }
+
+                        case 8:
+                        {
+                            var junk = new Line(dummyVertex, dummyVertex, 0, 0, 666);
+                            Trigger.FloorEvent(junk, FloorType.LowerFloorToLowest);
+                            return;
+                        }
+                    }
+                    break;
+            }
+        }
+
+        game.ExitLevel();
+    }
+
+    //
+    // SkullAttack
+    // Fly at the player like a missile.
+    //
+    private const int SkullSpeed = 20 * Constants.FracUnit;
+
+    private static void ActionSkullAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+
+        if (actor.Target is null)
+            return;
+
+        var dest = actor.Target;
+        actor.Flags |= MapObjectFlag.MF_SKULLFLY;
+
+        DoomGame.Instance.Sound.StartSound(actor, actor.Info.AttackSound);
+        ActionFaceTarget(actionParams);
+        var an = (int)(actor.Angle.Value >> DoomMath.AngleToFineShift);
+        actor.MomX = new Fixed(SkullSpeed) * DoomMath.Cos(an);
+        actor.MomY = new Fixed(SkullSpeed) * DoomMath.Sin(an);
+        var dist = DoomGame.Instance.Game.P_AproxDistance(dest.X - actor.X, dest.Y - actor.Y);
+        dist = new Fixed(dist.Value / SkullSpeed);
+
+        if (dist.Value < 1)
+            dist = new Fixed(1);
+        actor.MomZ = new Fixed((dest.Z.Value + (dest.Height.Value >> 1) - actor.Z.Value) / dist.Value);
+    }
+
+    //
+    // A_PainShootSkull
+    // Spawn a lost soul and launch it at the target
+    //
+    private static void PainShootSkull(MapObject actor, Angle angle)
+    {
+        var game = DoomGame.Instance.Game;
+
+        // count total number of skulls currently on the level
+        var count = 0;
+
+        foreach (var thinker in game.Thinkers)
+        {
+            if (thinker is MapObject mo && mo.Type == MapObjectType.MT_SKULL)
+                count++;
+        }
+
+        // if there are already 20 skulls on the level,
+        // don't spit another one
+        if (count > 20)
+            return;
+
+        // okay, there's place for another one
+        var an = (int)(angle.Value >> DoomMath.AngleToFineShift);
+
+        var prestep =
+            4 * Constants.FracUnit
+            + 3 * (actor.Info.Radius + MapObjectInfo.GetByType(MapObjectType.MT_SKULL).Radius) / 2;
+
+        var x = actor.X + new Fixed(prestep) * DoomMath.Cos(an);
+        var y = actor.Y + new Fixed(prestep) * DoomMath.Sin(an);
+        var z = actor.Z + Fixed.FromInt(8);
+
+        var newmobj = game.P_SpawnMapObject(x, y, z, MapObjectType.MT_SKULL);
+
+        // Check for movements.
+        if (!game.P_TryMove(newmobj, newmobj.X, newmobj.Y))
+        {
+            // kill it immediately
+            MapObject.DamageMapObject(newmobj, actor, actor, 10000);
+            return;
+        }
+
+        newmobj.Target = actor.Target;
+        ActionSkullAttack(new ActionParams(newmobj));
+    }
+
+    //
+    // A_PainAttack
+    // Spawn a lost soul and launch it at the target
+    //
+    private static void ActionPainAttack(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        if (actor.Target is null)
+            return;
+
+        ActionFaceTarget(actionParams);
+        PainShootSkull(actor, actor.Angle);
+    }
+
+    //
+    // A_PainDie
+    //
+    private static void ActionPainDie(ActionParams actionParams)
+    {
+        var actor = actionParams.MapObject!;
+        ActionFall(actionParams);
+        PainShootSkull(actor, actor.Angle + Angle.Angle90);
+        PainShootSkull(actor, actor.Angle + Angle.Angle180);
+        PainShootSkull(actor, actor.Angle + Angle.Angle270);
+    }
+
+    private static void ActionMetal(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_metal);
+        ActionChase(actionParams);
+    }
+
+    private static void ActionBabyMetal(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_bspwlk);
+        ActionChase(actionParams);
+    }
+
+    private static void ActionHoof(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_hoof);
+        ActionChase(actionParams);
+    }
+
+    //
+    // A_KeenDie
+    // DOOM II special, map 32.
+    // Uses special tag 666.
+    //
+    private static void ActionKeenDie(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        ActionFall(actionParams);
+
+        // scan the remaining thinkers
+        // to see if all Keens are dead
+        foreach (var thinker in game.Thinkers)
+        {
+            if (thinker is not MapObject mo2)
+                continue;
+
+            if (mo2 != mo
+                && mo2.Type == mo.Type
+                && mo2.Health > 0)
+            {
+                // other Keen not dead
+                return;
+            }
+        }
+
+        var dummyVertex = new Vertex(Fixed.Zero, Fixed.Zero);
+        var junk = new Line(dummyVertex, dummyVertex, 0, 0, 666);
+        Trigger.DoorEvent(junk, DoorType.Open);
+    }
+
+    //
+    // Icon of Sin / Boss Brain
+    //
+    private static MapObject?[] _brainTargets = new MapObject?[32];
+    private static int _numBrainTargets;
+    private static int _brainTargetOn;
+
+    private static void ActionBrainAwake(ActionParams actionParams)
+    {
+        var game = DoomGame.Instance.Game;
+
+        // find all the target spots
+        _numBrainTargets = 0;
+        _brainTargetOn = 0;
+
+        foreach (var thinker in game.Thinkers)
+        {
+            if (thinker is not MapObject m)
+                continue;
+
+            if (m.Type == MapObjectType.MT_BOSSTARGET)
+            {
+                _brainTargets[_numBrainTargets] = m;
+                _numBrainTargets++;
+            }
+        }
+
+        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_bossit);
+    }
+
+    private static void ActionBrainPain(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_bospn);
+    }
+
+    private static void ActionBrainScream(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+
+        for (var x = mo.X.Value - 196 * Constants.FracUnit; x < mo.X.Value + 320 * Constants.FracUnit; x += Constants.FracUnit * 8)
+        {
+            var y = mo.Y.Value - 320 * Constants.FracUnit;
+            var z = 128 + DoomRandom.P_Random() * 2 * Constants.FracUnit;
+            var th = DoomGame.Instance.Game.P_SpawnMapObject(new Fixed(x), new Fixed(y), new Fixed(z), MapObjectType.MT_ROCKET);
+            th.MomZ = new Fixed(DoomRandom.P_Random() * 512);
+
+            th.SetState(StateNum.S_BRAINEXPLODE1);
+
+            th.Tics -= DoomRandom.P_Random() & 7;
+            if (th.Tics < 1)
+                th.Tics = 1;
+        }
+
+        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_bosdth);
+    }
+
+    private static void ActionBrainExplode(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+
+        var x = mo.X.Value + (DoomRandom.P_Random() - DoomRandom.P_Random()) * 2048;
+        var y = mo.Y.Value;
+        var z = 128 + DoomRandom.P_Random() * 2 * Constants.FracUnit;
+        var th = DoomGame.Instance.Game.P_SpawnMapObject(new Fixed(x), new Fixed(y), new Fixed(z), MapObjectType.MT_ROCKET);
+        th.MomZ = new Fixed(DoomRandom.P_Random() * 512);
+
+        th.SetState(StateNum.S_BRAINEXPLODE1);
+
+        th.Tics -= DoomRandom.P_Random() & 7;
+        if (th.Tics < 1)
+            th.Tics = 1;
+    }
+
+    private static void ActionBrainDie(ActionParams actionParams)
+    {
+        DoomGame.Instance.Game.ExitLevel();
+    }
+
+    private static int _easy;
+
+    private static void ActionBrainSpit(ActionParams actionParams)
+    {
+        var game = DoomGame.Instance.Game;
+
+        _easy ^= 1;
+        if (game.GameSkill <= SkillLevel.Easy && (_easy == 0))
+            return;
+
+        // shoot a cube at current target
+        var targ = _brainTargets[_brainTargetOn]!;
+        _brainTargetOn = (_brainTargetOn + 1) % _numBrainTargets;
+
+        // spawn brain missile
+        var newmobj = game.P_SpawnMissile(actionParams.MapObject!, targ, MapObjectType.MT_SPAWNSHOT);
+        newmobj.Target = targ;
+        newmobj.ReactionTime =
+            ((targ.Y.Value - actionParams.MapObject!.Y.Value) / newmobj.MomY.Value) / newmobj.State!.Tics;
+
+        DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_bospit);
+    }
+
+    // travelling cube sound
+    private static void ActionSpawnSound(ActionParams actionParams)
+    {
+        DoomGame.Instance.Sound.StartSound(actionParams.MapObject!, SoundType.sfx_boscub);
+        ActionSpawnFly(actionParams);
+    }
+
+    private static void ActionSpawnFly(ActionParams actionParams)
+    {
+        var mo = actionParams.MapObject!;
+        var game = DoomGame.Instance.Game;
+
+        if (--mo.ReactionTime != 0)
+            return; // still flying
+
+        var targ = mo.Target!;
+
+        // First spawn teleport fog.
+        var fog = game.P_SpawnMapObject(targ.X, targ.Y, targ.Z, MapObjectType.MT_SPAWNFIRE);
+        DoomGame.Instance.Sound.StartSound(fog, SoundType.sfx_telept);
+
+        // Randomly select monster to spawn.
+        var r = DoomRandom.P_Random();
+
+        // Probability distribution (kind of :),
+        // decreasing likelihood.
+        MapObjectType type;
+        if (r < 50)
+            type = MapObjectType.MT_TROOP;
+        else if (r < 90)
+            type = MapObjectType.MT_SERGEANT;
+        else if (r < 120)
+            type = MapObjectType.MT_SHADOWS;
+        else if (r < 130)
+            type = MapObjectType.MT_PAIN;
+        else if (r < 160)
+            type = MapObjectType.MT_HEAD;
+        else if (r < 162)
+            type = MapObjectType.MT_VILE;
+        else if (r < 172)
+            type = MapObjectType.MT_UNDEAD;
+        else if (r < 192)
+            type = MapObjectType.MT_BABY;
+        else if (r < 222)
+            type = MapObjectType.MT_FATSO;
+        else if (r < 246)
+            type = MapObjectType.MT_KNIGHT;
+        else
+            type = MapObjectType.MT_BRUISER;
+
+        var newmobj = game.P_SpawnMapObject(targ.X, targ.Y, targ.Z, type);
+        if (game.P_LookForPlayers(newmobj, true))
+            newmobj.SetState(newmobj.Info.SeeState);
+
+        // telefrag anything in this spot
+        game.P_TeleportMove(newmobj, newmobj.X, newmobj.Y);
+
+        // remove self (i.e., cube).
+        game.P_RemoveMapObject(mo);
+    }
 
     private static void AddPredefinedStates()
     {

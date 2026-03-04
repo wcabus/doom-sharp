@@ -382,7 +382,7 @@ public class MapObject : Thinker
         if (target.Player != null)
         {
             // count environment kills against you
-            if (source != null)
+            if (source == null)
             {
                 var playerIndex = DoomGame.Instance.Game.GetPlayerIndex(target.Player);
                 if (playerIndex != -1)
