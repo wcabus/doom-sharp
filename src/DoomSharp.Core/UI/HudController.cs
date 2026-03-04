@@ -11,6 +11,9 @@ public class HudController
     public const char HuFontEnd = '_';
     public const int HuFontSize = HuFontEnd - HuFontStart + 1;
 
+    public const int HuMaxLineLength = 80;
+    public const int HuMaxLines = 4;
+
     public const int Broadcast = 5;
 
     public const int MessageRefresh = (int)Keys.Enter;
@@ -18,6 +21,8 @@ public class HudController
     public const int MessageY = 0;
     public const int MessageWidth = 64; // width in characters
     public const int MessageHeight = 1; // in lines
+
+    public const int TitleX = 0;
 
     public const int MessageTimeout = Constants.TicRate * 4;
 
@@ -31,10 +36,20 @@ public class HudController
     private bool _chatOn;
 
     private bool _messageOn;
-    private bool _messageDontFuckWithMe;
+    public bool MessageDontFuckWithMe { get; set; }
     private bool _messageNotToBeFuckedWith;
 
     private int _messageCounter;
+
+    // Message text storage (replaces hu_stext_t w_message)
+    private string _messageText = "";
+    private int _messageNeedsUpdate;
+
+    // Map title text storage (replaces hu_textline_t w_title)
+    private string _titleText = "";
+    private int _titleY;
+    private int _titleNeedsUpdate;
+    private bool _lastAutomapActive;
 
     static HudController()
     {
@@ -161,22 +176,19 @@ public class HudController
 
         _player = game.Players[DoomGame.Instance.Game.ConsolePlayer];
         _messageOn = false;
-        _messageDontFuckWithMe = false;
+        MessageDontFuckWithMe = false;
         _messageNotToBeFuckedWith = false;
         _chatOn = false;
 
-        //// create the message widget
-        //HUlib_initSText(&w_message,
-        //    HU_MSGX, HU_MSGY, HU_MSGHEIGHT,
-        //    hu_font,
-        //    HU_FONTSTART, &message_on);
+        // Clear message text
+        _messageText = "";
+        _messageNeedsUpdate = 0;
 
-        //// create the map title widget
-        //HUlib_initTextLine(&w_title,
-        //    HU_TITLEX, HU_TITLEY,
-        //    hu_font,
-        //    HU_FONTSTART);
+        // Calculate title Y position: 167 - font height
+        // In original DOOM: HU_TITLEY = (167 - SHORT(hu_font[0]->height))
+        _titleY = 167 - Font[0].Height;
 
+        // Build map title string
         var mapName = "";
         switch (DoomGame.Instance.GameMode)
         {
@@ -187,20 +199,12 @@ public class HudController
                 break;
             case GameMode.Commercial:
             default:
-                mapName = MapNames2[game.GameMap - 1]; ;
+                mapName = MapNames2[game.GameMap - 1];
                 break;
         }
 
-        foreach (var c in mapName)
-        {
-            // HUlib_addCharToTextLine(&w_title, c);
-        }
-
-        //// create the chat widget
-        //HUlib_initIText(&w_chat,
-        //    HU_INPUTX, HU_INPUTY,
-        //    hu_font,
-        //    HU_FONTSTART, &chat_on);
+        _titleText = mapName;
+        _titleNeedsUpdate = 4; // needs initial draw
 
         // create the inputbuffer widgets
         for (var i = 0; i < Constants.MaxPlayers; i++)
@@ -213,27 +217,142 @@ public class HudController
 
     public void Drawer()
     {
-        //HUlib_drawSText(&w_message);
-        //HUlib_drawIText(&w_chat);
+        // Draw the message if on
+        DrawMessage();
+
+        // Draw map title when automap is active
         if (DoomGame.Instance.Game.AutomapActive)
         {
-            // HUlib_drawTextLine(&w_title, false);
+            DrawTextLine(_titleText, TitleX, _titleY);
         }
-
     }
 
     public void Erase()
     {
-        //HUlib_eraseSText(&w_message);
-        //HUlib_eraseIText(&w_chat);
-        //HUlib_eraseTextLine(&w_title);
+        // Erase the message text
+        EraseTextLine(MessageY, _messageNeedsUpdate, ref _messageOn);
+        if (_messageNeedsUpdate > 0)
+        {
+            _messageNeedsUpdate--;
+        }
+
+        // Erase the title text
+        var automapActive = DoomGame.Instance.Game.AutomapActive;
+        if (_lastAutomapActive && !automapActive)
+        {
+            _titleNeedsUpdate = 4;
+        }
+        EraseTextLine(_titleY, _titleNeedsUpdate);
+        if (_titleNeedsUpdate > 0)
+        {
+            _titleNeedsUpdate--;
+        }
+        _lastAutomapActive = automapActive;
+    }
+
+    /// <summary>
+    /// Erases a text line by copying from the background screen (screen 1) to the
+    /// front screen (screen 0). This is the equivalent of HUlib_eraseTextLine.
+    /// Only erases when NOT in automap and the screen is reduced (viewwindowx != 0).
+    /// </summary>
+    private void EraseTextLine(int y, int needsUpdate)
+    {
+        var renderer = DoomGame.Instance.Renderer;
+
+        if (!DoomGame.Instance.Game.AutomapActive &&
+            renderer.ViewWindowX != 0 && needsUpdate > 0)
+        {
+            var lh = Font[0].Height + 1;
+            for (var row = y; row < y + lh; row++)
+            {
+                var yoffset = row * Constants.ScreenWidth;
+
+                if (row < renderer.ViewWindowY || row >= renderer.ViewWindowY + renderer.ViewHeight)
+                {
+                    // erase entire line
+                    Array.Copy(DoomGame.Instance.Video.Screens[1], yoffset,
+                        DoomGame.Instance.Video.Screens[0], yoffset, Constants.ScreenWidth);
+                }
+                else
+                {
+                    // erase left border
+                    Array.Copy(DoomGame.Instance.Video.Screens[1], yoffset,
+                        DoomGame.Instance.Video.Screens[0], yoffset, renderer.ViewWindowX);
+                    // erase right border
+                    var rightOfs = yoffset + renderer.ViewWindowX + renderer.ViewWidth;
+                    Array.Copy(DoomGame.Instance.Video.Screens[1], rightOfs,
+                        DoomGame.Instance.Video.Screens[0], rightOfs, renderer.ViewWindowX);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Erases a text line with message on/off tracking (for stext).
+    /// This is the equivalent of HUlib_eraseSText.
+    /// </summary>
+    private void EraseTextLine(int y, int needsUpdate, ref bool on)
+    {
+        // If message was on last frame but is now off, force an update
+        // to erase the old text
+        if (_lastMessageOn && !_messageOn)
+        {
+            _messageNeedsUpdate = 4;
+        }
+        EraseTextLine(y, _messageNeedsUpdate);
+        _lastMessageOn = _messageOn;
+    }
+
+    private bool _lastMessageOn = true;
+
+    /// <summary>
+    /// Draws a single line of text using the HU font.
+    /// This is the equivalent of HUlib_drawTextLine.
+    /// </summary>
+    private void DrawTextLine(string text, int x, int y)
+    {
+        var cx = x;
+        foreach (var ch in text)
+        {
+            var c = char.ToUpper(ch);
+            if (c != ' ' && c >= HuFontStart && c <= HuFontEnd)
+            {
+                var fontIdx = c - HuFontStart;
+                var w = Font[fontIdx].Width;
+                if (cx + w > Constants.ScreenWidth)
+                {
+                    break;
+                }
+                DoomGame.Instance.Video.DrawPatchDirect(cx, y, 0, Font[fontIdx]);
+                cx += w;
+            }
+            else
+            {
+                cx += 4;
+                if (cx >= Constants.ScreenWidth)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws the current message if it's on.
+    /// This is the equivalent of HUlib_drawSText.
+    /// </summary>
+    private void DrawMessage()
+    {
+        if (!_messageOn)
+        {
+            return;
+        }
+
+        DrawTextLine(_messageText, MessageX, MessageY);
     }
 
     public void Ticker()
     {
-        int rc;
-        char c;
-
         var game = DoomGame.Instance.Game;
 
         // tick down message counter if message is up
@@ -243,18 +362,19 @@ public class HudController
             _messageNotToBeFuckedWith = false;
         }
 
-        if (DoomGame.Instance.Menu.ShowMessages || _messageDontFuckWithMe)
+        if (DoomGame.Instance.Menu.ShowMessages || MessageDontFuckWithMe)
         {
             // display message if necessary
             if ((_player!.Message != null && !_messageNotToBeFuckedWith)
-                || (_player.Message != null && _messageDontFuckWithMe))
+                || (_player.Message != null && MessageDontFuckWithMe))
             {
-                //HUlib_addMessageToSText(&w_message, 0, plr->message);
+                _messageText = _player.Message;
+                _messageNeedsUpdate = 4;
                 _player.Message = null;
                 _messageOn = true;
                 _messageCounter = MessageTimeout;
-                _messageNotToBeFuckedWith = _messageDontFuckWithMe;
-                _messageDontFuckWithMe = false;
+                _messageNotToBeFuckedWith = MessageDontFuckWithMe;
+                MessageDontFuckWithMe = false;
             }
 
         } // else message_on = false;
@@ -311,6 +431,14 @@ public class HudController
 
     public bool HandleEvent(InputEvent currentEvent)
     {
+        // Pressing Enter refreshes the last message
+        if (currentEvent.Type == EventType.KeyDown && currentEvent.Data1 == MessageRefresh)
+        {
+            _messageOn = true;
+            _messageCounter = MessageTimeout;
+            return true;
+        }
+
         return false;
     }
 }

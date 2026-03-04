@@ -578,7 +578,7 @@ public class MenuController
 
                 case (int)Keys.F11:           // gamma toggle
                     DoomGame.Instance.Video.ToggleGamma();
-                    // DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = gammamsg[usegamma];
+                    DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = Messages.GammaMessages[DoomGame.Instance.Video.GammaLevel];
                     return true;
             }
         }
@@ -818,16 +818,16 @@ public class MenuController
     {
         ShowMessages = !ShowMessages;
 
-        //if (!ShowMessages)
-        //{
-        //    DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = MSGOFF;
-        //}
-        //else
-        //{
-        //    DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = MSGON;
-        //}
+        if (!ShowMessages)
+        {
+            DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = Messages.MsgOff;
+        }
+        else
+        {
+            DoomGame.Instance.Game.Players[DoomGame.Instance.Game.ConsolePlayer].Message = Messages.MsgOn;
+        }
 
-        //message_dontfuckwithme = true;
+        DoomGame.Instance.Hud.MessageDontFuckWithMe = true;
     }
 
     private void EndGame(int choice)
@@ -841,11 +841,11 @@ public class MenuController
 
         if (game.NetGame)
         {
-            // M_StartMessage(NETEND, NULL, false);
+            StartMessage(Messages.NetEnd, null, false);
             return;
         }
 
-        // M_StartMessage(ENDGAME, M_EndGameResponse, true);
+        StartMessage(Messages.EndGame, EndGameResponse, true);
     }
 
     private void EndGameResponse(char choice)
@@ -1094,11 +1094,11 @@ public class MenuController
 
     private void LoadGame(int choice)
     {
-        //if (netgame)
-        //{
-        //    M_StartMessage(LOADNET, NULL, false);
-        //    return;
-        //}
+        if (DoomGame.Instance.Game.NetGame)
+        {
+            StartMessage(Messages.LoadNet, null, false);
+            return;
+        }
 
         SetupNextMenu(_loadMenu);
         ReadSaveStrings();
@@ -1149,11 +1149,11 @@ public class MenuController
 
     private void SaveGame(int choice)
     {
-        //if (!usergame)
-        //{
-        //    M_StartMessage(SAVEDEAD, NULL, false);
-        //    return;
-        //}
+        if (!DoomGame.Instance.Game.UserGame)
+        {
+            StartMessage(Messages.SaveDead, null, false);
+            return;
+        }
 
         if (DoomGame.Instance.Game.GameState != GameState.Level)
         {
@@ -1175,11 +1175,11 @@ public class MenuController
 
     private void QuickSave()
     {
-        //if (!usergame)
-        //{
-        //    S_StartSound(NULL, sfx_oof);
-        //    return;
-        //}
+        if (!DoomGame.Instance.Game.UserGame)
+        {
+            DoomGame.Instance.Sound.StartSound(null, SoundType.sfx_oof);
+            return;
+        }
 
         if (DoomGame.Instance.Game.GameState != GameState.Level)
         {
@@ -1210,11 +1210,11 @@ public class MenuController
 
     private void QuickLoad()
     {
-        //if (netgame)
-        //{
-        //    M_StartMessage(QLOADNET, NULL, false);
-        //    return;
-        //}
+        if (DoomGame.Instance.Game.NetGame)
+        {
+            StartMessage(Messages.QLoadNet, null, false);
+            return;
+        }
 
         if (_quickSaveSlot < 0)
         {

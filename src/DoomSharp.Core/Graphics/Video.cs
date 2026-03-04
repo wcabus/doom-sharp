@@ -110,6 +110,8 @@ public class Video
 
     public byte[][] Screens => _screens;
 
+    public int GammaLevel => _gamma;
+
     public void Initialize()
     {
         for (var i = 0; i < 4; i++)
